@@ -137,6 +137,8 @@ logic            a_coming_mul_op;
 logic            a_coming_div_op;
 logic [31:0]     a_alu_result;
 logic            a_mul_ready;
+logic [32:0]     a_mul_src1;
+logic [32:0]     a_mul_src2;
 logic [63:0]     a_mul_result;
 logic            a_mul_sign_ex;
 logic            a_div_ready;
@@ -155,6 +157,8 @@ logic            b_coming_mul_op;
 logic            b_coming_div_op;
 logic [31:0]     b_alu_result;
 logic            b_mul_ready;
+logic [32:0]     b_mul_src1;
+logic [32:0]     b_mul_src2;
 logic [63:0]     b_mul_result;
 logic            b_mul_sign_ex;
 logic            b_div_ready;
@@ -236,11 +240,9 @@ always_ff @(posedge clk) begin
 
         if (EX_a_valid && a_is_mul_op && !a_mul_ready) begin
             a_mul_ready <= 1'b1;
-            a_mul_result <= {{32{a_mul_sign_ex&EX_a_src1[31]}},EX_a_src1} * {{32{a_mul_sign_ex&EX_a_src2[31]}},EX_a_src2};
         end
         if (EX_b_valid && b_is_mul_op && !b_mul_ready) begin
             b_mul_ready <= 1'b1;
-            b_mul_result <= {{32{b_mul_sign_ex&EX_b_src1[31]}},EX_b_src1} * {{32{b_mul_sign_ex&EX_b_src2[31]}},EX_b_src2};
         end
 
         if (a_div_ready)
@@ -289,6 +291,8 @@ assign a_is_div_op = EX_a_opcode[4:3] == 2'b11;
 assign a_coming_mul_op = ro_a_opcode[4:3] == 2'b10;
 assign a_coming_div_op = ro_a_opcode[4:3] == 2'b11;
 assign a_mul_sign_ex = EX_a_opcode == OP_MULH;
+assign a_mul_src1 = {a_mul_sign_ex && EX_a_src1[31], EX_a_src1};
+assign a_mul_src2 = {a_mul_sign_ex && EX_a_src2[31], EX_a_src2};
 assign a_div_signed = EX_a_opcode == OP_DIV || EX_a_opcode == OP_MOD;
 assign a_div_sign = a_div_signed && (EX_a_src1[31] ^ EX_a_src2[31]);
 assign a_mod_sign = a_div_signed && EX_a_src1[31];
@@ -301,6 +305,8 @@ assign b_is_div_op = EX_b_opcode[4:3] == 2'b11;
 assign b_coming_mul_op = ro_b_opcode[4:3] == 2'b10;
 assign b_coming_div_op = ro_b_opcode[4:3] == 2'b11;
 assign b_mul_sign_ex = EX_b_opcode == OP_MULH;
+assign b_mul_src1 = {b_mul_sign_ex && EX_b_src1[31], EX_b_src1};
+assign b_mul_src2 = {b_mul_sign_ex && EX_b_src2[31], EX_b_src2};
 assign b_div_signed = EX_b_opcode == OP_DIV || EX_b_opcode == OP_MOD;
 assign b_div_sign = b_div_signed && (EX_b_src1[31] ^ EX_b_src2[31]);
 assign b_mod_sign = b_div_signed && EX_b_src1[31];
@@ -320,6 +326,23 @@ alu alu_b (
     .src2(EX_b_src2),
     .result(b_alu_result)
 );
+
+mult_gen_0 mul_a (
+  .CLK(clk),
+  .A(a_mul_src1),
+  .B(a_mul_src2),
+  .CE(a_is_mul_op),
+  .P(a_mul_result)
+);
+
+mult_gen_0 mul_b (
+  .CLK(clk),
+  .A(b_mul_src1),
+  .B(b_mul_src2),
+  .CE(b_is_mul_op),
+  .P(b_mul_result)
+);
+
 
 div_gen_0 div_a (
     .aclk(clk),
