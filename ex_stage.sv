@@ -7,9 +7,9 @@ module ex_stage(
     input wire             flush,
     input wire             allowout,
     input wire             ro_ready,
-    output logic           ex_valid, // 有没有
-    output logic           ex_ready, // 工作完成了吗
-    output logic           ex_stall, // 是否暂停（上一阶段可以进来吗）
+    output logic           ex_valid,
+    output logic           ex_ready,
+    output logic           ex_stall,
 
     input wire             ro_a_valid,
     input wire [31:0]      ro_a_pc,
@@ -22,9 +22,9 @@ module ex_stage(
     input wire             ro_a_is_branch,
     input wire             ro_a_branch_condition,
     input wire [31:0]      ro_a_branch_target,
+    input wire             ro_a_is_jirl,
     input wire             ro_a_pred_branch_taken,
     input wire [31:0]      ro_a_pred_branch_target,
-    input wire             ro_a_branch_mistaken,
     input wire mem_type_t  ro_a_mem_type,
     input wire mem_size_t  ro_a_mem_size,
     input wire [31:0]      ro_a_st_data,
@@ -43,6 +43,7 @@ module ex_stage(
     input wire             ro_b_is_branch,
     input wire             ro_b_branch_condition,
     input wire [31:0]      ro_b_branch_target,
+    input wire             ro_b_is_jirl,
     input wire             ro_b_pred_branch_taken,
     input wire [31:0]      ro_b_pred_branch_target,
     input wire mem_type_t  ro_b_mem_type,
@@ -98,6 +99,7 @@ logic [4 :0]     EX_a_dest;
 logic            EX_a_is_branch;
 logic            EX_a_branch_condition;
 logic [31:0]     EX_a_branch_target;
+logic            EX_a_is_jirl;
 logic            EX_a_pred_branch_taken;
 logic [31:0]     EX_a_pred_branch_target;
 mem_type_t       EX_a_mem_type;
@@ -118,6 +120,7 @@ logic [4 :0]     EX_b_dest;
 logic            EX_b_is_branch;
 logic            EX_b_branch_condition;
 logic [31:0]     EX_b_branch_target;
+logic            EX_b_is_jirl;
 logic            EX_b_pred_branch_taken;
 logic [31:0]     EX_b_pred_branch_target;
 mem_type_t       EX_b_mem_type;
@@ -163,12 +166,12 @@ logic            b_mod_sign;
 logic [31:0]     b_div_result;
 logic [31:0]     b_mod_result;
 
+logic ex_a_ready;
+logic ex_b_ready;
+
 assign ex_valid = EX_a_valid || EX_b_valid;
 assign ex_ready = ex_valid && (!EX_a_valid || ex_a_ready) && (!EX_b_valid || ex_b_ready);
 assign ex_stall = ex_valid && (!ex_ready || !allowout);
-
-logic ex_a_ready;
-logic ex_b_ready;
 
 always_ff @(posedge clk) begin
     if (reset || flush || (!ex_stall && !ro_ready)) begin
@@ -187,6 +190,7 @@ always_ff @(posedge clk) begin
         EX_a_is_branch          <= ro_a_is_branch;
         EX_a_branch_condition   <= ro_a_branch_condition;
         EX_a_branch_target      <= ro_a_branch_target;
+        EX_a_is_jirl            <= ro_a_is_jirl;
         EX_a_pred_branch_taken  <= ro_a_pred_branch_taken;
         EX_a_pred_branch_target <= ro_a_pred_branch_target;
         EX_a_mem_type           <= ro_a_mem_type;
@@ -196,7 +200,7 @@ always_ff @(posedge clk) begin
         EX_a_csr_addr           <= ro_a_csr_addr;
         EX_a_csr_mask           <= ro_a_csr_mask;
         
-        EX_b_valid              <= ro_b_valid && !ro_a_branch_mistaken;
+        EX_b_valid              <= ro_b_valid;
         EX_b_pc                 <= ro_b_pc;
         EX_b_have_exception     <= ro_b_have_exception;
         EX_b_exception_type     <= ro_b_exception_type;
@@ -207,6 +211,7 @@ always_ff @(posedge clk) begin
         EX_b_is_branch          <= ro_b_is_branch;
         EX_b_branch_condition   <= ro_b_branch_condition;
         EX_b_branch_target      <= ro_b_branch_target;
+        EX_b_is_jirl            <= ro_b_is_jirl;
         EX_b_pred_branch_taken  <= ro_b_pred_branch_taken;
         EX_b_pred_branch_target <= ro_b_pred_branch_target;
         EX_b_mem_type           <= ro_b_mem_type;
@@ -257,7 +262,6 @@ assign ex_a_pc             = EX_a_pc;
 assign ex_a_have_exception = EX_a_have_exception;
 assign ex_a_exception_type = EX_a_exception_type;
 assign ex_a_dest           = EX_a_dest;
-assign ex_a_branch_target  = EX_a_branch_target;
 assign ex_a_mem_type       = EX_a_mem_type;
 assign ex_a_mem_size       = EX_a_mem_size;
 assign ex_a_st_data        = EX_a_st_data;
@@ -272,7 +276,6 @@ assign ex_b_pc             = EX_b_pc;
 assign ex_b_have_exception = EX_b_have_exception;
 assign ex_b_exception_type = EX_b_exception_type;
 assign ex_b_dest           = EX_b_dest;
-assign ex_b_branch_target  = EX_b_branch_target;
 assign ex_b_mem_type       = EX_b_mem_type;
 assign ex_b_mem_size       = EX_b_mem_size;
 assign ex_b_st_data        = EX_b_st_data;
@@ -338,26 +341,33 @@ div_gen_0 div_b (
     .m_axis_dout_tdata(b_div_output)
 );
 
-assign ex_a_result = {32{a_is_alu_op}} & a_alu_result
+assign ex_a_result = EX_a_is_jirl ? EX_a_pc + 32'd4 :
+                     {32{a_is_alu_op}} & a_alu_result
                    | {32{EX_a_opcode == OP_MUL}} & a_mul_result[31:0]
                    | {32{EX_a_opcode == OP_MULH || EX_a_opcode == OP_MULHU}} & a_mul_result[63:32]
                    | {32{EX_a_opcode == OP_DIV || EX_a_opcode == OP_DIVU}} & a_div_result
                    | {32{EX_a_opcode == OP_MOD || EX_a_opcode == OP_MODU}} & a_mod_result;
 
-assign ex_b_result = {32{b_is_alu_op}} & b_alu_result
+assign ex_b_result = EX_b_is_jirl ? EX_b_pc + 32'd4 :
+                     {32{b_is_alu_op}} & b_alu_result
                    | {32{EX_b_opcode == OP_MUL}} & b_mul_result[31:0]
                    | {32{EX_b_opcode == OP_MULH || EX_b_opcode == OP_MULHU}} & b_mul_result[63:32]
                    | {32{EX_b_opcode == OP_DIV || EX_b_opcode == OP_DIVU}} & b_div_result
                    | {32{EX_b_opcode == OP_MOD || EX_b_opcode == OP_MODU}} & b_div_result;
 
-assign ex_a_branch_taken = EX_a_is_branch && (EX_a_branch_condition == a_alu_result[0]);
+assign ex_a_branch_taken = EX_a_is_branch && (EX_a_is_jirl || EX_a_branch_condition == a_alu_result[0]);
 
 assign ex_a_branch_mistaken = ex_a_valid && !ex_stall && (ex_a_branch_taken != EX_a_pred_branch_taken
                                           || ex_a_branch_taken && ex_a_branch_target != EX_a_pred_branch_target);
 
-assign ex_b_branch_taken = EX_b_is_branch && (EX_b_branch_condition == b_alu_result[0]);
+assign ex_a_branch_target  = EX_a_is_jirl ? a_alu_result : EX_a_branch_target;
+
+
+assign ex_b_branch_taken = EX_b_is_branch && (EX_b_is_jirl || EX_b_branch_condition == b_alu_result[0]);
 
 assign ex_b_branch_mistaken = ex_b_valid && !ex_stall && (ex_b_branch_taken != EX_b_pred_branch_taken
                                           || ex_b_branch_taken && ex_b_branch_target != EX_b_pred_branch_target);
+
+assign ex_b_branch_target  = EX_b_is_jirl ? b_alu_result : EX_b_branch_target;
 
 endmodule

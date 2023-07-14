@@ -4,7 +4,6 @@ module id_stage (
     input wire             clk,
     input wire             reset,
 
-    input wire             flush,
     input wire             ro_stall,
     input wire [63:0]      counter,
 
@@ -46,7 +45,6 @@ module id_stage (
     output logic           id_a_branch_mistaken,
     output mem_type_t      id_a_mem_type,
     output mem_size_t      id_a_mem_size,
-    output logic [31:0]    id_a_st_data,
     output logic           id_a_is_csr_op,
     output logic [13:0]    id_a_csr_addr,
     output logic [31:0]    id_a_csr_mask,
@@ -71,7 +69,6 @@ module id_stage (
     output logic           id_b_branch_mistaken,
     output mem_type_t      id_b_mem_type,
     output mem_size_t      id_b_mem_size,
-    output logic [31:0]    id_b_st_data,
     output logic           id_b_is_csr_op,
     output logic [13:0]    id_b_csr_addr,
     output logic [31:0]    id_b_csr_mask

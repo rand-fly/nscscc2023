@@ -1,11 +1,11 @@
 `include "definitions.svh"
 
 module read_operands (
-    input wire              clk,
-    input wire              reset,
+    input wire             clk,
+    input wire             reset,
 
-    input wire              flush,
-    input wire              allowout,
+    input wire             flush,
+    input wire             allowout,
 
     input wire             id_ready,
     input wire [31:0]      id_pc,
@@ -24,10 +24,8 @@ module read_operands (
     input wire             id_is_jirl,
     input wire             id_pred_branch_taken,
     input wire [31:0]      id_pred_branch_target,
-    input wire             id_branch_mistaken,
     input wire mem_type_t  id_mem_type,
     input wire mem_size_t  id_mem_size,
-    input wire [31:0]      id_st_data,
     input wire             id_is_csr_op,
     input wire [13:0]      id_csr_addr,
     input wire [31:0]      id_csr_mask,
@@ -53,9 +51,9 @@ module read_operands (
     output logic           ro_branch_taken,
     output logic           ro_branch_condition,
     output logic [31:0]    ro_branch_target,
+    output logic           ro_is_jirl,
     output logic           ro_pred_branch_taken,
     output logic [31:0]    ro_pred_branch_target,
-    output logic           ro_branch_mistaken,
     output mem_type_t      ro_mem_type,
     output mem_size_t      ro_mem_size,
     output logic [31:0]    ro_st_data,
@@ -81,10 +79,8 @@ logic [31:0]     RO_branch_target;
 logic            RO_is_jirl;
 logic            RO_pred_branch_taken;
 logic [31:0]     RO_pred_branch_target;
-logic            RO_branch_mistaken;
 mem_type_t       RO_mem_type;
 mem_size_t       RO_mem_size;
-logic [31:0]     RO_st_data;
 logic            RO_is_csr_op;
 logic [13:0]     RO_csr_addr;
 logic [31:0]     RO_csr_mask;
@@ -111,10 +107,8 @@ always_ff @(posedge clk) begin
         RO_is_jirl <= id_is_jirl;
         RO_pred_branch_taken <= id_pred_branch_taken;
         RO_pred_branch_target <= id_pred_branch_target;
-        RO_branch_mistaken <= id_branch_mistaken;
         RO_mem_type <= id_mem_type;
         RO_mem_size <= id_mem_size;
-        RO_st_data <= id_st_data;
         RO_is_csr_op <= id_is_csr_op;
         RO_csr_addr <= id_csr_addr;
         RO_csr_mask <= id_csr_mask;
@@ -126,7 +120,7 @@ assign r1_addr = RO_rf_src1;
 assign r2_addr = RO_rf_src2;
 
 assign ro_valid = RO_valid;
-assign ro_ready = RO_valid && (r1_valid && r2_valid || id_have_exception);
+assign ro_ready = RO_valid && (r1_valid && r2_valid || RO_have_exception);
 
 assign ro_pc = RO_pc;
 assign ro_have_exception = RO_have_exception;
@@ -137,10 +131,10 @@ assign ro_src2 = RO_src2_is_imm ? RO_imm : r2_data;
 assign ro_dest = RO_dest;
 assign ro_is_branch = RO_is_branch;
 assign ro_branch_condition = RO_branch_condition;
-assign ro_branch_target = RO_is_jirl ? RO_branch_target + ro_src1 : RO_branch_target;
-// assign ro_branch_target = RO_branch_target;
+assign ro_branch_target = RO_branch_target;
 assign ro_branch_taken = RO_branch_taken || RO_is_jirl;
-assign ro_branch_mistaken = RO_valid && RO_is_jirl && (!RO_pred_branch_taken || RO_pred_branch_target != ro_branch_target);
+assign ro_is_jirl = RO_is_jirl;
+// assign ro_branch_mistaken = RO_valid && RO_is_jirl && (!RO_pred_branch_taken || RO_pred_branch_target != ro_branch_target);
 assign ro_pred_branch_taken = RO_pred_branch_taken;
 assign ro_pred_branch_target = RO_pred_branch_target;
 assign ro_mem_type = RO_mem_type;

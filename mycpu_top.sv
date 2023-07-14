@@ -90,7 +90,6 @@ logic [31:0] id_a_pred_branch_target;
 logic        id_a_branch_mistaken;
 mem_type_t   id_a_mem_type;
 mem_size_t   id_a_mem_size;
-logic [31:0] id_a_st_data;
 logic        id_a_is_csr_op;
 logic [13:0] id_a_csr_addr;
 logic [31:0] id_a_csr_mask;
@@ -115,7 +114,6 @@ logic [31:0] id_b_pred_branch_target;
 logic        id_b_branch_mistaken;
 mem_type_t   id_b_mem_type;
 mem_size_t   id_b_mem_size;
-logic [31:0] id_b_st_data;
 logic        id_b_is_csr_op;
 logic [13:0] id_b_csr_addr;
 logic [31:0] id_b_csr_mask;
@@ -136,9 +134,9 @@ logic        ro_a_is_branch;
 logic        ro_a_branch_taken;
 logic        ro_a_branch_condition;
 logic [31:0] ro_a_branch_target;
+logic        ro_a_is_jirl;
 logic        ro_a_pred_branch_taken;
 logic [31:0] ro_a_pred_branch_target;
-logic        ro_a_branch_mistaken;
 mem_type_t   ro_a_mem_type;
 mem_size_t   ro_a_mem_size;
 logic [31:0] ro_a_st_data;
@@ -158,9 +156,9 @@ logic        ro_b_is_branch;
 logic        ro_b_branch_taken;
 logic        ro_b_branch_condition;
 logic [31:0] ro_b_branch_target;
+logic        ro_b_is_jirl;
 logic        ro_b_pred_branch_taken;
 logic [31:0] ro_b_pred_branch_target;
-logic        ro_b_branch_mistaken;
 mem_type_t   ro_b_mem_type;
 mem_size_t   ro_b_mem_size;
 logic [31:0] ro_b_st_data;
@@ -321,7 +319,6 @@ logic        mmu_d2_pme;
 logic        branch_mistaken;
 logic [31:0] correct_target;
 logic        flush_ibuf;
-logic        flush_id;
 logic        flush_ro;
 logic        flush_ex;
 
@@ -413,7 +410,6 @@ end
 id_stage id_stage_0 (
     .clk(clk),
     .reset(reset),
-    .flush(flush_id || flush_all),
     .ro_stall(ro_stall),
     .counter(counter),
     .id_consume_inst(id_consume_inst),
@@ -454,7 +450,6 @@ id_stage id_stage_0 (
     .id_a_branch_mistaken(id_a_branch_mistaken),
     .id_a_mem_type(id_a_mem_type),
     .id_a_mem_size(id_a_mem_size),
-    .id_a_st_data(id_a_st_data),
     .id_a_is_csr_op(id_a_is_csr_op),
     .id_a_csr_addr(id_a_csr_addr),
     .id_a_csr_mask(id_a_csr_mask),
@@ -479,7 +474,6 @@ id_stage id_stage_0 (
     .id_b_branch_mistaken(id_b_branch_mistaken),
     .id_b_mem_type(id_b_mem_type),
     .id_b_mem_size(id_b_mem_size),
-    .id_b_st_data(id_b_st_data),
     .id_b_is_csr_op(id_b_is_csr_op),
     .id_b_csr_addr(id_b_csr_addr),
     .id_b_csr_mask(id_b_csr_mask)
@@ -515,7 +509,6 @@ ro_stage ro_stage_0(
     .id_a_branch_mistaken(id_a_branch_mistaken),
     .id_a_mem_type(id_a_mem_type),
     .id_a_mem_size(id_a_mem_size),
-    .id_a_st_data(id_a_st_data),
     .id_a_is_csr_op(id_a_is_csr_op),
     .id_a_csr_addr(id_a_csr_addr),
     .id_a_csr_mask(id_a_csr_mask),
@@ -537,10 +530,8 @@ ro_stage ro_stage_0(
     .id_b_is_jirl(id_b_is_jirl),
     .id_b_pred_branch_taken(id_b_pred_branch_taken),
     .id_b_pred_branch_target(id_b_pred_branch_target),
-    .id_b_branch_mistaken(id_b_branch_mistaken),
     .id_b_mem_type(id_b_mem_type),
     .id_b_mem_size(id_b_mem_size),
-    .id_b_st_data(id_b_st_data),
     .id_b_is_csr_op(id_b_is_csr_op),
     .id_b_csr_addr(id_b_csr_addr),
     .id_b_csr_mask(id_b_csr_mask),
@@ -593,9 +584,9 @@ ro_stage ro_stage_0(
     .ro_a_branch_taken(ro_a_branch_taken),
     .ro_a_branch_condition(ro_a_branch_condition),
     .ro_a_branch_target(ro_a_branch_target),
+    .ro_a_is_jirl(ro_a_is_jirl),
     .ro_a_pred_branch_taken(ro_a_pred_branch_taken),
     .ro_a_pred_branch_target(ro_a_pred_branch_target),
-    .ro_a_branch_mistaken(ro_a_branch_mistaken),
     .ro_a_mem_type(ro_a_mem_type),
     .ro_a_mem_size(ro_a_mem_size),
     .ro_a_st_data(ro_a_st_data),
@@ -615,9 +606,9 @@ ro_stage ro_stage_0(
     .ro_b_branch_taken(ro_b_branch_taken),
     .ro_b_branch_condition(ro_b_branch_condition),
     .ro_b_branch_target(ro_b_branch_target),
+    .ro_b_is_jirl(ro_b_is_jirl),
     .ro_b_pred_branch_taken(ro_b_pred_branch_taken),
     .ro_b_pred_branch_target(ro_b_pred_branch_target),
-    .ro_b_branch_mistaken(ro_b_branch_mistaken),
     .ro_b_mem_type(ro_b_mem_type),
     .ro_b_mem_size(ro_b_mem_size),
     .ro_b_st_data(ro_b_st_data),
@@ -647,9 +638,9 @@ ex_stage ex_stage_0(
     .ro_a_is_branch(ro_a_is_branch),
     .ro_a_branch_condition(ro_a_branch_condition),
     .ro_a_branch_target(ro_a_branch_target),
+    .ro_a_is_jirl(ro_a_is_jirl),
     .ro_a_pred_branch_taken(ro_a_pred_branch_taken),
     .ro_a_pred_branch_target(ro_a_pred_branch_target),
-    .ro_a_branch_mistaken(ro_a_branch_mistaken),
     .ro_a_mem_type(ro_a_mem_type),
     .ro_a_mem_size(ro_a_mem_size),
     .ro_a_st_data(ro_a_st_data),
@@ -668,6 +659,7 @@ ex_stage ex_stage_0(
     .ro_b_is_branch(ro_b_is_branch),
     .ro_b_branch_condition(ro_b_branch_condition),
     .ro_b_branch_target(ro_b_branch_target),
+    .ro_b_is_jirl(ro_b_is_jirl),
     .ro_b_pred_branch_taken(ro_b_pred_branch_taken),
     .ro_b_pred_branch_target(ro_b_pred_branch_target),
     .ro_b_mem_type(ro_b_mem_type),
@@ -714,7 +706,7 @@ ex_stage ex_stage_0(
 mem_ctrl mem_ctrl_a(
     .clk(clk),
     .reset(reset),
-    .flush(flush_all && mem_a_have_exception),
+    .flush(flush_all && (mem_a_have_exception || !mem_a_stall)),
     .ex_ready(ex_ready && !mem_b_stall),
     .allowout(!wb_a_stall && !wb_b_stall && (!mem_b_valid || mem_b_ready)),
     .cancel(1'b0),
@@ -815,7 +807,7 @@ wb_ctrl wb_ctrl_a(
     .wb_ready(wb_a_ready),
     .wb_stall(wb_a_stall),
 
-    .mem_valid(mem_a_valid),
+    .mem_valid(mem_a_valid && !mem_a_have_exception),
     .mem_pc(mem_a_pc),
     .mem_result(mem_a_result),
     .mem_mem_type(mem_a_mem_type),
@@ -845,7 +837,7 @@ wb_ctrl wb_ctrl_b(
     .wb_ready(wb_b_ready),
     .wb_stall(wb_b_stall),
 
-    .mem_valid(mem_b_valid),
+    .mem_valid(mem_b_valid && !mem_b_have_exception),
     .mem_pc(mem_b_pc),
     .mem_result(mem_b_result),
     .mem_mem_type(mem_b_mem_type),
@@ -939,7 +931,7 @@ csr csr_0(
     .reset(reset),
     .addr(MEM_csr_addr),
     .rdata(mem_csr_rdata),
-    .we(MEM_csr_mask & {32{!raise_exception}}),
+    .we(MEM_csr_mask & {32{!raise_exception && !mem_a_stall && !mem_b_stall}}),
     .wdata(MEM_csr_wdata),
     .have_exception(raise_exception),
     .exception_type(mem_exception_type),
@@ -963,14 +955,6 @@ branch_ctrl branch_ctrl_0(
     .id_b_branch_taken(id_b_branch_taken),
     .id_b_branch_target(id_b_branch_target),
     .id_b_pc(id_b_pc),
-    .ro_a_branch_mistaken(ro_a_branch_mistaken),
-    .ro_a_branch_taken(ro_a_branch_taken),
-    .ro_a_branch_target(ro_a_branch_target),
-    .ro_a_pc(ro_a_pc),
-    .ro_b_branch_mistaken(ro_b_branch_mistaken),
-    .ro_b_branch_taken(ro_b_branch_taken),
-    .ro_b_branch_target(ro_b_branch_target),
-    .ro_b_pc(ro_b_pc),
     .ex_a_branch_mistaken(ex_a_branch_mistaken),
     .ex_a_branch_taken(ex_a_branch_taken),
     .ex_a_branch_target(ex_a_branch_target),
@@ -983,7 +967,6 @@ branch_ctrl branch_ctrl_0(
     .branch_mistaken(branch_mistaken),
     .correct_target(correct_target),
     .flush_ibuf(flush_ibuf),
-    .flush_id(flush_id),
     .flush_ro(flush_ro),
     .flush_ex(flush_ex)
 );
@@ -1058,12 +1041,12 @@ mmu mmu_0(
 );
 
 assign debug_wb_pc1 = wb_a_pc;
-assign debug_wb_rf_wdata1 = wb_a_result;
+assign debug_wb_rf_wdata1 = rf_wdata1;
 assign debug_wb_rf_wnum1 = wb_a_dest;
 assign debug_wb_rf_we1 = {4{!wb_a_stall && wb_a_valid && wb_a_dest != 5'd0}};
 
 assign debug_wb_pc2 = wb_b_pc;
-assign debug_wb_rf_wdata2 = wb_b_result;
+assign debug_wb_rf_wdata2 = rf_wdata2;
 assign debug_wb_rf_wnum2 = wb_b_dest;
 assign debug_wb_rf_we2 = {4{!wb_b_stall && wb_b_valid && wb_b_dest != 5'd0}};
 

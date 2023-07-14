@@ -25,12 +25,11 @@ module ro_stage (
     input wire             id_a_branch_condition,
     input wire [31:0]      id_a_branch_target,
     input wire             id_a_is_jirl,
+    input wire             id_a_branch_mistaken,
     input wire             id_a_pred_branch_taken,
     input wire [31:0]      id_a_pred_branch_target,
-    input wire             id_a_branch_mistaken,
     input wire mem_type_t  id_a_mem_type,
     input wire mem_size_t  id_a_mem_size,
-    input wire [31:0]      id_a_st_data,
     input wire             id_a_is_csr_op,
     input wire [13:0]      id_a_csr_addr,
     input wire [31:0]      id_a_csr_mask,
@@ -52,10 +51,8 @@ module ro_stage (
     input wire             id_b_is_jirl,
     input wire             id_b_pred_branch_taken,
     input wire [31:0]      id_b_pred_branch_target,
-    input wire             id_b_branch_mistaken,
     input wire mem_type_t  id_b_mem_type,
     input wire mem_size_t  id_b_mem_size,
-    input wire [31:0]      id_b_st_data,
     input wire             id_b_is_csr_op,
     input wire [13:0]      id_b_csr_addr,
     input wire [31:0]      id_b_csr_mask,
@@ -108,9 +105,9 @@ module ro_stage (
     output logic           ro_a_branch_taken,
     output logic           ro_a_branch_condition,
     output logic [31:0]    ro_a_branch_target,
+    output logic           ro_a_is_jirl,
     output logic           ro_a_pred_branch_taken,
     output logic [31:0]    ro_a_pred_branch_target,
-    output logic           ro_a_branch_mistaken,
     output mem_type_t      ro_a_mem_type,
     output mem_size_t      ro_a_mem_size,
     output logic [31:0]    ro_a_st_data,
@@ -130,9 +127,9 @@ module ro_stage (
     output logic           ro_b_branch_taken,
     output logic           ro_b_branch_condition,
     output logic [31:0]    ro_b_branch_target,
+    output logic           ro_b_is_jirl,
     output logic           ro_b_pred_branch_taken,
     output logic [31:0]    ro_b_pred_branch_target,
-    output logic           ro_b_branch_mistaken,
     output mem_type_t      ro_b_mem_type,
     output mem_size_t      ro_b_mem_size,
     output logic [31:0]    ro_b_st_data,
@@ -140,12 +137,6 @@ module ro_stage (
     output logic [13:0]    ro_b_csr_addr,
     output logic [31:0]    ro_b_csr_mask
 );
-
-logic        a_branch_mistaken;
-logic        b_branch_mistaken;
-
-assign       ro_a_branch_mistaken = a_branch_mistaken && !ro_stall;
-assign       ro_b_branch_mistaken = b_branch_mistaken && !ro_stall;
 
 logic        forward_valid1;
 logic [ 4:0] forward_addr1;
@@ -191,10 +182,8 @@ read_operands read_operands_a(
     .id_is_jirl(id_a_is_jirl),
     .id_pred_branch_taken(id_a_pred_branch_taken),
     .id_pred_branch_target(id_a_pred_branch_target),
-    .id_branch_mistaken(id_a_branch_mistaken),
     .id_mem_type(id_a_mem_type),
     .id_mem_size(id_a_mem_size),
-    .id_st_data(id_a_st_data),
     .id_is_csr_op(id_a_is_csr_op),
     .id_csr_addr(id_a_csr_addr),
     .id_csr_mask(id_a_csr_mask),
@@ -220,9 +209,9 @@ read_operands read_operands_a(
     .ro_branch_taken(ro_a_branch_taken),
     .ro_branch_condition(ro_a_branch_condition),
     .ro_branch_target(ro_a_branch_target),
+    .ro_is_jirl(ro_a_is_jirl),
     .ro_pred_branch_taken(ro_a_pred_branch_taken),
     .ro_pred_branch_target(ro_a_pred_branch_target),
-    .ro_branch_mistaken(a_branch_mistaken),
     .ro_mem_type(ro_a_mem_type),
     .ro_mem_size(ro_a_mem_size),
     .ro_st_data(ro_a_st_data),
@@ -255,10 +244,8 @@ read_operands read_operands_b(
     .id_is_jirl(id_b_is_jirl),
     .id_pred_branch_taken(id_b_pred_branch_taken),
     .id_pred_branch_target(id_b_pred_branch_target),
-    .id_branch_mistaken(id_b_branch_mistaken),
     .id_mem_type(id_b_mem_type),
     .id_mem_size(id_b_mem_size),
-    .id_st_data(id_b_st_data),
     .id_is_csr_op(id_b_is_csr_op),
     .id_csr_addr(id_b_csr_addr),
     .id_csr_mask(id_b_csr_mask),
@@ -284,9 +271,9 @@ read_operands read_operands_b(
     .ro_branch_taken(ro_b_branch_taken),
     .ro_branch_condition(ro_b_branch_condition),
     .ro_branch_target(ro_b_branch_target),
+    .ro_is_jirl(ro_b_is_jirl),
     .ro_pred_branch_taken(ro_b_pred_branch_taken),
     .ro_pred_branch_target(ro_b_pred_branch_target),
-    .ro_branch_mistaken(b_branch_mistaken),
     .ro_mem_type(ro_b_mem_type),
     .ro_mem_size(ro_b_mem_size),
     .ro_st_data(ro_b_st_data),

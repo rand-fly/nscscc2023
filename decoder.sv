@@ -169,7 +169,7 @@ assign                 {match, opcode,   rf_src1, rf_src2, src2_is_imm,imm,     
 {54{inst_bgeu     }} & {1'b1,  OP_SLTU,  rj,      rd,      1'b0,       32'd0,  `R0  } |
 {54{inst_b        }} & {1'b1,  OP_OUT2, `R0,     `R0,      1'b0,       32'd0,  `R0  } |
 {54{inst_bl       }} & {1'b1,  OP_OUT2, `R0,     `R0,      1'b1,      pc+32'd4,`R1  } |
-{54{inst_jirl     }} & {1'b1,  OP_OUT2,  rj,     `R0,      1'b1,      pc+32'd4, rd  } | // special use of src1
+{54{inst_jirl     }} & {1'b1,  OP_ADD,   rj,     `R0,      1'b1,       si16,    rd  } | // special
 {54{inst_ld_b     }} & {1'b1,  OP_ADD,   rj,     `R0,      1'b1,       si12,    rd  } |
 {54{inst_ld_h     }} & {1'b1,  OP_ADD,   rj,     `R0,      1'b1,       si12,    rd  } |
 {54{inst_ld_w     }} & {1'b1,  OP_ADD,   rj,     `R0,      1'b1,       si12,    rd  } |
@@ -197,7 +197,7 @@ assign                 {is_branch, branch_target, branch_condition} =
 {34{inst_bgeu     }} & {1'b1,      pc+si16,       1'b0 /* SLTU */ } |
 {34{inst_b        }} & {1'b0,      pc+si26,       1'b0            } |
 {34{inst_bl       }} & {1'b0,      pc+si26,       1'b0            } |
-{34{inst_jirl     }} & {1'b0,      si16,          1'b0            } ;
+{34{inst_jirl     }} & {1'b1,      si16,          1'b0            } ;
 
 assign branch_taken = inst_b || inst_bl;
 assign is_jirl = inst_jirl;

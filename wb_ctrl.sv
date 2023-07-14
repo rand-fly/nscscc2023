@@ -83,13 +83,15 @@ always_comb begin
     endcase
 end
 
-assign wb_forwardable = wb_ready;
+// assign wb_forwardable = wb_ready;
+assign wb_forwardable = WB_mem_type == MEM_NOP;
 assign wb_dest        = WB_dest;
-assign wb_result      = (WB_mem_type == MEM_LOAD_S || WB_mem_type == MEM_LOAD_U) ? load_result : WB_result;
+// assign wb_result      = (WB_mem_type == MEM_LOAD_S || WB_mem_type == MEM_LOAD_U) ? load_result : WB_result;
+assign wb_result      = WB_result;
 assign wb_pc          = WB_pc;
 
 assign rf_we    = allowout && wb_valid;
 assign rf_waddr = WB_dest;
-assign rf_wdata = wb_result;
+assign rf_wdata = (WB_mem_type == MEM_LOAD_S || WB_mem_type == MEM_LOAD_U) ? load_result : WB_result;
 
 endmodule

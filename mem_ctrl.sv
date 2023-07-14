@@ -61,8 +61,8 @@ logic [31:0] MEM_st_data;
 logic        waiting_for_out;
 
 assign mem_valid = MEM_valid && !cancel;
-assign mem_ready = MEM_valid && !mem_have_exception &&(MEM_mem_type == MEM_NOP || (mmu_valid && mmu_addr_ok) || waiting_for_out);
-assign mem_stall = MEM_valid && !mem_have_exception && (!mem_ready || !allowout);
+assign mem_ready = MEM_valid && (mem_have_exception || MEM_mem_type == MEM_NOP || (mmu_valid && mmu_addr_ok) || waiting_for_out);
+assign mem_stall = MEM_valid && (!mem_ready || !allowout);
 
 always_ff @(posedge clk) begin
     if (reset || flush || (!mem_stall && !ex_ready)) begin
