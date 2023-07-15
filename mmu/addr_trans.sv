@@ -1,4 +1,4 @@
-`include "../definitions.svh"
+`include "definitions.svh"
 
 module addr_trans(
     input wire               direct_access,

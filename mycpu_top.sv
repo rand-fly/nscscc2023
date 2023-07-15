@@ -226,7 +226,7 @@ logic [ 4:0] mem_b_dest;
 logic        MEM_a_is_spec_op;
 logic        MEM_b_is_spec_op;
 spec_op_t    MEM_spec_op;
-spec_op_t    MEM_spec_op_pc;
+logic [31:0] MEM_spec_op_pc;
 logic [31:0] MEM_csr_wdata;
 logic        mem_is_spec_op;
 logic        mem_spec_valid;
@@ -342,7 +342,6 @@ logic [TLBIDLEN-1:0] mmu_tlb_w_index;
 tlb_entry_t  mmu_tlb_w_entry;
 logic [TLBIDLEN-1:0] mmu_tlb_r_index;
 tlb_entry_t  mmu_tlb_r_entry;
-logic        mmu_tlbsrch_valid;
 logic [18:0] mmu_tlbsrch_vppn;
 logic        mmu_tlbsrch_found;
 logic [TLBIDLEN-1:0] mmu_tlbsrch_index;
@@ -923,16 +922,15 @@ assign csr_vppn_we = raise_exception && (
 || mem_exception_type == PPI);
 assign csr_vppn_data = mem_exception_type == PIF ? mem_exception_pc[31:13] : mem_exception_address[31:13];
 
-assign csr_tlbsrch_we = MEM_spec_op.opcode == SPEC_TLBSRCH && mem_spec_valid;
+assign csr_tlbsrch_we = MEM_spec_op.opcode == SPEC_TLBSRCH && mem_spec_valid; //good
 assign csr_tlbsrch_found = mmu_tlbsrch_found;
 assign csr_tlbsrch_index = mmu_tlbsrch_index;
-assign csr_tlb_we = MEM_spec_op.opcode == SPEC_TLBRD && mem_spec_valid;
+assign csr_tlb_we = MEM_spec_op.opcode == SPEC_TLBRD && mem_spec_valid; //good
 assign csr_tlb_wdata = mmu_tlb_r_entry;
 
-assign mmu_tlbsrch_valid = csr_tlbsrch_we;
 assign mmu_tlbsrch_vppn = csr_tlb_rdata.vppn;
 assign mmu_tlb_r_index = csr_tlbidx;
-assign mmu_tlb_we = (MEM_spec_op.opcode == SPEC_TLBWR || MEM_spec_op.opcode == SPEC_TLBFILL) && mem_spec_valid;
+assign mmu_tlb_we = (MEM_spec_op.opcode == SPEC_TLBWR || MEM_spec_op.opcode == SPEC_TLBFILL) && mem_spec_valid; //good
 assign mmu_tlb_w_index = csr_tlbidx;
 assign mmu_tlb_w_entry = csr_tlb_rdata;
 
@@ -1048,7 +1046,7 @@ branch_ctrl branch_ctrl_0(
     .flush_ex(flush_ex)
 );
 
-mmu mmu_0(
+mmu muu_0(
     .clk(clk),
     .reset(reset),
 
@@ -1111,7 +1109,8 @@ mmu mmu_0(
     .tlb_r_index(mmu_tlb_r_index),
     .tlb_r_entry(mmu_tlb_r_entry),
 
-    .tlbsrch_valid(mmu_tlbsrch_valid),
+    .tlbsrch_d1_valid(MEM_spec_op.opcode == SPEC_TLBSRCH && MEM_a_is_spec_op),
+    .tlbsrch_d2_valid(MEM_spec_op.opcode == SPEC_TLBSRCH && MEM_b_is_spec_op),
     .tlbsrch_vppn(mmu_tlbsrch_vppn),
     .tlbsrch_found(mmu_tlbsrch_found),
     .tlbsrch_index(mmu_tlbsrch_index),

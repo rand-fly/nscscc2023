@@ -88,12 +88,14 @@ generate
     end
 endgenerate
 
-
-assign s0_result.found = match0 != 0;
-assign s1_result.found = match1 != 0;
-assign s2_result.found = match2 != 0;
-integer j;
-always @* begin
+always_comb begin
+	integer j;
+	s0_result = 0;
+	s1_result = 0;
+	s2_result = 0;
+	s0_result.found = match0 != 0;
+	s1_result.found = match1 != 0;
+	s2_result.found = match2 != 0;
 	for(j = 0; j < TLBNUM; j = j + 1) begin
 		//for s0 port
 	    if(match0[j] == 1) begin
@@ -182,6 +184,7 @@ wire [18:0] invtlb_vppn;
 assign invtlb_vppn = invtlb_va[31:13];
 
 always @(posedge clk) begin
+	integer j;
 	if(invtlb_valid) begin
 		for(j = 0; j < TLBNUM; j = j + 1) begin
 			 if(tlb_e[j]) begin

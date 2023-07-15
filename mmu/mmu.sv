@@ -1,4 +1,4 @@
-`include "../definitions.svh"
+`include "definitions.svh"
 
 module mmu(
     input wire          clk,
@@ -62,7 +62,8 @@ module mmu(
     input wire [TLBIDLEN-1:0] tlb_r_index,
     output tlb_entry_t  tlb_r_entry,
 
-    input wire          tlbsrch_valid,
+    input wire          tlbsrch_d1_valid,
+    input wire          tlbsrch_d2_valid,
     input wire [18:0]   tlbsrch_vppn,
     output logic        tlbsrch_found,
     output logic [TLBIDLEN-1:0] tlbsrch_index,
@@ -94,7 +95,6 @@ logic        i_page_fault;
 logic        i_page_invalid;
 logic        i_page_dirty;
 logic        i_plv_fault;
-logic        i_exception;
 
 logic [31:0] d1_pa;
 logic [1:0]  d1_mat;
@@ -204,7 +204,7 @@ assign d2_pis  = d2_page_invalid && d2_we;
 assign d2_ppi  = d2_plv_fault;
 assign d2_pme  = d2_page_dirty && d2_we;
 
-assign tlbsrch_found = tlbsrch_valid && (!d1_valid && tlb_s1_result.found || !d2_valid && tlb_s2_result.found);
+assign tlbsrch_found = tlbsrch_d1_valid && tlb_s1_result.found || tlbsrch_d2_valid && tlb_s1_result.found;
 assign tlbsrch_index = !d1_valid ? tlb_s1_result.index : tlb_s2_result.index;
 
 tlb tlb_0(
@@ -216,12 +216,12 @@ tlb tlb_0(
     .s0_asid     (tlb_s0_asid),
     .s0_result   (tlb_s0_result),
 
-    .s1_vppn     (tlbsrch_valid && !d1_valid ? tlbsrch_vppn : tlb_s1_vppn),
+    .s1_vppn     (tlbsrch_d1_valid ? tlbsrch_vppn : tlb_s1_vppn),
     .s1_va_bit12 (tlb_s1_va_bit12),
     .s1_asid     (tlb_s1_asid),
     .s1_result   (tlb_s1_result),
 
-    .s2_vppn     (tlbsrch_valid && !d2_valid ? tlbsrch_vppn : tlb_s2_vppn),
+    .s2_vppn     (tlbsrch_d2_valid ? tlbsrch_vppn : tlb_s2_vppn),
     .s2_va_bit12 (tlb_s2_va_bit12),
     .s2_asid     (tlb_s2_asid),
     .s2_result   (tlb_s2_result),
