@@ -61,7 +61,7 @@ logic [31:0] MEM_st_data;
 logic        waiting_for_out;
 
 assign mem_valid = MEM_valid && !cancel;
-assign mem_ready = MEM_valid && (mem_have_exception || MEM_mem_type == MEM_NOP || (mmu_valid && mmu_addr_ok) || waiting_for_out);
+assign mem_ready = MEM_valid && (!mmu_valid || mmu_addr_ok);
 assign mem_stall = MEM_valid && (!mem_ready || !allowout);
 
 always_ff @(posedge clk) begin
@@ -103,14 +103,14 @@ always_ff @(posedge clk) begin
     end
 end
 
-assign mem_forwardable = !mem_have_exception && MEM_mem_type == MEM_NOP;
+assign mem_forwardable = !MEM_have_exception && MEM_mem_type == MEM_NOP;
 
 assign mmu_size = MEM_mem_size == MEM_BYTE ? 2'd0 :
                   MEM_mem_size == MEM_HALF ? 2'd1 :
                                              2'd2 ;
 
 always_comb begin
-    if (!mem_have_exception && MEM_mem_type == MEM_STORE) begin
+    if (MEM_mem_type == MEM_STORE) begin
         mmu_we = 1'b1;
         unique case (MEM_mem_size)
             MEM_BYTE: begin

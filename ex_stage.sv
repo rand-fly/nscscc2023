@@ -28,9 +28,8 @@ module ex_stage(
     input wire mem_type_t  ro_a_mem_type,
     input wire mem_size_t  ro_a_mem_size,
     input wire [31:0]      ro_a_st_data,
-    input wire             ro_a_is_csr_op,
-    input wire [13:0]      ro_a_csr_addr,
-    input wire [31:0]      ro_a_csr_mask,
+    input wire             ro_a_is_spec_op,
+    input wire spec_op_t   ro_a_spec_op,
 
     input wire             ro_b_valid,
     input wire [31:0]      ro_b_pc,
@@ -49,9 +48,8 @@ module ex_stage(
     input wire mem_type_t  ro_b_mem_type,
     input wire mem_size_t  ro_b_mem_size,
     input wire [31:0]      ro_b_st_data,
-    input wire             ro_b_is_csr_op,
-    input wire [13:0]      ro_b_csr_addr,
-    input wire [31:0]      ro_b_csr_mask,
+    input wire             ro_b_is_spec_op,
+    input wire spec_op_t   ro_b_spec_op,
 
     output logic           ex_a_valid,
     output logic           ex_a_forwardable,
@@ -66,9 +64,8 @@ module ex_stage(
     output mem_type_t      ex_a_mem_type,
     output mem_size_t      ex_a_mem_size,
     output logic [31:0]    ex_a_st_data,
-    output logic           ex_a_is_csr_op,
-    output logic [13:0]    ex_a_csr_addr,
-    output logic [31:0]    ex_a_csr_mask,
+    output logic           ex_a_is_spec_op,
+    output spec_op_t       ex_a_spec_op,
 
     output logic           ex_b_valid,
     output logic           ex_b_forwardable,
@@ -83,9 +80,8 @@ module ex_stage(
     output mem_type_t      ex_b_mem_type,
     output mem_size_t      ex_b_mem_size,
     output logic [31:0]    ex_b_st_data,
-    output logic           ex_b_is_csr_op,
-    output logic [13:0]    ex_b_csr_addr,
-    output logic [31:0]    ex_b_csr_mask
+    output logic           ex_b_is_spec_op,
+    output spec_op_t       ex_b_spec_op
 );
 
 logic            EX_a_valid;
@@ -105,9 +101,8 @@ logic [31:0]     EX_a_pred_branch_target;
 mem_type_t       EX_a_mem_type;
 mem_size_t       EX_a_mem_size;
 logic [31:0]     EX_a_st_data;
-logic            EX_a_is_csr_op;
-logic [13:0]     EX_a_csr_addr;
-logic [31:0]     EX_a_csr_mask;
+logic            EX_a_is_spec_op;
+spec_op_t        EX_a_spec_op;
 
 logic            EX_b_valid;
 logic [31:0]     EX_b_pc;
@@ -126,9 +121,8 @@ logic [31:0]     EX_b_pred_branch_target;
 mem_type_t       EX_b_mem_type;
 mem_size_t       EX_b_mem_size;
 logic [31:0]     EX_b_st_data;
-logic            EX_b_is_csr_op;
-logic [13:0]     EX_b_csr_addr;
-logic [31:0]     EX_b_csr_mask;
+logic            EX_b_is_spec_op;
+spec_op_t        EX_b_spec_op;
 
 logic            a_is_alu_op;
 logic            a_is_mul_op;
@@ -200,9 +194,8 @@ always_ff @(posedge clk) begin
         EX_a_mem_type           <= ro_a_mem_type;
         EX_a_mem_size           <= ro_a_mem_size;
         EX_a_st_data            <= ro_a_st_data;
-        EX_a_is_csr_op          <= ro_a_is_csr_op;
-        EX_a_csr_addr           <= ro_a_csr_addr;
-        EX_a_csr_mask           <= ro_a_csr_mask;
+        EX_a_is_spec_op         <= ro_a_is_spec_op;
+        EX_a_spec_op            <= ro_a_spec_op;
         
         EX_b_valid              <= ro_b_valid;
         EX_b_pc                 <= ro_b_pc;
@@ -221,9 +214,8 @@ always_ff @(posedge clk) begin
         EX_b_mem_type           <= ro_b_mem_type;
         EX_b_mem_size           <= ro_b_mem_size;
         EX_b_st_data            <= ro_b_st_data;
-        EX_b_is_csr_op          <= ro_b_is_csr_op;
-        EX_b_csr_addr           <= ro_b_csr_addr;
-        EX_b_csr_mask           <= ro_b_csr_mask;
+        EX_b_is_spec_op         <= ro_b_is_spec_op;
+        EX_b_spec_op            <= ro_b_spec_op;
     end
 end
 
@@ -259,7 +251,7 @@ end
 
 assign ex_a_valid          = EX_a_valid;
 assign ex_a_ready          = EX_a_valid && !((a_is_mul_op && !a_mul_ready) || (a_is_div_op && !a_div_ready));
-assign ex_a_forwardable    = ex_a_ready && !EX_a_have_exception && EX_a_mem_type == MEM_NOP && !EX_a_is_csr_op;
+assign ex_a_forwardable    = ex_a_ready && !EX_a_have_exception && EX_a_mem_type == MEM_NOP && !EX_a_is_spec_op;
 assign ex_a_pc             = EX_a_pc;
 assign ex_a_have_exception = EX_a_have_exception;
 assign ex_a_exception_type = EX_a_exception_type;
@@ -267,13 +259,12 @@ assign ex_a_dest           = EX_a_dest;
 assign ex_a_mem_type       = EX_a_mem_type;
 assign ex_a_mem_size       = EX_a_mem_size;
 assign ex_a_st_data        = EX_a_st_data;
-assign ex_a_is_csr_op      = EX_a_valid && EX_a_is_csr_op;
-assign ex_a_csr_addr       = EX_a_csr_addr;
-assign ex_a_csr_mask       = EX_a_csr_mask;
+assign ex_a_is_spec_op     = EX_a_valid && EX_a_is_spec_op;
+assign ex_a_spec_op        = EX_a_spec_op;
 
 assign ex_b_valid          = EX_b_valid;
 assign ex_b_ready          = EX_b_valid && !((b_is_mul_op && !b_mul_ready) || (b_is_div_op && !b_div_ready));
-assign ex_b_forwardable    = ex_b_ready && !EX_b_have_exception && EX_b_mem_type == MEM_NOP && !EX_b_is_csr_op;
+assign ex_b_forwardable    = ex_b_ready && !EX_b_have_exception && EX_b_mem_type == MEM_NOP && !EX_b_is_spec_op;
 assign ex_b_pc             = EX_b_pc;
 assign ex_b_have_exception = EX_b_have_exception;
 assign ex_b_exception_type = EX_b_exception_type;
@@ -281,9 +272,8 @@ assign ex_b_dest           = EX_b_dest;
 assign ex_b_mem_type       = EX_b_mem_type;
 assign ex_b_mem_size       = EX_b_mem_size;
 assign ex_b_st_data        = EX_b_st_data;
-assign ex_b_is_csr_op      = EX_b_valid && EX_b_is_csr_op;
-assign ex_b_csr_addr       = EX_b_csr_addr;
-assign ex_b_csr_mask       = EX_b_csr_mask;
+assign ex_b_is_spec_op     = EX_b_valid && EX_b_is_spec_op;
+assign ex_b_spec_op        = EX_b_spec_op;
 
 assign a_is_alu_op = EX_a_opcode[4] == 1'b0;
 assign a_is_mul_op = EX_a_opcode[4:3] == 2'b10;

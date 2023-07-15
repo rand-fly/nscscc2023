@@ -1,65 +1,63 @@
 `include "definitions.svh"
 
 module read_operands (
-    input wire             clk,
-    input wire             reset,
+    input wire               clk,
+    input wire               reset,
 
-    input wire             flush,
-    input wire             allowout,
+    input wire               flush,
+    input wire               allowout,
 
-    input wire             id_ready,
-    input wire [31:0]      id_pc,
-    input wire             id_have_exception,
-    input wire exception_t id_exception_type,
-    input wire opcode_t    id_opcode,
-    input wire [ 4:0]      id_rf_src1,
-    input wire [ 4:0]      id_rf_src2,
-    input wire             id_src2_is_imm,
-    input wire [31:0]      id_imm,
-    input wire [4 :0]      id_dest,
-    input wire             id_is_branch,
-    input wire             id_branch_taken,
-    input wire             id_branch_condition,
-    input wire [31:0]      id_branch_target,
-    input wire             id_is_jirl,
-    input wire             id_pred_branch_taken,
-    input wire [31:0]      id_pred_branch_target,
-    input wire mem_type_t  id_mem_type,
-    input wire mem_size_t  id_mem_size,
-    input wire             id_is_csr_op,
-    input wire [13:0]      id_csr_addr,
-    input wire [31:0]      id_csr_mask,
+    input wire               id_ready,
+    input wire [31:0]        id_pc,
+    input wire               id_have_exception,
+    input wire exception_t   id_exception_type,
+    input wire opcode_t      id_opcode,
+    input wire [ 4:0]        id_rf_src1,
+    input wire [ 4:0]        id_rf_src2,
+    input wire               id_src2_is_imm,
+    input wire [31:0]        id_imm,
+    input wire [4 :0]        id_dest,
+    input wire               id_is_branch,
+    input wire               id_branch_taken,
+    input wire               id_branch_condition,
+    input wire [31:0]        id_branch_target,
+    input wire               id_is_jirl,
+    input wire               id_pred_branch_taken,
+    input wire [31:0]        id_pred_branch_target,
+    input wire mem_type_t    id_mem_type,
+    input wire mem_size_t    id_mem_size,
+    input wire               id_is_spec_op,
+    input wire spec_opcode_t id_spec_opcode,
 
-    output logic [4:0]     r1_addr,
-    input wire             r1_valid,
-    input wire [31:0]      r1_data,
+    output logic [4:0]       r1_addr,
+    input wire               r1_valid,
+    input wire [31:0]        r1_data,
 
-    output logic [4:0]     r2_addr,
-    input wire             r2_valid,
-    input wire [31:0]      r2_data,
+    output logic [4:0]       r2_addr,
+    input wire               r2_valid,
+    input wire [31:0]        r2_data,
 
-    output logic           ro_valid,
-    output logic           ro_ready,
-    output logic [31:0]    ro_pc,
-    output logic           ro_have_exception,
-    output exception_t     ro_exception_type,
-    output opcode_t        ro_opcode,
-    output logic [31:0]    ro_src1,
-    output logic [31:0]    ro_src2,
-    output logic [4 :0]    ro_dest,
-    output logic           ro_is_branch,
-    output logic           ro_branch_taken,
-    output logic           ro_branch_condition,
-    output logic [31:0]    ro_branch_target,
-    output logic           ro_is_jirl,
-    output logic           ro_pred_branch_taken,
-    output logic [31:0]    ro_pred_branch_target,
-    output mem_type_t      ro_mem_type,
-    output mem_size_t      ro_mem_size,
-    output logic [31:0]    ro_st_data,
-    output logic           ro_is_csr_op,
-    output logic [13:0]    ro_csr_addr,
-    output logic [31:0]    ro_csr_mask
+    output logic             ro_valid,
+    output logic             ro_ready,
+    output logic [31:0]      ro_pc,
+    output logic             ro_have_exception,
+    output exception_t       ro_exception_type,
+    output opcode_t          ro_opcode,
+    output logic [31:0]      ro_src1,
+    output logic [31:0]      ro_src2,
+    output logic [4 :0]      ro_dest,
+    output logic             ro_is_branch,
+    output logic             ro_branch_taken,
+    output logic             ro_branch_condition,
+    output logic [31:0]      ro_branch_target,
+    output logic             ro_is_jirl,
+    output logic             ro_pred_branch_taken,
+    output logic [31:0]      ro_pred_branch_target,
+    output mem_type_t        ro_mem_type,
+    output mem_size_t        ro_mem_size,
+    output logic [31:0]      ro_st_data,
+    output logic             ro_is_spec_op,
+    output spec_op_t         ro_spec_op
 );
 
 logic            RO_valid;
@@ -81,9 +79,8 @@ logic            RO_pred_branch_taken;
 logic [31:0]     RO_pred_branch_target;
 mem_type_t       RO_mem_type;
 mem_size_t       RO_mem_size;
-logic            RO_is_csr_op;
-logic [13:0]     RO_csr_addr;
-logic [31:0]     RO_csr_mask;
+logic            RO_is_spec_op;
+spec_opcode_t    RO_spec_opcode;
 
 always_ff @(posedge clk) begin
     if (reset || flush) begin
@@ -109,9 +106,8 @@ always_ff @(posedge clk) begin
         RO_pred_branch_target <= id_pred_branch_target;
         RO_mem_type <= id_mem_type;
         RO_mem_size <= id_mem_size;
-        RO_is_csr_op <= id_is_csr_op;
-        RO_csr_addr <= id_csr_addr;
-        RO_csr_mask <= id_csr_mask;
+        RO_is_spec_op <= id_is_spec_op;
+        RO_spec_opcode <= id_spec_opcode;
     end
 end
 
@@ -140,8 +136,13 @@ assign ro_pred_branch_target = RO_pred_branch_target;
 assign ro_mem_type = RO_mem_type;
 assign ro_mem_size = RO_mem_size;
 assign ro_st_data = r2_data;
-assign ro_is_csr_op = RO_is_csr_op;
-assign ro_csr_addr = RO_csr_addr;
-assign ro_csr_mask = r1_addr == 5'd1 ? 32'hffffffff : r1_data;
+
+assign ro_is_spec_op = RO_is_spec_op;
+assign ro_spec_op.opcode = RO_spec_opcode;
+assign ro_spec_op.csr_addr = RO_imm[13:0];
+assign ro_spec_op.csr_mask = r1_addr == 5'd1 ? 32'hffffffff : r1_data;
+assign ro_spec_op.invtlb_op = RO_imm[4:0];
+assign ro_spec_op.invtlb_asid = r1_data[9:0];
+assign ro_spec_op.invtlb_va = r2_data;
 
 endmodule

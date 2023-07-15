@@ -6,6 +6,7 @@
 
 parameter TLBNUM = 16;
 parameter TLBIDLEN = $clog2(TLBNUM);
+parameter PALEN  = 32;
 
 typedef enum logic [4:0] {
     // alu operation
@@ -69,6 +70,24 @@ typedef enum logic [1:0] {
     MEM_HALF,
     MEM_WORD
 } mem_size_t;
+
+typedef enum logic [2:0] {
+    SPEC_CSR,
+    SPEC_TLBSRCH,
+    SPEC_TLBRD,
+    SPEC_TLBWR,
+    SPEC_TLBFILL,
+    SPEC_INVTLB
+} spec_opcode_t;
+
+typedef struct packed {
+    spec_opcode_t opcode;
+    logic [13:0]  csr_addr;
+    logic [31:0]  csr_mask;
+    logic [ 4:0]  invtlb_op;
+    logic [ 9:0]  invtlb_asid;
+    logic [31:0]  invtlb_va;
+} spec_op_t;
 
 typedef struct packed {
     logic       plv0;

@@ -90,9 +90,8 @@ logic [31:0] id_a_pred_branch_target;
 logic        id_a_branch_mistaken;
 mem_type_t   id_a_mem_type;
 mem_size_t   id_a_mem_size;
-logic        id_a_is_csr_op;
-logic [13:0] id_a_csr_addr;
-logic [31:0] id_a_csr_mask;
+logic        id_a_is_spec_op;
+spec_opcode_t id_a_spec_opcode;
 
 logic        id_b_ready;
 logic [31:0] id_b_pc;
@@ -114,9 +113,8 @@ logic [31:0] id_b_pred_branch_target;
 logic        id_b_branch_mistaken;
 mem_type_t   id_b_mem_type;
 mem_size_t   id_b_mem_size;
-logic        id_b_is_csr_op;
-logic [13:0] id_b_csr_addr;
-logic [31:0] id_b_csr_mask;
+logic        id_b_is_spec_op;
+spec_opcode_t id_b_spec_opcode;
 
 logic        ro_valid;
 logic        ro_ready;
@@ -140,9 +138,8 @@ logic [31:0] ro_a_pred_branch_target;
 mem_type_t   ro_a_mem_type;
 mem_size_t   ro_a_mem_size;
 logic [31:0] ro_a_st_data;
-logic        ro_a_is_csr_op;
-logic [13:0] ro_a_csr_addr;
-logic [31:0] ro_a_csr_mask;
+logic        ro_a_is_spec_op;
+spec_op_t    ro_a_spec_op;
 
 logic        ro_b_valid;
 logic [31:0] ro_b_pc;
@@ -162,9 +159,9 @@ logic [31:0] ro_b_pred_branch_target;
 mem_type_t   ro_b_mem_type;
 mem_size_t   ro_b_mem_size;
 logic [31:0] ro_b_st_data;
-logic        ro_b_is_csr_op;
-logic [13:0] ro_b_csr_addr;
-logic [31:0] ro_b_csr_mask;
+logic        ro_b_is_spec_op;
+spec_op_t    ro_b_spec_op;
+
 
 logic        ex_valid;
 logic        ex_ready;
@@ -182,9 +179,9 @@ logic        ex_a_branch_mistaken;
 mem_type_t   ex_a_mem_type;
 mem_size_t   ex_a_mem_size;
 logic [31:0] ex_a_st_data;
-logic        ex_a_is_csr_op;
-logic [13:0] ex_a_csr_addr;
-logic [31:0] ex_a_csr_mask;
+logic        ex_a_is_spec_op;
+spec_op_t    ex_a_spec_op;
+
 logic        ex_b_valid;
 logic        ex_b_forwardable;
 logic [31:0] ex_b_pc;
@@ -198,9 +195,8 @@ logic        ex_b_branch_mistaken;
 mem_type_t   ex_b_mem_type;
 mem_size_t   ex_b_mem_size;
 logic [31:0] ex_b_st_data;
-logic        ex_b_is_csr_op;
-logic [13:0] ex_b_csr_addr;
-logic [31:0] ex_b_csr_mask;
+logic        ex_b_is_spec_op;
+spec_op_t    ex_b_spec_op;
 
 
 logic        mem_a_valid;
@@ -227,17 +223,40 @@ mem_type_t   mem_b_mem_type;
 mem_size_t   mem_b_mem_size;
 logic [ 4:0] mem_b_dest;
 
-logic        MEM_a_is_csr_op;
-logic        MEM_b_is_csr_op;
-logic [13:0] MEM_csr_addr;
-logic [31:0] MEM_csr_mask;
+logic        MEM_a_is_spec_op;
+logic        MEM_b_is_spec_op;
+spec_op_t    MEM_spec_op;
+spec_op_t    MEM_spec_op_pc;
 logic [31:0] MEM_csr_wdata;
+logic        mem_is_spec_op;
+logic        mem_spec_valid;
+
 logic        mem_a_csr_result_valid;
 logic        mem_b_csr_result_valid;
 logic [31:0] mem_csr_rdata;
 exception_t  mem_exception_type;
 logic [31:0] mem_exception_pc;
 logic [31:0] mem_exception_address;
+
+logic        csr_we;
+logic        csr_badv_we;
+logic [31:0] csr_badv_data;
+logic        csr_vppn_we;
+logic [18:0] csr_vppn_data;
+logic        csr_tlbsrch_we;
+logic        csr_tlbsrch_found;
+logic[TLBIDLEN-1:0] csr_tlbsrch_index;
+logic        csr_tlb_we;
+tlb_entry_t  csr_tlb_wdata;
+tlb_entry_t  csr_tlb_rdata;
+logic [TLBIDLEN-1:0] csr_tlbidx;
+logic [9:0]  csr_asid;
+logic        csr_da;
+logic [1:0]  csr_datf;
+logic [1:0]  csr_datm;
+logic [1:0]  csr_plv;
+dmw_t        csr_dmw0;
+dmw_t        csr_dmw1;
 
 logic        wb_a_valid;
 logic        wb_a_ready;
@@ -269,7 +288,6 @@ logic [31:0] rf_wdata1;
 logic        rf_we2;
 logic [ 4:0] rf_waddr2;
 logic [31:0] rf_wdata2;
-
 
 
 logic        mmu_direct_access;
@@ -315,6 +333,19 @@ logic        mmu_d2_pil;
 logic        mmu_d2_pis;
 logic        mmu_d2_ppi;
 logic        mmu_d2_pme;
+logic        mmu_invtlb_valid;
+logic [4:0]  mmu_invtlb_op;
+logic [9:0]  mmu_invtlb_asid;
+logic [31:0] mmu_invtlb_va;
+logic        mmu_tlb_we;
+logic [TLBIDLEN-1:0] mmu_tlb_w_index;
+tlb_entry_t  mmu_tlb_w_entry;
+logic [TLBIDLEN-1:0] mmu_tlb_r_index;
+tlb_entry_t  mmu_tlb_r_entry;
+logic        mmu_tlbsrch_valid;
+logic [18:0] mmu_tlbsrch_vppn;
+logic        mmu_tlbsrch_found;
+logic [TLBIDLEN-1:0] mmu_tlbsrch_index;
 
 logic        branch_mistaken;
 logic [31:0] correct_target;
@@ -324,10 +355,9 @@ logic        flush_ex;
 
 logic        raise_exception;
 logic [31:0] exception_target;
+logic        rewind;
+logic [31:0] rewind_target;
 logic        interrupt;
-
-logic        csr_badv_we;
-logic [31:0] csr_badv_data;
 
 ifu ifu_0(
     .clk(clk),
@@ -345,6 +375,8 @@ ifu ifu_0(
 
     .have_exception(if_have_exception),
     .exception_type(if_exception_type),
+    .rewind(rewind),
+    .rewind_target(rewind_target),
 
     .branch_mistaken(branch_mistaken),
     .correct_target(correct_target),
@@ -450,9 +482,8 @@ id_stage id_stage_0 (
     .id_a_branch_mistaken(id_a_branch_mistaken),
     .id_a_mem_type(id_a_mem_type),
     .id_a_mem_size(id_a_mem_size),
-    .id_a_is_csr_op(id_a_is_csr_op),
-    .id_a_csr_addr(id_a_csr_addr),
-    .id_a_csr_mask(id_a_csr_mask),
+    .id_a_is_spec_op(id_a_is_spec_op),
+    .id_a_spec_opcode(id_a_spec_opcode),
 
     .id_b_ready(id_b_ready),
     .id_b_pc(id_b_pc),
@@ -474,9 +505,8 @@ id_stage id_stage_0 (
     .id_b_branch_mistaken(id_b_branch_mistaken),
     .id_b_mem_type(id_b_mem_type),
     .id_b_mem_size(id_b_mem_size),
-    .id_b_is_csr_op(id_b_is_csr_op),
-    .id_b_csr_addr(id_b_csr_addr),
-    .id_b_csr_mask(id_b_csr_mask)
+    .id_b_is_spec_op(id_b_is_spec_op),
+    .id_b_spec_opcode(id_b_spec_opcode)
 );
 
 ro_stage ro_stage_0(
@@ -509,9 +539,8 @@ ro_stage ro_stage_0(
     .id_a_branch_mistaken(id_a_branch_mistaken),
     .id_a_mem_type(id_a_mem_type),
     .id_a_mem_size(id_a_mem_size),
-    .id_a_is_csr_op(id_a_is_csr_op),
-    .id_a_csr_addr(id_a_csr_addr),
-    .id_a_csr_mask(id_a_csr_mask),
+    .id_a_is_spec_op(id_a_is_spec_op),
+    .id_a_spec_opcode(id_a_spec_opcode),
 
     .id_b_ready(id_b_ready),
     .id_b_pc(id_b_pc),
@@ -532,9 +561,8 @@ ro_stage ro_stage_0(
     .id_b_pred_branch_target(id_b_pred_branch_target),
     .id_b_mem_type(id_b_mem_type),
     .id_b_mem_size(id_b_mem_size),
-    .id_b_is_csr_op(id_b_is_csr_op),
-    .id_b_csr_addr(id_b_csr_addr),
-    .id_b_csr_mask(id_b_csr_mask),
+    .id_b_is_spec_op(id_b_is_spec_op),
+    .id_b_spec_opcode(id_b_spec_opcode),
 
     .r1_addr(rf_raddr1),
     .r1_data(rf_rdata1),
@@ -590,9 +618,8 @@ ro_stage ro_stage_0(
     .ro_a_mem_type(ro_a_mem_type),
     .ro_a_mem_size(ro_a_mem_size),
     .ro_a_st_data(ro_a_st_data),
-    .ro_a_is_csr_op(ro_a_is_csr_op),
-    .ro_a_csr_addr(ro_a_csr_addr),
-    .ro_a_csr_mask(ro_a_csr_mask),
+    .ro_a_is_spec_op(ro_a_is_spec_op),
+    .ro_a_spec_op(ro_a_spec_op),
 
     .ro_b_valid(ro_b_valid),
     .ro_b_pc(ro_b_pc),
@@ -612,9 +639,8 @@ ro_stage ro_stage_0(
     .ro_b_mem_type(ro_b_mem_type),
     .ro_b_mem_size(ro_b_mem_size),
     .ro_b_st_data(ro_b_st_data),
-    .ro_b_is_csr_op(ro_b_is_csr_op),
-    .ro_b_csr_addr(ro_b_csr_addr),
-    .ro_b_csr_mask(ro_b_csr_mask)
+    .ro_b_is_spec_op(ro_b_is_spec_op),
+    .ro_b_spec_op(ro_b_spec_op)
 );
 
 ex_stage ex_stage_0(
@@ -644,9 +670,8 @@ ex_stage ex_stage_0(
     .ro_a_mem_type(ro_a_mem_type),
     .ro_a_mem_size(ro_a_mem_size),
     .ro_a_st_data(ro_a_st_data),
-    .ro_a_is_csr_op(ro_a_is_csr_op),
-    .ro_a_csr_addr(ro_a_csr_addr),
-    .ro_a_csr_mask(ro_a_csr_mask),
+    .ro_a_is_spec_op(ro_a_is_spec_op),
+    .ro_a_spec_op(ro_a_spec_op),
 
     .ro_b_valid(ro_b_valid),
     .ro_b_pc(ro_b_pc),
@@ -665,9 +690,8 @@ ex_stage ex_stage_0(
     .ro_b_mem_type(ro_b_mem_type),
     .ro_b_mem_size(ro_b_mem_size),
     .ro_b_st_data(ro_b_st_data),
-    .ro_b_is_csr_op(ro_b_is_csr_op),
-    .ro_b_csr_addr(ro_b_csr_addr),
-    .ro_b_csr_mask(ro_b_csr_mask),
+    .ro_b_is_spec_op(ro_b_is_spec_op),
+    .ro_b_spec_op(ro_b_spec_op),
 
     .ex_a_valid(ex_a_valid),
     .ex_a_forwardable(ex_a_forwardable),
@@ -682,9 +706,9 @@ ex_stage ex_stage_0(
     .ex_a_mem_type(ex_a_mem_type),
     .ex_a_mem_size(ex_a_mem_size),
     .ex_a_st_data(ex_a_st_data),
-    .ex_a_is_csr_op(ex_a_is_csr_op),
-    .ex_a_csr_addr(ex_a_csr_addr),
-    .ex_a_csr_mask(ex_a_csr_mask),
+    .ex_a_is_spec_op(ex_a_is_spec_op),
+    .ex_a_spec_op(ex_a_spec_op),
+
     .ex_b_valid(ex_b_valid),
     .ex_b_forwardable(ex_b_forwardable),
     .ex_b_pc(ex_b_pc),
@@ -698,9 +722,8 @@ ex_stage ex_stage_0(
     .ex_b_mem_type(ex_b_mem_type),
     .ex_b_mem_size(ex_b_mem_size),
     .ex_b_st_data(ex_b_st_data),
-    .ex_b_is_csr_op(ex_b_is_csr_op),
-    .ex_b_csr_addr(ex_b_csr_addr),
-    .ex_b_csr_mask(ex_b_csr_mask)
+    .ex_b_is_spec_op(ex_b_is_spec_op),
+    .ex_b_spec_op(ex_b_spec_op)
 );
 
 mem_ctrl mem_ctrl_a(
@@ -797,6 +820,131 @@ mem_ctrl mem_ctrl_b(
     .mmu_pme(mmu_d2_pme)
 );
 
+always_ff @(posedge clk) begin
+    if (reset || flush_all) begin
+        MEM_a_is_spec_op <= 1'b0;
+        MEM_b_is_spec_op <= 1'b0;
+    end
+    else if (!mem_a_stall && !mem_b_stall) begin
+        MEM_a_is_spec_op <= ex_a_is_spec_op;
+        MEM_b_is_spec_op <= ex_b_is_spec_op;
+        if (ex_a_is_spec_op) begin
+            MEM_spec_op <= ex_a_spec_op;
+            MEM_spec_op_pc <= ex_a_pc;
+            MEM_csr_wdata <= ex_a_result;
+        end
+        else if (ex_b_is_spec_op) begin
+            MEM_spec_op <= ex_b_spec_op;
+            MEM_spec_op_pc <= ex_b_pc;
+            MEM_csr_wdata <= ex_b_result;
+        end
+    end
+end
+
+assign mem_is_spec_op = MEM_a_is_spec_op || MEM_b_is_spec_op;
+assign mem_a_csr_result_valid = MEM_a_is_spec_op && csr_we;
+assign mem_b_csr_result_valid = MEM_b_is_spec_op && csr_we;
+
+always_comb begin
+    if (mem_a_valid && (mem_a_have_exception || interrupt)) begin
+        raise_exception = 1'b1;
+        mem_exception_type = interrupt ? INT : mem_a_exception_type;
+        mem_exception_pc = mem_a_pc;
+        mem_exception_address = mem_ctrl_a.MEM_result;
+    end
+    else if (mem_b_valid && mem_b_have_exception) begin
+        raise_exception = 1'b1;
+        mem_exception_type = mem_b_exception_type;
+        mem_exception_pc = mem_b_pc;
+        mem_exception_address = mem_ctrl_b.MEM_result;
+    end
+    else begin
+        raise_exception = 1'b0;
+        mem_exception_type = INT;
+        mem_exception_pc = 32'd0;
+        mem_exception_address = 32'd0;
+    end
+end
+
+csr csr_0(
+    .clk(clk),
+    .reset(reset),
+    .addr(MEM_spec_op.csr_addr),
+    .rdata(mem_csr_rdata),
+    .we(csr_we),
+    .mask(MEM_spec_op.csr_mask),
+    .wdata(MEM_csr_wdata),
+    .have_exception(raise_exception),
+    .exception_type(mem_exception_type),
+    .pc_in(mem_exception_pc),
+    .pc_out(exception_target),
+    .interrupt(interrupt),
+    .badv_we(csr_badv_we),
+    .badv_data(csr_badv_data),
+    .vppn_we(csr_vppn_we),
+    .vppn_data(csr_vppn_data),
+    .csr_tlbsrch_we(csr_tlbsrch_we),
+    .csr_tlbsrch_found(csr_tlbsrch_found),
+    .csr_tlbsrch_index(csr_tlbsrch_index),
+    
+    .csr_tlb_we(csr_tlb_we),
+    .csr_tlb_wdata(csr_tlb_wdata),
+    .csr_tlb_rdata(csr_tlb_rdata),
+
+    .csr_tlbidx(csr_tlbidx),
+    .csr_asid(csr_asid),
+    .csr_da(csr_da),
+    .csr_datf(csr_datf),
+    .csr_datm(csr_datm),
+    .csr_plv(csr_plv),
+    .csr_dmw0(csr_dmw0),
+    .csr_dmw1(csr_dmw1)
+);
+
+assign mem_spec_valid = mem_is_spec_op && !raise_exception && !mem_a_stall && !mem_b_stall;
+
+assign csr_we = MEM_spec_op.opcode == SPEC_CSR && mem_spec_valid;
+assign csr_badv_we = raise_exception && (
+   mem_exception_type == TLBR
+|| mem_exception_type == ADEF
+|| mem_exception_type == ALE
+|| mem_exception_type == PIL
+|| mem_exception_type == PIS
+|| mem_exception_type == PIF
+|| mem_exception_type == PME
+|| mem_exception_type == PPI);
+assign csr_badv_data = (mem_exception_type == ADEF || mem_exception_type == PIF) ? mem_exception_pc : mem_exception_address;
+assign csr_vppn_we = raise_exception && (
+   mem_exception_type == TLBR
+|| mem_exception_type == PIL
+|| mem_exception_type == PIS
+|| mem_exception_type == PIF
+|| mem_exception_type == PME
+|| mem_exception_type == PPI);
+assign csr_vppn_data = mem_exception_type == PIF ? mem_exception_pc[31:13] : mem_exception_address[31:13];
+
+assign csr_tlbsrch_we = MEM_spec_op.opcode == SPEC_TLBSRCH && mem_spec_valid;
+assign csr_tlbsrch_found = mmu_tlbsrch_found;
+assign csr_tlbsrch_index = mmu_tlbsrch_index;
+assign csr_tlb_we = MEM_spec_op.opcode == SPEC_TLBRD && mem_spec_valid;
+assign csr_tlb_wdata = mmu_tlb_r_entry;
+
+assign mmu_tlbsrch_valid = csr_tlbsrch_we;
+assign mmu_tlbsrch_vppn = csr_tlb_rdata.vppn;
+assign mmu_tlb_r_index = csr_tlbidx;
+assign mmu_tlb_we = (MEM_spec_op.opcode == SPEC_TLBWR || MEM_spec_op.opcode == SPEC_TLBFILL) && mem_spec_valid;
+assign mmu_tlb_w_index = csr_tlbidx;
+assign mmu_tlb_w_entry = csr_tlb_rdata;
+
+assign mmu_invtlb_valid = MEM_spec_op.opcode == SPEC_INVTLB && mem_spec_valid;
+assign mmu_invtlb_op = MEM_spec_op.invtlb_op;
+assign mmu_invtlb_asid = MEM_spec_op.invtlb_asid;
+assign mmu_invtlb_va = MEM_spec_op.invtlb_va;
+
+assign flush_all = raise_exception || rewind;
+assign rewind = mem_is_spec_op && mem_spec_valid;
+assign rewind_target = MEM_spec_op_pc + 32'd4;
+
 wb_ctrl wb_ctrl_a(
     .clk(clk),
     .reset(reset),
@@ -875,77 +1023,6 @@ regfile regfile_0(
     .wdata2(rf_wdata2)
 );
 
-always_ff @(posedge clk) begin
-    if (reset || flush_all) begin
-        MEM_a_is_csr_op <= 1'b0;
-        MEM_b_is_csr_op <= 1'b0;
-        MEM_csr_mask <= 32'd0;
-    end
-    else if (!mem_a_stall && !mem_b_stall) begin
-        MEM_a_is_csr_op <= ex_a_is_csr_op;
-        MEM_b_is_csr_op <= ex_b_is_csr_op;
-        if (ex_a_is_csr_op) begin
-            MEM_csr_addr <= ex_a_csr_addr;
-            MEM_csr_mask <= ex_a_csr_mask;
-            MEM_csr_wdata <= ex_a_result;
-        end
-        else if (ex_b_is_csr_op) begin
-            MEM_csr_addr <= ex_b_csr_addr;
-            MEM_csr_mask <= ex_b_csr_mask;
-            MEM_csr_wdata <= ex_b_result;
-        end
-        else begin
-            MEM_csr_mask <= 32'd0;
-        end
-    end
-end
-
-assign mem_a_csr_result_valid = MEM_a_is_csr_op && !raise_exception;
-assign mem_b_csr_result_valid = MEM_b_is_csr_op && !raise_exception;
-
-always_comb begin
-    if (mem_a_valid && (mem_a_have_exception || interrupt)) begin
-        raise_exception = 1'b1;
-        mem_exception_type = interrupt ? INT : mem_a_exception_type;
-        mem_exception_pc = mem_a_pc;
-        mem_exception_address = mem_ctrl_a.MEM_result;
-    end
-    else if (mem_b_valid && mem_b_have_exception) begin
-        raise_exception = 1'b1;
-        mem_exception_type = mem_b_exception_type;
-        mem_exception_pc = mem_b_pc;
-        mem_exception_address = mem_ctrl_b.MEM_result;
-    end
-    else begin
-        raise_exception = 1'b0;
-        mem_exception_type = INT;
-        mem_exception_pc = 32'd0;
-        mem_exception_address = 32'd0;
-    end
-end
-
-assign flush_all = raise_exception;
-
-csr csr_0(
-    .clk(clk),
-    .reset(reset),
-    .addr(MEM_csr_addr),
-    .rdata(mem_csr_rdata),
-    .we(MEM_csr_mask & {32{!raise_exception && !mem_a_stall && !mem_b_stall}}),
-    .wdata(MEM_csr_wdata),
-    .have_exception(raise_exception),
-    .exception_type(mem_exception_type),
-    .ertn(mem_exception_type == ERTN),
-    .pc_in(mem_exception_pc),
-    .pc_out(exception_target),
-    .interrupt(interrupt),
-    .badv_we(csr_badv_we),
-    .badv_data(csr_badv_data)
-);
-
-assign csr_badv_we = raise_exception && (mem_exception_type == ADEF || mem_exception_type == ALE);
-assign csr_badv_data = mem_exception_type == ADEF ? mem_exception_pc : mem_exception_address;
-
 branch_ctrl branch_ctrl_0(
     .id_a_branch_mistaken(id_a_branch_mistaken),
     .id_a_branch_taken(id_a_branch_taken),
@@ -972,12 +1049,16 @@ branch_ctrl branch_ctrl_0(
 );
 
 mmu mmu_0(
-    .direct_access(1'b1),
-    .direct_access_mat(2'd0),
-    .plv(2'd0),
-    .asid(10'd0),
-    .dmw0(10'd0),
-    .dmw1(10'd0),
+    .clk(clk),
+    .reset(reset),
+
+    .da(csr_da),
+    .datf(csr_datf),
+    .datm(csr_datm),
+    .plv(csr_plv),
+    .asid(csr_asid),
+    .dmw0(csr_dmw0),
+    .dmw1(csr_dmw1),
 
     .i_valid(mmu_i_valid),
     .i_va(mmu_i_va),
@@ -1018,6 +1099,22 @@ mmu mmu_0(
     .d2_pis(mmu_d2_pis),
     .d2_ppi(mmu_d2_ppi),
     .d2_pme(mmu_d2_pme),
+
+    .invtlb_valid(mmu_invtlb_valid),
+    .invtlb_op(mmu_invtlb_op),
+    .invtlb_asid(mmu_invtlb_asid),
+    .invtlb_va(mmu_invtlb_va),
+
+    .tlb_we(mmu_tlb_we),
+    .tlb_w_index(mmu_tlb_w_index),
+    .tlb_w_entry(mmu_tlb_w_entry),
+    .tlb_r_index(mmu_tlb_r_index),
+    .tlb_r_entry(mmu_tlb_r_entry),
+
+    .tlbsrch_valid(mmu_tlbsrch_valid),
+    .tlbsrch_vppn(mmu_tlbsrch_vppn),
+    .tlbsrch_found(mmu_tlbsrch_found),
+    .tlbsrch_index(mmu_tlbsrch_index),
 
     .inst_sram_req(inst_sram_req),
     .inst_sram_wr(inst_sram_wr),
