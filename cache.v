@@ -112,12 +112,12 @@ reg [`TAG_WIDTH-1:0] tag_way3 [0:255];
 `endif\
 )
 
-reg [0:`LINE_NUM-1] valid_way0;
-reg [0:`LINE_NUM-1] valid_way1;
+reg [`LINE_NUM-1:0] valid_way0;
+reg [`LINE_NUM-1:0] valid_way1;
 
 `ifdef CACHE_4WAY
-reg [0:`LINE_NUM-1] valid_way2;
-reg [0:`LINE_NUM-1] valid_way3;
+reg [`LINE_NUM-1:0] valid_way2;
+reg [`LINE_NUM-1:0] valid_way3;
 `endif
 
 `define get_valid(way_id_,index_) (\
@@ -167,12 +167,12 @@ reg [`LINE_WIDTH-1:0] data_way3 [0:`LINE_NUM-1];
 //         0\
 // )
 
-reg [0:`LINE_NUM-1] dirty_way0;
-reg [0:`LINE_NUM-1] dirty_way1;
+reg [`LINE_NUM-1:0] dirty_way0;
+reg [`LINE_NUM-1:0] dirty_way1;
 
 `ifdef CACHE_4WAY
-reg [0:`LINE_NUM-1] dirty_way2;
-reg [0:`LINE_NUM-1] dirty_way3;
+reg [`LINE_NUM-1:0] dirty_way2;
+reg [`LINE_NUM-1:0] dirty_way3;
 `endif
 
 `define get_dirty(way_id_,index_) (\
