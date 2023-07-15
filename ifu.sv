@@ -50,7 +50,7 @@ assign pred_branch_target2 = 32'd0;
 assign pc1 = have_exception ? pc_start : pc_start_sent;
 assign pc2 = pc1 + 32'd4;
 
-assign inst1 = pc_start_sent[2] == 1'b1 ? mmu_i_rdata[63:32] : mmu_i_rdata[31: 0];
+assign inst1 = /*pc_start_sent[2] == 1'b1 ? mmu_i_rdata[63:32] :*/ mmu_i_rdata[31: 0];
 assign inst2 = mmu_i_rdata[63:32];
 
 always_ff @(posedge clk) begin
@@ -99,12 +99,12 @@ end
 
 assign mmu_i_valid = !reset && !have_exception && ibuf_ready && (!pending_data || mmu_i_data_ok);
 assign mmu_i_addr = pc_start;
-assign mmu_i_double = pc_start[2] != 1'b1;
+assign mmu_i_double = 1'b0; //pc_start[2] != 1'b1;
 
 assign ibuf_input_size = have_exception           ? 2'd1 :
                          !mmu_i_data_ok || cancel ? 2'd0 :
                          pc_start_sent[2] == 1'b1 ? 2'd1 :
-                                                    2'd2 ;
+                                                    2'd1 ;
 
 always_comb begin
     if (pc_start[1:0] != 2'h0) begin

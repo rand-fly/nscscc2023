@@ -68,25 +68,27 @@ module mmu(
     output logic        tlbsrch_found,
     output logic [TLBIDLEN-1:0] tlbsrch_index,
 
-    output logic        inst_sram_req,
-    output logic        inst_sram_wr,
-    output logic [ 1:0] inst_sram_size,
-    output logic [ 3:0] inst_sram_wstrb,
-    output logic [31:0] inst_sram_addr,
-    output logic [31:0] inst_sram_wdata,
-    input wire          inst_sram_addr_ok,
-    input wire          inst_sram_data_ok,
-    input wire   [63:0] inst_sram_rdata,
+    output logic        icache_req,
+    output logic        icache_wr,
+    output logic [ 1:0] icache_size,
+    output logic [ 3:0] icache_wstrb,
+    output logic [31:0] icache_addr,
+    output logic [31:0] icache_wdata,
+    output logic        icache_uncached,
+    input wire          icache_addr_ok,
+    input wire          icache_data_ok,
+    input wire   [63:0] icache_rdata,
 
-    output logic        data_sram_req,
-    output logic        data_sram_wr,
-    output logic [ 1:0] data_sram_size,
-    output logic [ 3:0] data_sram_wstrb,
-    output logic [31:0] data_sram_addr,
-    output logic [31:0] data_sram_wdata,
-    input wire          data_sram_addr_ok,
-    input wire          data_sram_data_ok,
-    input wire   [31:0] data_sram_rdata
+    output logic        dcache_req,
+    output logic        dcache_wr,
+    output logic [ 1:0] dcache_size,
+    output logic [ 3:0] dcache_wstrb,
+    output logic [31:0] dcache_addr,
+    output logic [31:0] dcache_wdata,
+    output logic        dcache_uncached,
+    input wire          dcache_addr_ok,
+    input wire          dcache_data_ok,
+    input wire   [31:0] dcache_rdata
 );
 
 logic [31:0] i_pa;
@@ -238,25 +240,27 @@ tlb tlb_0(
     .r_entry     (tlb_r_entry)
 );
 
-assign inst_sram_req = i_valid;
-assign inst_sram_wr  = 1'b0;
-assign inst_sram_size = 2'd2;
-assign inst_sram_wstrb = 4'b0000;
-assign inst_sram_addr = i_pa;
-assign inst_sram_wdata = 32'h0;
-assign i_addr_ok = inst_sram_addr_ok;
-assign i_data_ok = inst_sram_data_ok;
-assign i_rdata = inst_sram_rdata;
+assign icache_req = i_valid;
+assign icache_wr  = 1'b0;
+assign icache_size = 2'd2;
+assign icache_wstrb = 4'b0000;
+assign icache_addr = i_pa;
+assign icache_wdata = 32'h0;
+assign icache_uncached = i_mat == 2'd0;
+assign i_addr_ok = icache_addr_ok;
+assign i_data_ok = icache_data_ok;
+assign i_rdata = icache_rdata;
 
-assign data_sram_req = d1_valid;
-assign data_sram_wr  = d1_we;
-assign data_sram_size = d1_size;
-assign data_sram_wstrb = d1_wstrb;
-assign data_sram_addr = d1_pa;
-assign data_sram_wdata = d1_wdata;
-assign d1_addr_ok = data_sram_addr_ok;
-assign d1_data_ok = data_sram_data_ok;
-assign d1_rdata = data_sram_rdata;
+assign dcache_req = d1_valid;
+assign dcache_wr  = d1_we;
+assign dcache_size = d1_size;
+assign dcache_wstrb = d1_wstrb;
+assign dcache_addr = d1_pa;
+assign dcache_wdata = d1_wdata;
+assign dcache_uncached = d1_mat == 2'd0;
+assign d1_addr_ok = dcache_addr_ok;
+assign d1_data_ok = dcache_data_ok;
+assign d1_rdata = dcache_rdata;
 
 assign d2_addr_ok = 1'b0;
 assign d2_data_ok = 1'b0;

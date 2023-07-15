@@ -8,6 +8,16 @@ parameter TLBNUM = 16;
 parameter TLBIDLEN = $clog2(TLBNUM);
 parameter PALEN  = 32;
 
+`define CACHE_LINE_32B
+
+`ifdef CACHE_LINE_16B
+`define LINE_WIDTH 128
+`define LINE_WORD_NUM 4
+`elsif CACHE_LINE_32B
+`define LINE_WIDTH 256
+`define LINE_WORD_NUM 8
+`endif
+
 typedef enum logic [4:0] {
     // alu operation
     OP_OUT1 = 5'h00,  // ALU output A
