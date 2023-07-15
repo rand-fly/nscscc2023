@@ -50,7 +50,6 @@ wire [ 5:0] op_31_26 = inst[31:26];
 wire [4:0] rd  = inst[ 4: 0];
 wire [4:0] rj  = inst[ 9: 5];
 wire [4:0] rk  = inst[14:10];
-wire [4:0] ra  = inst[19:15];
 
 wire [4: 0] i5  = inst[14:10];
 wire [11:0] i12 = inst[21:10];

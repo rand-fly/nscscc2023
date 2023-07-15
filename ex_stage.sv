@@ -128,7 +128,6 @@ logic            a_is_alu_op;
 logic            a_is_mul_op;
 logic            a_is_div_op;
 logic            a_coming_mul_op;
-logic            a_coming_div_op;
 logic [31:0]     a_alu_result;
 logic            a_mul_ready;
 logic [32:0]     a_mul_src1;
@@ -148,7 +147,6 @@ logic            b_is_alu_op;
 logic            b_is_mul_op;
 logic            b_is_div_op;
 logic            b_coming_mul_op;
-logic            b_coming_div_op;
 logic [31:0]     b_alu_result;
 logic            b_mul_ready;
 logic [32:0]     b_mul_src1;
@@ -279,7 +277,6 @@ assign a_is_alu_op = EX_a_opcode[4] == 1'b0;
 assign a_is_mul_op = EX_a_opcode[4:3] == 2'b10;
 assign a_is_div_op = EX_a_opcode[4:3] == 2'b11;
 assign a_coming_mul_op = ro_a_opcode[4:3] == 2'b10;
-assign a_coming_div_op = ro_a_opcode[4:3] == 2'b11;
 assign a_mul_sign_ex = EX_a_opcode == OP_MULH;
 assign a_mul_src1 = {a_mul_sign_ex && EX_a_src1[31], EX_a_src1};
 assign a_mul_src2 = {a_mul_sign_ex && EX_a_src2[31], EX_a_src2};
@@ -293,7 +290,6 @@ assign b_is_alu_op = EX_b_opcode[4] == 1'b0;
 assign b_is_mul_op = EX_b_opcode[4:3] == 2'b10;
 assign b_is_div_op = EX_b_opcode[4:3] == 2'b11;
 assign b_coming_mul_op = ro_b_opcode[4:3] == 2'b10;
-assign b_coming_div_op = ro_b_opcode[4:3] == 2'b11;
 assign b_mul_sign_ex = EX_b_opcode == OP_MULH;
 assign b_mul_src1 = {b_mul_sign_ex && EX_b_src1[31], EX_b_src1};
 assign b_mul_src2 = {b_mul_sign_ex && EX_b_src2[31], EX_b_src2};
@@ -366,7 +362,7 @@ assign ex_b_result = EX_b_is_jirl ? EX_b_pc + 32'd4 :
                    | {32{EX_b_opcode == OP_MUL}} & b_mul_result[31:0]
                    | {32{EX_b_opcode == OP_MULH || EX_b_opcode == OP_MULHU}} & b_mul_result[63:32]
                    | {32{EX_b_opcode == OP_DIV || EX_b_opcode == OP_DIVU}} & b_div_result
-                   | {32{EX_b_opcode == OP_MOD || EX_b_opcode == OP_MODU}} & b_div_result;
+                   | {32{EX_b_opcode == OP_MOD || EX_b_opcode == OP_MODU}} & b_mod_result;
 
 assign ex_a_branch_taken = EX_a_is_branch && (EX_a_is_jirl || EX_a_branch_condition == a_alu_result[0]);
 

@@ -289,13 +289,6 @@ logic        rf_we2;
 logic [ 4:0] rf_waddr2;
 logic [31:0] rf_wdata2;
 
-
-logic        mmu_direct_access;
-logic [1:0]  mmu_direct_access_mat;
-logic [1:0]  mmu_plv;
-logic [9:0]  mmu_asid;
-dmw_t        mmu_dmw0;
-dmw_t        mmu_dmw1;
 logic        mmu_i_valid;
 logic [31:0] mmu_i_va;
 logic        mmu_i_double;
@@ -438,9 +431,7 @@ always_ff @(posedge clk) begin
         counter <= counter + 64'd1;
 end
 
-id_stage id_stage_0 (
-    .clk(clk),
-    .reset(reset),
+id_stage id_stage_0(
     .ro_stall(ro_stall),
     .counter(counter),
     .id_consume_inst(id_consume_inst),

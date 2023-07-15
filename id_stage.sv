@@ -1,9 +1,6 @@
 `include "definitions.svh"
 
 module id_stage (
-    input wire             clk,
-    input wire             reset,
-
     input wire             ro_stall,
     input wire [63:0]      counter,
 

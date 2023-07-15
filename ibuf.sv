@@ -45,10 +45,8 @@ logic [31:0] pred_branch_target[7:0];
 logic [2:0] head;
 logic [2:0] tail;
 logic [3:0] length;
-logic       full;
 
-assign input_ready = length <= 4'd4;
-assign full = length == 4'd8;
+assign input_ready = length <= 4'd4; // 本周期最多可能进来两条，同时最多可能发起两条请求
 
 assign output_valid1 = length >= 4'd1;
 assign output_pc1 = pc[head];
