@@ -693,9 +693,6 @@ always @(posedge clk) begin
         prefetch_tag_reg <= prefetch_tag;
         prefetch_index_reg <= prefetch_index;
     end
-end
-
-always @(posedge clk) begin
     if (prefetching & ret_valid_last) begin
         prefetching <= 0;
         prefetch_valid_reg <= 1;

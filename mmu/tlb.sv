@@ -26,8 +26,8 @@ module tlb
     // invtlb opcode
     input  wire                invtlb_valid,
     input  wire [         4:0] invtlb_op,
-	input  wire [         9:0] invtlb_asid,
-	input  wire [        31:0] invtlb_va,
+    input  wire [         9:0] invtlb_asid,
+    input  wire [        31:0] invtlb_va,
 
     // write port
     input  wire                we,     //w(rite) e(nable)
@@ -54,15 +54,25 @@ reg  [       1:0] tlb_plv1     [TLBNUM-1:0];
 reg  [       1:0] tlb_mat1     [TLBNUM-1:0];
 reg               tlb_d1       [TLBNUM-1:0];
 reg               tlb_v1       [TLBNUM-1:0];
-wire [TLBNUM-1:0] match_vppn0			   ;
-wire [TLBNUM-1:0] match_asid0              ;
-wire [TLBNUM-1:0] match0                   ;
-wire [TLBNUM-1:0] match_vppn1              ;
-wire [TLBNUM-1:0] match_asid1              ;
-wire [TLBNUM-1:0] match1                   ;
-wire [TLBNUM-1:0] match_vppn2              ;
-wire [TLBNUM-1:0] match_asid2              ;
-wire [TLBNUM-1:0] match2                   ;
+
+
+reg [TLBIDLEN-1:0] match_id0;
+reg [TLBIDLEN-1:0] match_id1;
+reg [TLBIDLEN-1:0] match_id2;
+
+wire [TLBNUM-1:0] match0;
+wire [TLBNUM-1:0] match_vppn0;
+wire [TLBNUM-1:0] match_asid0;
+wire [TLBNUM-1:0] match1;
+wire [TLBNUM-1:0] match_vppn1;
+wire [TLBNUM-1:0] match_asid1;
+wire [TLBNUM-1:0] match2;
+wire [TLBNUM-1:0] match_vppn2;
+wire [TLBNUM-1:0] match_asid2;
+
+logic [TLBIDLEN-1:0] match_id_sel0 [TLBNUM-1:0];
+logic [TLBIDLEN-1:0] match_id_sel1 [TLBNUM-1:0];
+logic [TLBIDLEN-1:0] match_id_sel2 [TLBNUM-1:0];
 
 genvar i;
 
@@ -70,109 +80,102 @@ genvar i;
 generate
     for(i = 0; i < TLBNUM; i = i + 1)
     begin: match
-    	assign match_vppn0[i] = tlb_ps4MB[i] ? s0_vppn[18:9] == tlb_vppn[i][18:9]: s0_vppn == tlb_vppn[i];
-    	assign match_asid0[i] = s0_asid == tlb_asid[i];
-        assign match0[i] = tlb_e[i]?
-        	 match_vppn0[i] && (match_asid0[i] || tlb_g[i]):
-        	0;
+        assign match_vppn0[i] = tlb_ps4MB[i] ? s0_vppn[18:9] == tlb_vppn[i][18:9]: s0_vppn == tlb_vppn[i];
+        assign match_asid0[i] = s0_asid == tlb_asid[i];
+        assign match0[i] = tlb_e[i] && match_vppn0[i] && (match_asid0[i] || tlb_g[i]);
+        assign match_id_sel0[i] = match0[i] ? i : 0;
+
         assign match_vppn1[i] = tlb_ps4MB[i] ? s1_vppn[18:9] == tlb_vppn[i][18:9]: s1_vppn == tlb_vppn[i];
-    	assign match_asid1[i] = s1_asid == tlb_asid[i];
-        assign match1[i] = tlb_e[i]?
-        	 match_vppn1[i] && (match_asid1[i] || tlb_g[i]):
-        	0;
+        assign match_asid1[i] = s1_asid == tlb_asid[i];
+        assign match1[i] = tlb_e[i] && match_vppn1[i] && (match_asid1[i] || tlb_g[i]);
+        assign match_id_sel1[i] = match1[i] ? i : 0;
+
         assign match_vppn2[i] = tlb_ps4MB[i] ? s2_vppn[18:9] == tlb_vppn[i][18:9]: s2_vppn == tlb_vppn[i];
-    	assign match_asid2[i] = s2_asid == tlb_asid[i];
-        assign match2[i] = tlb_e[i]?
-        	 match_vppn2[i] && (match_asid2[i] || tlb_g[i]):
-        	0;
+        assign match_asid2[i] = s2_asid == tlb_asid[i];
+        assign match2[i] = tlb_e[i] && match_vppn2[i] && (match_asid2[i] || tlb_g[i]);
+        assign match_id_sel2[i] = match2[i] ? i : 0;
     end
 endgenerate
 
 always_comb begin
-	integer j;
-	s0_result = 0;
-	s1_result = 0;
-	s2_result = 0;
-	s0_result.found = match0 != 0;
-	s1_result.found = match1 != 0;
-	s2_result.found = match2 != 0;
-	for(j = 0; j < TLBNUM; j = j + 1) begin
-		//for s0 port
-	    if(match0[j] == 1) begin
-    		//decode to index
-	    	s0_result.index = j;
-	    	//fetch result output
+    integer j;
+    match_id0 = 0;
+    match_id1 = 0;
+    match_id2 = 0;
+    for(j = 0; j < TLBNUM; j = j + 1) begin
+        match_id0 |= match_id_sel0[j];
+        match_id1 |= match_id_sel1[j];
+        match_id2 |= match_id_sel2[j];
+    end
+end
 
-	    	//even case
-	    	//4KB->vpn[12] = 0 or 4MB->vpn[21] = 0
-	    	if((tlb_ps4MB[j] == 0 && s0_va_bit12 == 0) || (tlb_ps4MB[j] == 1 && s0_vppn[8] == 0))begin
-		    	s0_result.ppn = tlb_ppn0[j];
-		    	s0_result.ps = tlb_ps4MB[j] ? 21 : 12;
-		    	s0_result.plv = tlb_plv0[j];
-		    	s0_result.mat = tlb_mat0[j];
-		    	s0_result.d = tlb_d0[j];
-		    	s0_result.v = tlb_v0[j];
-	    	end
-	    	//odd case
-	    	//4KB->vpn[12] = 1 or 4MB->vpn[21] = 1
-	    	else if((tlb_ps4MB[j] == 0 && s0_va_bit12 == 1) || (tlb_ps4MB[j] == 1 && s0_vppn[8] == 1)) begin
-	    		s0_result.ppn = tlb_ppn1[j];
-		    	s0_result.ps = tlb_ps4MB[j] ? 21 : 12;
-		    	s0_result.plv = tlb_plv1[j];
-		    	s0_result.mat = tlb_mat1[j];
-		    	s0_result.d = tlb_d1[j];
-		    	s0_result.v = tlb_v1[j];
-	    	end
-	    end
-	    //for s1 port
-	   	if(match1[j] == 1) begin
-	    	s1_result.index = j;
-	    	if((tlb_ps4MB[j] == 0 && s1_va_bit12 == 0) || (tlb_ps4MB[j] == 1 && s1_vppn[8] == 0))begin
-		    	s1_result.ppn = tlb_ppn0[j];
-		    	s1_result.ps = tlb_ps4MB[j] ? 21 : 12;
-		    	s1_result.plv = tlb_plv0[j];
-		    	s1_result.mat = tlb_mat0[j];
-		    	s1_result.d = tlb_d0[j];
-		    	s1_result.v = tlb_v0[j];
-	    	end
-	    	//odd case
-	    	//4KB->vpn[12] = 1 or 4MB->vpn[21] = 1
-	    	else if((tlb_ps4MB[j] == 0 && s1_va_bit12 == 1) || (tlb_ps4MB[j] == 1 && s1_vppn[8] == 1)) begin
-	    		s1_result.ppn = tlb_ppn1[j];
-		    	s1_result.ps = tlb_ps4MB[j] ? 21 : 12;
-		    	s1_result.plv = tlb_plv1[j];
-		    	s1_result.mat = tlb_mat1[j];
-		    	s1_result.d = tlb_d1[j];
-		    	s1_result.v = tlb_v1[j];
-	    	end
-	    end
-	    if(match2[j] == 1) begin
-	    	s2_result.index = j;
-	    	if((tlb_ps4MB[j] == 0 && s2_va_bit12 == 0) || (tlb_ps4MB[j] == 1 && s2_vppn[8] == 0))begin
-		    	s2_result.ppn = tlb_ppn0[j];
-		    	s2_result.ps = tlb_ps4MB[j] ? 21 : 12;
-		    	s2_result.plv = tlb_plv0[j];
-		    	s2_result.mat = tlb_mat0[j];
-		    	s2_result.d = tlb_d0[j];
-		    	s2_result.v = tlb_v0[j];
-	    	end
-	    	//odd case
-	    	//4KB->vpn[12] = 1 or 4MB->vpn[21] = 1
-	    	else if((tlb_ps4MB[j] == 0 && s2_va_bit12 == 1) || (tlb_ps4MB[j] == 1 && s2_vppn[8] == 1)) begin
-	    		s2_result.ppn = tlb_ppn1[j];
-		    	s2_result.ps = tlb_ps4MB[j] ? 21 : 12;
-		    	s2_result.plv = tlb_plv1[j];
-		    	s2_result.mat = tlb_mat1[j];
-		    	s2_result.d = tlb_d1[j];
-		    	s2_result.v = tlb_v1[j];
-	    	end
-	    end
+assign s0_result.index = match_id0;
+assign s1_result.index = match_id1;
+assign s2_result.index = match_id2;
+
+assign s0_result.found = match0 != 0;
+assign s1_result.found = match1 != 0;
+assign s2_result.found = match2 != 0;
+
+always_comb begin
+    logic [TLBIDLEN-1:0] j;
+    j = match_id0;
+    if((tlb_ps4MB[j] == 0 && s0_va_bit12 == 0) || (tlb_ps4MB[j] == 1 && s0_vppn[8] == 0))begin
+        s0_result.ppn = tlb_ppn0[j];
+        s0_result.ps = tlb_ps4MB[j] ? 21 : 12;
+        s0_result.plv = tlb_plv0[j];
+        s0_result.mat = tlb_mat0[j];
+        s0_result.d = tlb_d0[j];
+        s0_result.v = tlb_v0[j];
+    end
+    else begin
+        s0_result.ppn = tlb_ppn1[j];
+        s0_result.ps = tlb_ps4MB[j] ? 21 : 12;
+        s0_result.plv = tlb_plv1[j];
+        s0_result.mat = tlb_mat1[j];
+        s0_result.d = tlb_d1[j];
+        s0_result.v = tlb_v1[j];
+    end
+    
+    j = match_id1;
+    if((tlb_ps4MB[j] == 0 && s1_va_bit12 == 0) || (tlb_ps4MB[j] == 1 && s1_vppn[8] == 0))begin
+        s1_result.ppn = tlb_ppn0[j];
+        s1_result.ps = tlb_ps4MB[j] ? 21 : 12;
+        s1_result.plv = tlb_plv0[j];
+        s1_result.mat = tlb_mat0[j];
+        s1_result.d = tlb_d0[j];
+        s1_result.v = tlb_v0[j];
+    end
+    else begin
+        s1_result.ppn = tlb_ppn1[j];
+        s1_result.ps = tlb_ps4MB[j] ? 21 : 12;
+        s1_result.plv = tlb_plv1[j];
+        s1_result.mat = tlb_mat1[j];
+        s1_result.d = tlb_d1[j];
+        s1_result.v = tlb_v1[j];
+    end
+
+    j = match_id2;
+    if((tlb_ps4MB[j] == 0 && s2_va_bit12 == 0) || (tlb_ps4MB[j] == 1 && s2_vppn[8] == 0))begin
+        s2_result.ppn = tlb_ppn0[j];
+        s2_result.ps = tlb_ps4MB[j] ? 21 : 12;
+        s2_result.plv = tlb_plv0[j];
+        s2_result.mat = tlb_mat0[j];
+        s2_result.d = tlb_d0[j];
+        s2_result.v = tlb_v0[j];
+    end
+    else begin
+        s2_result.ppn = tlb_ppn1[j];
+        s2_result.ps = tlb_ps4MB[j] ? 21 : 12;
+        s2_result.plv = tlb_plv1[j];
+        s2_result.mat = tlb_mat1[j];
+        s2_result.d = tlb_d1[j];
+        s2_result.v = tlb_v1[j];
     end
 end
 //end select tlb
 
 //invtlb
-
 wire tlb_clr = 				invtlb_op == 5'h0 || invtlb_op == 5'h1;
 wire tlb_clr_g1 =			invtlb_op == 5'h2;
 wire tlb_clr_g0 =			invtlb_op == 5'h3;
@@ -184,82 +187,54 @@ wire [18:0] invtlb_vppn;
 assign invtlb_vppn = invtlb_va[31:13];
 
 always @(posedge clk) begin
-	integer j;
-	if(invtlb_valid) begin
-		for(j = 0; j < TLBNUM; j = j + 1) begin
-			 if(tlb_e[j]) begin
-				//for both 0 and 1
-				if(
-					(tlb_clr) ||
-					(tlb_clr_g1 && tlb_g[j] == 1)||
-					(tlb_clr_g0 && tlb_g[j] == 0)||
-					(tlb_clr_g0_asid && tlb_g[j] == 0 && tlb_asid[j] == invtlb_asid)||
-					(
-						tlb_clr_g0_asid_vpn && 
-						tlb_g[j] == 0 && tlb_asid[j] == invtlb_asid && 
-						(tlb_ps4MB[j] ? invtlb_vppn[18:9] == tlb_vppn[j][18:9]: invtlb_vppn == tlb_vppn[j])//vppn match
-					) || 
-					(
-						tlb_clr_g1_asid_vpn && 
-						(tlb_g[j] == 1 || tlb_asid[j] == invtlb_asid) && 
-						(tlb_ps4MB[j] ? invtlb_vppn[18:9] == tlb_vppn[j][18:9]: invtlb_vppn == tlb_vppn[j])
-					)
-				) begin
-					tlb_e[j] <= 0;
-					tlb_ps4MB[j] <= 0;
-					tlb_vppn[j] <= 0;
-			        tlb_asid[j] <= 0;
-			        tlb_g[j] <= 0;
-			        tlb_ppn0[j] <= 0;
-			        tlb_ppn1[j] <= 0;
-	                tlb_plv0[j] <= 0;
-	                tlb_plv1[j] <= 0;
-	                tlb_mat0[j] <= 0;
-	                tlb_mat1[j] <= 0;
-	                tlb_d0[j] <= 0;
-	                tlb_d1[j] <= 0;
-	                tlb_v0[j] <= 0;
-	                tlb_v1[j] <= 0;
-				end
-			end
-		end	
-	end
-	else if(reset) begin
-		for(j = 0; j < TLBNUM; j = j + 1) begin
-			tlb_e[j] <= 0;
-			tlb_ps4MB[j] <= 0;
-			tlb_vppn[j] <= 0;
-			tlb_asid[j] <= 0;
-			tlb_g[j] <= 0;
-			tlb_ppn0[j] <= 0;
-			tlb_ppn1[j] <= 0;
-			tlb_plv0[j] <= 0;
-			tlb_plv1[j] <= 0;
-			tlb_mat0[j] <= 0;
-			tlb_mat1[j] <= 0;
-			tlb_d0[j] <= 0;
-			tlb_d1[j] <= 0;
-			tlb_v0[j] <= 0;
-			tlb_v1[j] <= 0;
+    integer j;
+    if(reset) begin
+        for(j = 0; j < TLBNUM; j = j + 1) begin
+            tlb_e[j] <= 0;
         end
     end
+    else if(invtlb_valid) begin
+        for(j = 0; j < TLBNUM; j = j + 1) begin
+             if(tlb_e[j]) begin
+                //for both 0 and 1
+                if(
+                    (tlb_clr) ||
+                    (tlb_clr_g1 && tlb_g[j] == 1)||
+                    (tlb_clr_g0 && tlb_g[j] == 0)||
+                    (tlb_clr_g0_asid && tlb_g[j] == 0 && tlb_asid[j] == invtlb_asid)||
+                    (
+                        tlb_clr_g0_asid_vpn && 
+                        tlb_g[j] == 0 && tlb_asid[j] == invtlb_asid && 
+                        (tlb_ps4MB[j] ? invtlb_vppn[18:9] == tlb_vppn[j][18:9]: invtlb_vppn == tlb_vppn[j])//vppn match
+                    ) || 
+                    (
+                        tlb_clr_g1_asid_vpn && 
+                        (tlb_g[j] == 1 || tlb_asid[j] == invtlb_asid) && 
+                        (tlb_ps4MB[j] ? invtlb_vppn[18:9] == tlb_vppn[j][18:9]: invtlb_vppn == tlb_vppn[j])
+                    )
+                ) begin
+                    tlb_e[j] <= 0;
+                end
+            end
+        end	
+    end
     else if(we) begin
-		tlb_e[w_index] <= w_entry.e;
-		tlb_vppn[w_index] <= w_entry.vppn;
-		tlb_ps4MB[w_index] <= w_entry.ps == 12 ? 0 : 1;//21(else)->4MB, 12->4KB
-		tlb_asid[w_index] <= w_entry.asid;
-		tlb_g[w_index] <= w_entry.g;
-		tlb_ppn0[w_index] <= w_entry.ppn0;
-		tlb_plv0[w_index] <= w_entry.plv0;
-		tlb_mat0[w_index] <= w_entry.mat0;
-		tlb_d0[w_index] <= w_entry.d0;
-		tlb_v0[w_index] <= w_entry.v0;
-		tlb_ppn1[w_index] <= w_entry.ppn1;
-		tlb_plv1[w_index] <= w_entry.plv1;
-		tlb_mat1[w_index] <= w_entry.mat1;
-		tlb_d1[w_index] <= w_entry.d1;
-		tlb_v1[w_index] <= w_entry.v1;
-	end
+        tlb_e[w_index] <= w_entry.e;
+        tlb_vppn[w_index] <= w_entry.vppn;
+        tlb_ps4MB[w_index] <= w_entry.ps == 12 ? 0 : 1;//21(else)->4MB, 12->4KB
+        tlb_asid[w_index] <= w_entry.asid;
+        tlb_g[w_index] <= w_entry.g;
+        tlb_ppn0[w_index] <= w_entry.ppn0;
+        tlb_plv0[w_index] <= w_entry.plv0;
+        tlb_mat0[w_index] <= w_entry.mat0;
+        tlb_d0[w_index] <= w_entry.d0;
+        tlb_v0[w_index] <= w_entry.v0;
+        tlb_ppn1[w_index] <= w_entry.ppn1;
+        tlb_plv1[w_index] <= w_entry.plv1;
+        tlb_mat1[w_index] <= w_entry.mat1;
+        tlb_d1[w_index] <= w_entry.d1;
+        tlb_v1[w_index] <= w_entry.v1;
+    end
 end
 //end invtlb
 
