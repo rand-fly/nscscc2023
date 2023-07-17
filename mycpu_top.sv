@@ -57,15 +57,15 @@ module mycpu_top(
     input  wire         bvalid,
     output logic        bready,
 
-    output logic [31:0] debug_wb_pc0,
-    output logic [ 3:0] debug_wb_rf_wen0,
-    output logic [ 4:0] debug_wb_rf_wnum0,
-    output logic [31:0] debug_wb_rf_wdata0,
+    output logic [31:0] debug0_wb_pc,
+    output logic [ 3:0] debug0_wb_rf_wen,
+    output logic [ 4:0] debug0_wb_rf_wnum,
+    output logic [31:0] debug0_wb_rf_wdata,
 
-    output logic [31:0] debug_wb_pc1,
-    output logic [ 3:0] debug_wb_rf_wen1,
-    output logic [ 4:0] debug_wb_rf_wnum1,
-    output logic [31:0] debug_wb_rf_wdata1
+    output logic [31:0] debug1_wb_pc,
+    output logic [ 3:0] debug1_wb_rf_wen,
+    output logic [ 4:0] debug1_wb_rf_wnum,
+    output logic [31:0] debug1_wb_rf_wdata 
 );
 
 logic        icache_req;
@@ -144,15 +144,15 @@ core core_0(
     .dcache_data_ok(dcache_data_ok),
     .dcache_rdata(dcache_rdata),
 
-    .debug_wb_pc0(debug_wb_pc0),
-    .debug_wb_rf_wen0(debug_wb_rf_wen0),
-    .debug_wb_rf_wnum0(debug_wb_rf_wnum0),
-    .debug_wb_rf_wdata0(debug_wb_rf_wdata0),
+    .debug0_wb_pc(debug0_wb_pc),
+    .debug0_wb_rf_wen(debug0_wb_rf_wen),
+    .debug0_wb_rf_wnum(debug0_wb_rf_wnum),
+    .debug0_wb_rf_wdata(debug0_wb_rf_wdata),
 
-    .debug_wb_pc1(debug_wb_pc1),
-    .debug_wb_rf_wen1(debug_wb_rf_wen1),
-    .debug_wb_rf_wnum1(debug_wb_rf_wnum1),
-    .debug_wb_rf_wdata1(debug_wb_rf_wdata1)
+    .debug1_wb_pc(debug1_wb_pc),
+    .debug1_wb_rf_wen(debug1_wb_rf_wen),
+    .debug1_wb_rf_wnum(debug1_wb_rf_wnum),
+    .debug1_wb_rf_wdata(debug1_wb_rf_wdata)
 );
 
 logic [31:0] icache_rdata_l;

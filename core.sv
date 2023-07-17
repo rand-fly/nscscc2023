@@ -26,15 +26,15 @@ module core(
     input wire          dcache_data_ok,
     input wire   [31:0] dcache_rdata,
 
-    output logic [31:0] debug_wb_pc0,
-    output logic [ 3:0] debug_wb_rf_wen0,
-    output logic [ 4:0] debug_wb_rf_wnum0,
-    output logic [31:0] debug_wb_rf_wdata0,
+    output logic [31:0] debug0_wb_pc,
+    output logic [ 3:0] debug0_wb_rf_wen,
+    output logic [ 4:0] debug0_wb_rf_wnum,
+    output logic [31:0] debug0_wb_rf_wdata,
 
-    output logic [31:0] debug_wb_pc1,
-    output logic [ 3:0] debug_wb_rf_wen1,
-    output logic [ 4:0] debug_wb_rf_wnum1,
-    output logic [31:0] debug_wb_rf_wdata1
+    output logic [31:0] debug1_wb_pc,
+    output logic [ 3:0] debug1_wb_rf_wen,
+    output logic [ 4:0] debug1_wb_rf_wnum,
+    output logic [31:0] debug1_wb_rf_wdata
 );
 
 logic reset;
@@ -1131,14 +1131,14 @@ mmu muu_0(
     .dcache_rdata(dcache_rdata)
 );
 
-assign debug_wb_pc0 = wb_a_pc;
-assign debug_wb_rf_wdata0 = rf_wdata1;
-assign debug_wb_rf_wnum0 = wb_a_dest;
-assign debug_wb_rf_wen0 = {4{!wb_a_stall && wb_a_valid && wb_a_dest != 5'd0}};
+assign debug0_wb_pc = wb_a_pc;
+assign debug0_wb_rf_wdata = rf_wdata1;
+assign debug0_wb_rf_wnum = wb_a_dest;
+assign debug0_wb_rf_wen = {4{!wb_a_stall && wb_a_valid && wb_a_dest != 5'd0}};
 
-assign debug_wb_pc1 = wb_b_pc;
-assign debug_wb_rf_wdata1 = rf_wdata2;
-assign debug_wb_rf_wnum1 = wb_b_dest;
-assign debug_wb_rf_wen1 = {4{!wb_b_stall && wb_b_valid && wb_b_dest != 5'd0}};
+assign debug1_wb_pc = wb_b_pc;
+assign debug1_wb_rf_wdata = rf_wdata2;
+assign debug1_wb_rf_wnum = wb_b_dest;
+assign debug1_wb_rf_wen = {4{!wb_b_stall && wb_b_valid && wb_b_dest != 5'd0}};
 
 endmodule
