@@ -160,19 +160,15 @@ logic [31:0] icache_rdata_h;
 
 assign icache_rdata = {icache_rdata_h, icache_rdata_l};
 
-cache icache(
+icache icache_0(
     .clk(aclk),
     .resetn(aresetn),
 
     .valid(icache_req),
-    .op(icache_wr),
     .tag(icache_addr[31:12]),
     .index(icache_addr[11:5]),
     .offset(icache_addr[4:0]),
-    .wstrb(icache_wstrb),
-    .wdata(icache_wdata),
-    .uncached(icache_uncached),
-    .size(icache_size),
+    .uncached(0),
     .addr_ok(icache_addr_ok),
     .data_ok(icache_data_ok),
     .rdata_l(icache_rdata_l),
