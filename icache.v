@@ -419,7 +419,7 @@ always @(posedge clk) begin
             buffer_read_data <= buffer_read_data_new;
             buffer_read_data_count <= buffer_read_data_count + 1;
         end
-        if (ret_last) begin
+        if (ret_valid_last) begin
             buffer_read_data <= 0;
             buffer_read_data_count <= 0;
         end

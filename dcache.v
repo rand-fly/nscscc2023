@@ -16,26 +16,39 @@
 `define OFFSET_WIDTH 5
 `endif
 
-module cache(
+module dcache(
     // Clock and reset
     input wire clk,
     input wire resetn,
 
     // Pipe interface
-    input wire valid,
-    input wire op,
-    input wire [`TAG_WIDTH-1:0] tag,
-    input wire [`INDEX_WIDTH-1:0] index,
-    input wire [`OFFSET_WIDTH-1:0] offset,
-    input wire [3:0] wstrb, // write strobe
-    input wire [31:0] wdata,
-    input wire uncached,
-    input wire [1:0] size,
-    output wire addr_ok,
-    output wire data_ok,
-    // output wire [31:0] rdata,
-    output wire [31:0] rdata_l,
-    output wire [31:0] rdata_h,
+    // TODO
+    input wire                      p1_valid,
+    input wire                      p1_op,
+    input wire [`TAG_WIDTH-1:0]     p1_tag,
+    input wire [`INDEX_WIDTH-1:0]   p1_index,
+    input wire [`OFFSET_WIDTH-1:0]  p1_offset,
+    input wire [3:0]                p1_wstrb, // write strobe
+    input wire [31:0]               p1_wdata,
+    input wire                      p1_uncached,
+    input wire [1:0]                p1_size,
+    output wire                     p1_addr_ok,
+    output wire                     p1_data_ok,
+    output wire [31:0]              p1_rdata,
+
+    input wire                      p2_valid,
+    input wire                      p2_op,
+    input wire [`TAG_WIDTH-1:0]     p2_tag,
+    input wire [`INDEX_WIDTH-1:0]   p2_index,
+    input wire [`OFFSET_WIDTH-1:0]  p2_offset,
+    input wire [3:0]                p2_wstrb, // write strobe
+    input wire [31:0]               p2_wdata,
+    input wire                      p2_uncached,
+    input wire [1:0]                p2_size,
+    output wire                     p2_addr_ok,
+    output wire                     p2_data_ok,
+    output wire [31:0]              p2_rdata,
+
 
     // AXI
     output wire rd_req,
@@ -199,20 +212,17 @@ reg [`LINE_NUM-1:0] dirty_way3;
 
 reg [2:0] main_state;
 
-parameter OP_READ = 0;
-parameter OP_WRITE = 1;
+`define OP_READ     0
+`define OP_WRITE    1
 
-parameter RD_TYPE_CACHELINE = 3'b100;
-parameter WR_TYPE_CACHELINE = 3'b100;
+`define RD_TYPE_CACHELINE 3'b100
+`define WR_TYPE_CACHELINE 3'b100
 
-parameter MAIN_ST_IDLE = 0;
-parameter MAIN_ST_LOOKUP = 1;
-parameter MAIN_ST_MISS = 2;      // wait for memory finish writing previous data
-parameter MAIN_ST_REPLACE = 3;   // write data and wait for memory finish reading miss data
-parameter MAIN_ST_REFILL = 4;
-
-parameter SUB_ST_IDLE = 0;
-parameter SUB_ST_WRITE = 1;
+`define MAIN_ST_IDLE    0
+`define MAIN_ST_LOOKUP  1
+`define MAIN_ST_MISS    2   // wait for memory finish writing previous data
+`define MAIN_ST_REPLACE 3   // write data and wait for memory finish reading miss data
+`define MAIN_ST_REFILL  4
 
 wire [2:0]  rd_type_cache;
 wire [31:0] rd_addr_cache;
@@ -297,28 +307,28 @@ assign cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{wstrb[3]}},{8{wstr
 // endgenerate
 
 // always @(posedge clk) begin
-//     if (main_state == MAIN_ST_LOOKUP) begin
+//     if (main_state == `MAIN_ST_LOOKUP) begin
 //         wdata_actually_reg <= wdata_actually;
 //     end
 // end
 
 assign offset_w_reg = offset_reg[`OFFSET_WIDTH-1:2];
 
-assign idle = (main_state == MAIN_ST_IDLE);
-assign lookup = (main_state == MAIN_ST_LOOKUP);
-assign miss = (main_state == MAIN_ST_MISS);
-assign replace = (main_state == MAIN_ST_REPLACE);
-assign refill = (main_state == MAIN_ST_REFILL);
+assign idle = (main_state == `MAIN_ST_IDLE);
+assign lookup = (main_state == `MAIN_ST_LOOKUP);
+assign miss = (main_state == `MAIN_ST_MISS);
+assign replace = (main_state == `MAIN_ST_REPLACE);
+assign refill = (main_state == `MAIN_ST_REFILL);
 
 assign ret_valid_last = (ret_valid & ret_last);
 
 assign next_same_line = (index == index_reg) & (tag == tag_reg);
 
 assign pipe_interface_latch = valid & (
-    (idle & !(prefetching & (op_reg == OP_READ) & prefetch_next_same_line & ret_valid_last)) | 
-    (lookup & (op_reg == OP_READ) & cache_hit_and_cached) |
-    (refill & !uncached_reg & (op_reg == OP_READ) & (data_ok | finished) & next_same_line & !fetch_ok) |
-    ((op_reg == OP_WRITE) & cache_hit_and_cached & !hit_write & !refill_write & (op == OP_WRITE) & next_same_line)
+    (idle & !(prefetching & (op_reg == `OP_READ) & prefetch_next_same_line & ret_valid_last)) | 
+    (lookup & (op_reg == `OP_READ) & cache_hit_and_cached) |
+    (refill & !uncached_reg & (op_reg == `OP_READ) & (data_ok | finished) & next_same_line & !fetch_ok) |
+    ((op_reg == `OP_WRITE) & cache_hit_and_cached & !hit_write & !refill_write & (op == `OP_WRITE) & next_same_line)
     );
 
 assign replace_dirty = `get_valid(replace_way_id,index_reg_miss) & `get_dirty(replace_way_id, index_reg_miss);
@@ -351,7 +361,7 @@ always @(posedge clk) begin
             size_reg <= size;
             wstrb_reg <= wstrb;
             wdata_reg <= wdata;
-            if (op == OP_WRITE) begin
+            if (op == `OP_WRITE) begin
                 cache_wstrb_reg <= cache_wstrb_reg | ({{(32-4){1'b0}},wstrb} << offset);
                 cache_write_data_reg <= (cache_write_data_reg & ~cache_write_data_strobe) | (({{(`LINE_WIDTH-32){1'b0}},wdata} << (offset*8)) & cache_write_data_strobe);
             end
@@ -369,10 +379,10 @@ end
 assign addr_ok = pipe_interface_latch;
 
 always @(posedge clk) begin
-    wdata_ok_reg <= (op == OP_WRITE) & pipe_interface_latch;
+    wdata_ok_reg <= (op == `OP_WRITE) & pipe_interface_latch;
 end
 
-assign hit_write = lookup & cache_hit_and_cached & (op_reg == OP_WRITE);
+assign hit_write = lookup & cache_hit_and_cached & (op_reg == `OP_WRITE);
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -408,57 +418,57 @@ always @(posedge clk) begin
     end
     else begin
         case(main_state)
-            MAIN_ST_IDLE: begin
+            `MAIN_ST_IDLE: begin
                 if (pipe_interface_latch) begin
-                    main_state <= MAIN_ST_LOOKUP;
+                    main_state <= `MAIN_ST_LOOKUP;
                 end
             end
-            MAIN_ST_LOOKUP: begin
+            `MAIN_ST_LOOKUP: begin
                 if (cache_hit_and_cached) begin
                     if (!valid | hit_write) begin
-                        main_state <= MAIN_ST_IDLE;
+                        main_state <= `MAIN_ST_IDLE;
                     end
                     else begin
                         replace_way_id <= replace_way_id + 1;
                     end
                 end
                 else begin
-                    main_state <= MAIN_ST_MISS;
+                    main_state <= `MAIN_ST_MISS;
                 end
             end
-            MAIN_ST_MISS: begin
+            `MAIN_ST_MISS: begin
                 if (!prefetching) begin    
                     if (uncached_reg) begin
-                        if ((op_reg == OP_READ) & rd_rdy & !prefetching) begin
-                            main_state <= MAIN_ST_REFILL;
+                        if ((op_reg == `OP_READ) & rd_rdy & !prefetching) begin
+                            main_state <= `MAIN_ST_REFILL;
                         end
-                        else if ((op_reg == OP_WRITE) & wr_rdy) begin
-                            main_state <= MAIN_ST_REPLACE;
+                        else if ((op_reg == `OP_WRITE) & wr_rdy) begin
+                            main_state <= `MAIN_ST_REPLACE;
                         end
                     end
                     else if (replace_dirty) begin
                         if (wr_rdy) begin
-                            main_state <= MAIN_ST_REPLACE;
+                            main_state <= `MAIN_ST_REPLACE;
                         end
                     end
                     else if (!prefetching) begin
-                        main_state <= MAIN_ST_REFILL;
+                        main_state <= `MAIN_ST_REFILL;
                     end
                 end
             end
-            MAIN_ST_REPLACE: begin
+            `MAIN_ST_REPLACE: begin
                 if (uncached_reg) begin
                     if (wr_rdy) begin
-                        main_state <= MAIN_ST_IDLE;
+                        main_state <= `MAIN_ST_IDLE;
                     end
                 end
                 else if (rd_rdy & !prefetching) begin
-                    main_state <= MAIN_ST_REFILL;
+                    main_state <= `MAIN_ST_REFILL;
                 end
             end
-            MAIN_ST_REFILL: begin
+            `MAIN_ST_REFILL: begin
                 if (fetch_ok) begin
-                    main_state <= MAIN_ST_IDLE;
+                    main_state <= `MAIN_ST_IDLE;
                     replace_way_id <= replace_way_id + 1;
                 end
             end
@@ -498,8 +508,8 @@ assign cache_rd_data = cache_hit
 assign rdata_l = uncached_reg ? ret_data : `get_word(cache_rd_data, offset_w_reg);
 assign rdata_h = `get_word(cache_rd_data, offset_w_reg+1);
 
-// assign data_ok = (op_reg == OP_READ) ? ((lookup & cache_hit) | ret_valid_last) : wdata_ok_reg;
-assign data_ok = !finished & ((op_reg == OP_READ)
+// assign data_ok = (op_reg == `OP_READ) ? ((lookup & cache_hit) | ret_valid_last) : wdata_ok_reg;
+assign data_ok = !finished & ((op_reg == `OP_READ)
                     ? ((lookup & cache_hit_and_cached) | prefetch_hit | (uncached_reg
                                                     ? ret_valid_last
                                                     : ((refill | (prefetching & prefetch_same_line)) & ret_valid & (buffer_read_data_count >= offset_reg[`OFFSET_WIDTH-1:2]))))
@@ -515,7 +525,7 @@ end
 
 // axi interface
 
-assign wr_type = uncached_reg ? {1'b0,size_reg} : WR_TYPE_CACHELINE;
+assign wr_type = uncached_reg ? {1'b0,size_reg} : `WR_TYPE_CACHELINE;
 assign wr_addr = uncached_reg ? {tag_reg,index_reg,offset_reg} : {replace_tag,index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
 // assign wr_data = replace_way_id ? data_way1[index_reg] : data_way0[index_reg];
 // assign wr_data = `get_data(replace_way_id, index_reg);
@@ -523,11 +533,11 @@ assign wr_data = uncached_reg ? {{(`LINE_WIDTH-32){1'b0}},wdata_reg} : `get_prel
 assign wr_req = replace;
 assign wr_wstrb = uncached_reg ? wstrb_reg : 4'b1111;
 
-assign rd_type_cache = uncached_reg ? {1'b0,size_reg} : RD_TYPE_CACHELINE;
+assign rd_type_cache = uncached_reg ? {1'b0,size_reg} : `RD_TYPE_CACHELINE;
 assign rd_addr_cache = uncached_reg ? {tag_reg,index_reg,offset_reg} : {tag_reg, index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
 assign rd_req_cache = !prefetch_hit & refill & ~rd_addr_ok;
 
-assign rd_type = prefetching ? RD_TYPE_CACHELINE : rd_type_cache;
+assign rd_type = prefetching ? `RD_TYPE_CACHELINE : rd_type_cache;
 assign rd_addr = prefetching ? rd_addr_prefetch : rd_addr_cache;
 assign rd_req = prefetching ? rd_req_prefetch : rd_req_cache;
 
@@ -602,26 +612,26 @@ always @(posedge clk) begin
                 tag_way0[index_reg] <= tag_reg;
                 valid_way0[index_reg] <= 1;
                 data_way0[index_reg] <= cache_write_data_actually;
-                dirty_way0[index_reg] <= op_reg == OP_WRITE;
+                dirty_way0[index_reg] <= op_reg == `OP_WRITE;
             end
             1 : begin
                 tag_way1[index_reg] <= tag_reg;
                 valid_way1[index_reg] <= 1;
                 data_way1[index_reg] <= cache_write_data_actually;
-                dirty_way1[index_reg] <= op_reg == OP_WRITE;
+                dirty_way1[index_reg] <= op_reg == `OP_WRITE;
             end
 `ifdef CACHE_4WAY
             2 : begin
                 tag_way2[index_reg] <= tag_reg;
                 valid_way2[index_reg] <= 1;
                 data_way2[index_reg] <= cache_write_data_actually;
-                dirty_way2[index_reg] <= op_reg == OP_WRITE;
+                dirty_way2[index_reg] <= op_reg == `OP_WRITE;
             end
             3 : begin
                 tag_way3[index_reg] <= tag_reg;
                 valid_way3[index_reg] <= 1;
                 data_way3[index_reg] <= cache_write_data_actually;
-                dirty_way3[index_reg] <= op_reg == OP_WRITE;
+                dirty_way3[index_reg] <= op_reg == `OP_WRITE;
             end
 `endif
         endcase
