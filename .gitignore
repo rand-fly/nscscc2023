@@ -1,2 +1,2 @@
-/myCpu/*_gen_*/*
-!/myCpu/*_gen_*/*.xci
+/myCPU/*_gen_*/*
+!/myCPU/*_gen_*/*.xci

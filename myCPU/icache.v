@@ -367,7 +367,7 @@ assign cache_hit_way_id =   {2{cache_hit_way[0]}} & 0 |
 // assign cache_rd_data = cache_hit ? `get_preload_data(cache_hit_way_id) : (ret_valid_last ? buffer_read_data_new : 0);
 assign cache_rd_data = cache_hit
                         ? `get_preload_data(cache_hit_way_id)
-                        : prefetch_hit
+                        : (prefetch_hit)
                             ? prefetch_data_reg
                             : buffer_read_data_new;
 
@@ -502,7 +502,7 @@ assign prefetch_next_same_line = (prefetch_index == index_reg) & (prefetch_tag =
 assign prefetch_same_line = (prefetch_index_reg == index_reg) & (prefetch_tag_reg == tag_reg);
 
 assign prefetch_cached = prefetch_cached_way != 0;
-assign prefetch_hit = prefetch_valid_reg & prefetch_same_line;
+assign prefetch_hit = !uncached_reg & prefetch_valid_reg & prefetch_same_line;
 
 assign fetch_ok = prefetch_hit | ret_valid_last;
 
