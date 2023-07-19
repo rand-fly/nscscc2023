@@ -15,8 +15,8 @@ module mmu(
     input wire          i_valid,
     input wire [31:0]   i_va,
     
-    input wire          i_double,
     output logic        i_addr_ok,
+    output logic        i_double,
     output logic        i_data_ok,
     output logic [63:0] i_rdata,
     output logic        i_tlbr,
@@ -241,6 +241,7 @@ assign icache_req = i_valid;
 assign icache_addr = i_pa;
 assign icache_uncached = i_mat == 2'd0;
 assign i_addr_ok = icache_addr_ok;
+assign i_double = i_mat == 2'd1 && i_va[5:2] != 4'b1111;
 assign i_data_ok = icache_data_ok;
 assign i_rdata = icache_rdata;
 

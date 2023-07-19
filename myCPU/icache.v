@@ -1,4 +1,4 @@
-`define CACHE_LINE_32B
+`define CACHE_LINE_64B
 
 `ifdef CACHE_LINE_16B
 `define LINE_SIZE 16
@@ -7,13 +7,24 @@
 `define INDEX_WIDTH 8
 `define LINE_NUM 256
 `define OFFSET_WIDTH 4
-`elsif CACHE_LINE_32B
+`endif
+
+`ifdef CACHE_LINE_32B
 `define LINE_SIZE 32
 `define LINE_WIDTH 256
 `define TAG_WIDTH 20
 `define INDEX_WIDTH 7
 `define LINE_NUM 128
 `define OFFSET_WIDTH 5
+`endif
+
+`ifdef CACHE_LINE_64B
+`define LINE_SIZE 64
+`define LINE_WIDTH 512
+`define TAG_WIDTH 20
+`define INDEX_WIDTH 6
+`define LINE_NUM 64
+`define OFFSET_WIDTH 6
 `endif
 
 module icache(
@@ -149,6 +160,20 @@ reg [`LINE_WIDTH-1:0] data_way3 [0:`LINE_NUM-1];
     |   {32{offset_==6}} & data_[223:192]\
     |   {32{offset_==7}} & data_[255:224]\
 `endif\
+`ifdef CACHE_LINE_64B\
+    |   {32{offset_==4  }} & data_[159:128]\
+    |   {32{offset_==5  }} & data_[191:160]\
+    |   {32{offset_==6  }} & data_[223:192]\
+    |   {32{offset_==7  }} & data_[255:224]\
+    |   {32{offset_==8  }} & data_[287:256]\
+    |   {32{offset_==9  }} & data_[319:288]\
+    |   {32{offset_==10 }} & data_[351:320]\
+    |   {32{offset_==11 }} & data_[383:352]\
+    |   {32{offset_==12 }} & data_[415:384]\
+    |   {32{offset_==13 }} & data_[447:416]\
+    |   {32{offset_==14 }} & data_[479:448]\
+    |   {32{offset_==15 }} & data_[511:480]\
+`endif\
 )
 
 reg [2:0] main_state;
@@ -221,6 +246,7 @@ wire prefetch_hit;
 wire prefetch_same_line;
 wire prefetch_next_same_line;
 
+
 wire fetch_ok;
 
 assign offset_w_reg = offset_reg[`OFFSET_WIDTH-1:2];
@@ -237,6 +263,7 @@ assign next_same_line = (index == index_reg) & (tag == tag_reg);
 assign pipe_interface_latch = valid & (
     (idle & !(prefetching & prefetch_next_same_line & ret_valid_last)) | 
     (lookup & cache_hit_and_cached) |
+    (miss & (prefetching & prefetch_next_same_line & !ret_valid_last)) |
     (refill & !uncached_reg & (data_ok | finished) & next_same_line & !fetch_ok));
 
 always @(posedge clk) begin
@@ -498,7 +525,7 @@ generate
     end
 endgenerate
 
-assign prefetch_next_same_line = (prefetch_index == index_reg) & (prefetch_tag == tag_reg);
+assign prefetch_next_same_line = (prefetch_index_reg == index) & (prefetch_tag_reg == tag);
 assign prefetch_same_line = (prefetch_index_reg == index_reg) & (prefetch_tag_reg == tag_reg);
 
 assign prefetch_cached = prefetch_cached_way != 0;

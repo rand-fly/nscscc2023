@@ -1,13 +1,20 @@
 // test only
 
-`define CACHE_LINE_32B
+`define CACHE_LINE_64B
 
 `ifdef CACHE_LINE_16B
 `define LINE_WIDTH 128
 `define LINE_WORD_NUM 4
-`elsif CACHE_LINE_32B
+`endif
+
+`ifdef CACHE_LINE_32B
 `define LINE_WIDTH 256
 `define LINE_WORD_NUM 8
+`endif
+
+`ifdef CACHE_LINE_64B
+`define LINE_WIDTH 512
+`define LINE_WORD_NUM 16
 `endif
 
 

@@ -182,8 +182,8 @@ icache icache(
 
     .valid(icache_req),
     .tag(icache_addr[31:12]),
-    .index(icache_addr[11:5]),
-    .offset(icache_addr[4:0]),
+    .index(icache_addr[11:6]),
+    .offset(icache_addr[5:0]),
     .uncached(icache_uncached),
     .addr_ok(icache_addr_ok),
     .data_ok(icache_data_ok),

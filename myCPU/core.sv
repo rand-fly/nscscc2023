@@ -397,8 +397,8 @@ ifu ifu_0(
 
     .mmu_i_valid(mmu_i_valid),
     .mmu_i_addr(mmu_i_va),
-    .mmu_i_double(mmu_i_double),
     .mmu_i_addr_ok(mmu_i_addr_ok),
+    .mmu_i_double(mmu_i_double),
     .mmu_i_data_ok(mmu_i_data_ok),
     .mmu_i_rdata(mmu_i_rdata),
     .mmu_i_tlbr(mmu_i_tlbr),
@@ -928,13 +928,13 @@ assign mem_a_csr_result_valid = MEM_a_is_spec_op && csr_we;
 assign mem_b_csr_result_valid = MEM_b_is_spec_op && csr_we;
 
 always_comb begin
-    if (mem_a_valid && (mem_a_have_exception || interrupt)) begin
+    if (mem_a_valid && (mem_a_have_exception || interrupt) && !mem_a_stall && !mem_b_stall) begin
         raise_exception = 1'b1;
         mem_exception_type = interrupt ? INT : mem_a_exception_type;
         mem_exception_pc = mem_a_pc;
         mem_exception_address = mem_ctrl_a.MEM_result;
     end
-    else if (mem_b_valid && mem_b_have_exception) begin
+    else if (mem_b_valid && mem_b_have_exception && !mem_a_stall && !mem_b_stall) begin
         raise_exception = 1'b1;
         mem_exception_type = mem_b_exception_type;
         mem_exception_pc = mem_b_pc;
@@ -1143,8 +1143,8 @@ mmu mmu_0(
 
     .i_valid(mmu_i_valid),
     .i_va(mmu_i_va),
-    .i_double(mmu_i_double),
     .i_addr_ok(mmu_i_addr_ok),
+    .i_double(mmu_i_double),
     .i_data_ok(mmu_i_data_ok),
     .i_rdata(mmu_i_rdata),
     .i_tlbr(mmu_i_tlbr),
@@ -1240,11 +1240,12 @@ always_ff @(posedge clk) begin
         WB_b_difftest <= mem_b_difftest;
         WB_b_difftest.csr_rstat <= MEM_b_is_spec_op && MEM_spec_op.opcode == SPEC_CSR && MEM_spec_op.csr_addr == 14'd5;
         WB_b_difftest.csr_data <= mem_csr_rdata;
+
+        WB_excp_difftest.excp_valid <= raise_exception && mem_exception_type != ERTN;
+        WB_excp_difftest.eret <= mem_exception_type == ERTN;
+        WB_excp_difftest.exceptionPC <= mem_exception_pc;
+        WB_excp_difftest.exceptionInst <= mem_a_have_exception ? mem_a_difftest.instr : mem_b_difftest.instr;
     end
-    WB_excp_difftest.excp_valid <= raise_exception && mem_exception_type != ERTN;
-    WB_excp_difftest.eret <= mem_exception_type == ERTN;
-    WB_excp_difftest.exceptionPC <= mem_exception_pc;
-    WB_excp_difftest.exceptionInst <= mem_a_have_exception ? mem_a_difftest.instr : mem_b_difftest.instr;
 
     wb_a_difftest <= WB_a_difftest;
     wb_a_difftest.valid <= !wb_a_stall && !wb_b_stall && wb_a_valid;

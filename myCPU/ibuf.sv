@@ -72,13 +72,13 @@ always_ff @(posedge clk) begin
         tail <= tail + input_size;
         head <= head + consume_inst;
         length <= length + {1'b0, input_size} - {1'b0, consume_inst};
-        if (input_size == 2'd1) begin
+        if (input_size == 2'd1 || input_size == 2'd2) begin
             pc[tail] <= input_pc1;
             inst[tail] <= input_inst1;
             pred_branch_taken[tail] <= input_pred_branch_taken1;
             pred_branch_target[tail] <= input_pred_branch_target1;
         end
-        if (input_size == 2'd1 || input_size == 2'd2) begin
+        if (input_size == 2'd2) begin
             pc[tail + 3'd1] <= input_pc2;
             inst[tail + 3'd1] <= input_inst2;
             pred_branch_taken[tail + 3'd1] <= input_pred_branch_taken2;
