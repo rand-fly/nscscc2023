@@ -5,11 +5,7 @@ module core(
     input wire          resetn,
 
     output logic        icache_req,
-    output logic        icache_wr,
-    output logic [ 1:0] icache_size,
-    output logic [ 3:0] icache_wstrb,
     output logic [31:0] icache_addr,
-    output logic [31:0] icache_wdata,
     output logic        icache_uncached,
     input wire          icache_addr_ok,
     input wire          icache_data_ok,
@@ -26,15 +22,22 @@ module core(
     input wire          dcache_data_ok,
     input wire   [31:0] dcache_rdata,
 
-    output logic [31:0] debug_wb_pc0,
-    output logic [ 3:0] debug_wb_rf_wen0,
-    output logic [ 4:0] debug_wb_rf_wnum0,
-    output logic [31:0] debug_wb_rf_wdata0,
+    output logic [31:0] debug0_wb_pc,
+    output logic [ 3:0] debug0_wb_rf_wen,
+    output logic [ 4:0] debug0_wb_rf_wnum,
+    output logic [31:0] debug0_wb_rf_wdata,
 
-    output logic [31:0] debug_wb_pc1,
-    output logic [ 3:0] debug_wb_rf_wen1,
-    output logic [ 4:0] debug_wb_rf_wnum1,
-    output logic [31:0] debug_wb_rf_wdata1
+    output logic [31:0] debug1_wb_pc,
+    output logic [ 3:0] debug1_wb_rf_wen,
+    output logic [ 4:0] debug1_wb_rf_wnum,
+    output logic [31:0] debug1_wb_rf_wdata
+
+`ifdef DIFFTEST_EN
+,   output difftest_t   wb_a_difftest,
+    output difftest_t   wb_b_difftest,
+    output difftest_excp_t wb_excp_difftest,
+    output difftest_csr_t wb_csr_difftest
+`endif
 );
 
 logic reset;
@@ -353,6 +356,24 @@ logic        rewind;
 logic [31:0] rewind_target;
 logic        interrupt;
 
+`ifdef DIFFTEST_EN
+difftest_t id_a_difftest;
+difftest_t id_b_difftest;
+difftest_t ro_a_difftest;
+difftest_t ro_b_difftest;
+difftest_t ex_a_difftest;
+difftest_t ex_b_difftest;
+difftest_t MEM_a_difftest;
+difftest_t MEM_b_difftest;
+difftest_t mem_a_difftest;
+difftest_t mem_b_difftest;
+difftest_t WB_a_difftest;
+difftest_t WB_b_difftest;
+difftest_excp_t WB_excp_difftest;
+
+difftest_csr_t WB_csr_difftest;
+`endif
+
 ifu ifu_0(
     .clk(clk),
     .reset(reset),
@@ -499,6 +520,11 @@ id_stage id_stage_0(
     .id_b_mem_size(id_b_mem_size),
     .id_b_is_spec_op(id_b_is_spec_op),
     .id_b_spec_opcode(id_b_spec_opcode)
+
+`ifdef DIFFTEST_EN
+,   .id_a_difftest(id_a_difftest),
+    .id_b_difftest(id_b_difftest)
+`endif
 );
 
 ro_stage ro_stage_0(
@@ -633,6 +659,13 @@ ro_stage ro_stage_0(
     .ro_b_st_data(ro_b_st_data),
     .ro_b_is_spec_op(ro_b_is_spec_op),
     .ro_b_spec_op(ro_b_spec_op)
+
+`ifdef DIFFTEST_EN
+,   .id_a_difftest(id_a_difftest),
+    .id_b_difftest(id_b_difftest),
+    .ro_a_difftest(ro_a_difftest),
+    .ro_b_difftest(ro_b_difftest)
+`endif
 );
 
 ex_stage ex_stage_0(
@@ -716,6 +749,13 @@ ex_stage ex_stage_0(
     .ex_b_st_data(ex_b_st_data),
     .ex_b_is_spec_op(ex_b_is_spec_op),
     .ex_b_spec_op(ex_b_spec_op)
+
+`ifdef DIFFTEST_EN
+,   .ro_a_difftest(ro_a_difftest),
+    .ro_b_difftest(ro_b_difftest),
+    .ex_a_difftest(ex_a_difftest),
+    .ex_b_difftest(ex_b_difftest)
+`endif
 );
 
 mem_ctrl mem_ctrl_a(
@@ -833,6 +873,60 @@ always_ff @(posedge clk) begin
     end
 end
 
+`ifdef DIFFTEST_EN
+always_ff @(posedge clk) begin
+    if (!mem_a_stall && !mem_b_stall) begin
+        MEM_a_difftest <= ex_a_difftest;
+        MEM_a_difftest.store_valid <= {4'b0, 1'b0,
+            ex_a_mem_type == MEM_STORE && ex_a_mem_size == MEM_WORD,
+            ex_a_mem_type == MEM_STORE && ex_a_mem_size == MEM_HALF,
+            ex_a_mem_type == MEM_STORE && ex_a_mem_size == MEM_BYTE};
+        MEM_a_difftest.storeVAddr <= ex_a_result;
+
+        MEM_a_difftest.storeData <= ex_a_mem_size == MEM_WORD ? ex_a_st_data : 
+                                                    ex_a_mem_size == MEM_HALF ? ex_a_st_data[15:0] << (ex_a_result[1]*16) :
+                                                    ex_a_st_data[7:0] << (ex_a_result[1:0]*8);
+        MEM_a_difftest.load_valid <= {2'b0, 1'b0,
+            ex_a_mem_type == MEM_LOAD_S && ex_a_mem_size == MEM_WORD,
+            ex_a_mem_type == MEM_LOAD_U && ex_a_mem_size == MEM_HALF,
+            ex_a_mem_type == MEM_LOAD_S && ex_a_mem_size == MEM_HALF,
+            ex_a_mem_type == MEM_LOAD_U && ex_a_mem_size == MEM_BYTE,
+            ex_a_mem_type == MEM_LOAD_S && ex_a_mem_size == MEM_BYTE};
+        MEM_a_difftest.loadVAddr <= ex_a_result;
+        
+        MEM_b_difftest <= ex_b_difftest;
+        MEM_b_difftest.store_valid <= {4'b0, 1'b0,
+            ex_b_mem_type == MEM_STORE && ex_b_mem_size == MEM_WORD,
+            ex_b_mem_type == MEM_STORE && ex_b_mem_size == MEM_HALF,
+            ex_b_mem_type == MEM_STORE && ex_b_mem_size == MEM_BYTE};
+        MEM_b_difftest.storeVAddr <= ex_b_result;
+        MEM_b_difftest.storeData <= ex_b_mem_size == MEM_WORD ? ex_b_st_data :
+                                                    ex_b_mem_size == MEM_HALF ? ex_b_st_data[15:0]  << (ex_b_result[1]*16):
+                                                    ex_b_st_data[7:0] << (ex_b_result[1:0]*8);
+        MEM_b_difftest.load_valid <= {2'b0, 1'b0,
+            ex_b_mem_type == MEM_LOAD_S && ex_b_mem_size == MEM_WORD,
+            ex_b_mem_type == MEM_LOAD_U && ex_b_mem_size == MEM_HALF,
+            ex_b_mem_type == MEM_LOAD_S && ex_b_mem_size == MEM_HALF,
+            ex_b_mem_type == MEM_LOAD_U && ex_b_mem_size == MEM_BYTE,
+            ex_b_mem_type == MEM_LOAD_S && ex_b_mem_size == MEM_BYTE};
+        MEM_b_difftest.loadVAddr <= ex_b_result;
+    end
+end
+always_comb begin
+    mem_a_difftest = MEM_a_difftest;
+    mem_a_difftest.is_TLBFILL = MEM_a_is_spec_op && MEM_spec_op.opcode == SPEC_TLBFILL;
+    mem_a_difftest.TLBFILL_index = mmu_tlb_w_index;
+    mem_a_difftest.storePAddr = mmu_0.d1_pa;
+    mem_a_difftest.loadPAddr = mmu_0.d1_pa;
+
+    mem_b_difftest = MEM_b_difftest;
+    mem_b_difftest.is_TLBFILL = MEM_b_is_spec_op && MEM_spec_op.opcode == SPEC_TLBFILL;
+    mem_b_difftest.TLBFILL_index = mmu_tlb_w_index;
+    mem_b_difftest.storePAddr = mmu_0.d2_pa;
+    mem_b_difftest.loadPAddr = mmu_0.d2_pa;
+end
+`endif
+
 assign mem_is_spec_op = MEM_a_is_spec_op || MEM_b_is_spec_op;
 assign mem_a_csr_result_valid = MEM_a_is_spec_op && csr_we;
 assign mem_b_csr_result_valid = MEM_b_is_spec_op && csr_we;
@@ -915,15 +1009,15 @@ assign csr_vppn_we = raise_exception && (
 || mem_exception_type == PPI);
 assign csr_vppn_data = mem_exception_type == PIF ? mem_exception_pc[31:13] : mem_exception_address[31:13];
 
-assign csr_tlbsrch_we = MEM_spec_op.opcode == SPEC_TLBSRCH && mem_spec_valid; //good
+assign csr_tlbsrch_we = MEM_spec_op.opcode == SPEC_TLBSRCH && mem_spec_valid;
 assign csr_tlbsrch_found = mmu_tlbsrch_found;
 assign csr_tlbsrch_index = mmu_tlbsrch_index;
-assign csr_tlb_we = MEM_spec_op.opcode == SPEC_TLBRD && mem_spec_valid; //good
+assign csr_tlb_we = MEM_spec_op.opcode == SPEC_TLBRD && mem_spec_valid;
 assign csr_tlb_wdata = mmu_tlb_r_entry;
 
 assign mmu_tlbsrch_vppn = csr_tlb_rdata.vppn;
 assign mmu_tlb_r_index = csr_tlbidx;
-assign mmu_tlb_we = (MEM_spec_op.opcode == SPEC_TLBWR || MEM_spec_op.opcode == SPEC_TLBFILL) && mem_spec_valid; //good
+assign mmu_tlb_we = (MEM_spec_op.opcode == SPEC_TLBWR || MEM_spec_op.opcode == SPEC_TLBFILL) && mem_spec_valid;
 assign mmu_tlb_w_index = csr_tlbidx;
 assign mmu_tlb_w_entry = csr_tlb_rdata;
 
@@ -946,7 +1040,7 @@ wb_ctrl wb_ctrl_a(
     .wb_ready(wb_a_ready),
     .wb_stall(wb_a_stall),
 
-    .mem_valid(mem_a_valid && !mem_a_have_exception),
+    .mem_valid(mem_a_valid && (!mem_a_have_exception || mem_a_exception_type == ERTN) && !interrupt),
     .mem_pc(mem_a_pc),
     .mem_result(mem_a_result),
     .mem_mem_type(mem_a_mem_type),
@@ -976,7 +1070,7 @@ wb_ctrl wb_ctrl_b(
     .wb_ready(wb_b_ready),
     .wb_stall(wb_b_stall),
 
-    .mem_valid(mem_b_valid && !mem_b_have_exception),
+    .mem_valid(mem_b_valid && (!mem_b_have_exception || mem_b_exception_type == ERTN)),
     .mem_pc(mem_b_pc),
     .mem_result(mem_b_result),
     .mem_mem_type(mem_b_mem_type),
@@ -1039,7 +1133,7 @@ branch_ctrl branch_ctrl_0(
     .flush_ex(flush_ex)
 );
 
-mmu muu_0(
+mmu mmu_0(
     .clk(clk),
     .reset(reset),
 
@@ -1109,11 +1203,7 @@ mmu muu_0(
     .tlbsrch_index(mmu_tlbsrch_index),
 
     .icache_req(icache_req),
-    .icache_wr(icache_wr),
-    .icache_size(icache_size),
-    .icache_wstrb(icache_wstrb),
     .icache_addr(icache_addr),
-    .icache_wdata(icache_wdata),
     .icache_uncached(icache_uncached),
     .icache_addr_ok(icache_addr_ok),
     .icache_data_ok(icache_data_ok),
@@ -1131,14 +1221,73 @@ mmu muu_0(
     .dcache_rdata(dcache_rdata)
 );
 
-assign debug_wb_pc0 = wb_a_pc;
-assign debug_wb_rf_wdata0 = rf_wdata1;
-assign debug_wb_rf_wnum0 = wb_a_dest;
-assign debug_wb_rf_wen0 = {4{!wb_a_stall && wb_a_valid && wb_a_dest != 5'd0}};
 
-assign debug_wb_pc1 = wb_b_pc;
-assign debug_wb_rf_wdata1 = rf_wdata2;
-assign debug_wb_rf_wnum1 = wb_b_dest;
-assign debug_wb_rf_wen1 = {4{!wb_b_stall && wb_b_valid && wb_b_dest != 5'd0}};
+always_ff @(posedge clk) begin
+    debug0_wb_pc <= wb_a_pc;
+    debug0_wb_rf_wdata <= rf_wdata1;
+    debug0_wb_rf_wnum <= wb_a_dest;
+    debug0_wb_rf_wen <= {4{!wb_a_stall && wb_a_valid && wb_a_dest != 5'd0}};
+
+    debug1_wb_pc <= wb_b_pc;
+    debug1_wb_rf_wdata <= rf_wdata2;
+    debug1_wb_rf_wnum <= wb_b_dest;
+    debug1_wb_rf_wen <= {4{!wb_b_stall && wb_b_valid && wb_b_dest != 5'd0}};
+end
+
+`ifdef DIFFTEST_EN
+always_ff @(posedge clk) begin
+    if (!wb_a_stall && !wb_b_stall) begin
+        WB_a_difftest <= mem_a_difftest;
+        WB_a_difftest.csr_rstat <= MEM_a_is_spec_op && MEM_spec_op.opcode == SPEC_CSR && MEM_spec_op.csr_addr == 14'd5;
+        WB_a_difftest.csr_data <= mem_csr_rdata;
+
+        WB_b_difftest <= mem_b_difftest;
+        WB_b_difftest.csr_rstat <= MEM_b_is_spec_op && MEM_spec_op.opcode == SPEC_CSR && MEM_spec_op.csr_addr == 14'd5;
+        WB_b_difftest.csr_data <= mem_csr_rdata;
+    end
+    WB_excp_difftest.excp_valid <= raise_exception && mem_exception_type != ERTN;
+    WB_excp_difftest.eret <= mem_exception_type == ERTN;
+    WB_excp_difftest.exceptionPC <= mem_exception_pc;
+    WB_excp_difftest.exceptionInst <= mem_a_have_exception ? mem_a_difftest.instr : mem_b_difftest.instr;
+
+    wb_a_difftest <= WB_a_difftest;
+    wb_a_difftest.valid <= !wb_a_stall && !wb_b_stall && wb_a_valid;
+    wb_b_difftest <= WB_b_difftest;
+    wb_b_difftest.valid <= !wb_a_stall && !wb_b_stall && wb_b_valid;
+
+    wb_excp_difftest <= WB_excp_difftest;
+end
+
+
+always_ff @(posedge clk) begin
+    if (!wb_a_stall && !wb_b_stall) begin
+        wb_csr_difftest.CRMD      <= csr_0.CRMD     ;
+        wb_csr_difftest.PRMD      <= csr_0.PRMD     ;
+        wb_csr_difftest.ECFG      <= csr_0.ECFG     ;
+        wb_csr_difftest.ESTAT     <= csr_0.ESTAT    ;
+        wb_csr_difftest.ERA       <= csr_0.ERA      ;
+        wb_csr_difftest.BADV      <= csr_0.BADV     ;
+        wb_csr_difftest.EENTRY    <= csr_0.EENTRY   ;
+        wb_csr_difftest.TLBIDX    <= csr_0.TLBIDX   ;
+        wb_csr_difftest.TLBEHI    <= csr_0.TLBEHI   ;
+        wb_csr_difftest.TLBELO0   <= csr_0.TLBELO0  ;
+        wb_csr_difftest.TLBELO1   <= csr_0.TLBELO1  ;
+        wb_csr_difftest.ASID      <= csr_0.ASID     ;
+        wb_csr_difftest.SAVE0     <= csr_0.SAVE0    ;
+        wb_csr_difftest.SAVE1     <= csr_0.SAVE1    ;
+        wb_csr_difftest.SAVE2     <= csr_0.SAVE2    ;
+        wb_csr_difftest.SAVE3     <= csr_0.SAVE3    ;
+        wb_csr_difftest.TID       <= csr_0.TID      ;
+        wb_csr_difftest.TCFG      <= csr_0.TCFG     ;
+        wb_csr_difftest.TVAL      <= csr_0.TVAL     ;
+        wb_csr_difftest.TLBRENTRY <= csr_0.TLBRENTRY;
+        wb_csr_difftest.DMW0      <= csr_0.DMW0     ;
+        wb_csr_difftest.DMW1      <= csr_0.DMW1     ;
+    end
+
+    // wb_csr_difftest           <= WB_csr_difftest;
+end
+
+`endif
 
 endmodule

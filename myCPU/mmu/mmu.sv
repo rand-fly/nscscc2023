@@ -14,13 +14,14 @@ module mmu(
 
     input wire          i_valid,
     input wire [31:0]   i_va,
+    
     input wire          i_double,
-    output wire         i_addr_ok,
-    output wire         i_data_ok,
-    output wire [63:0]  i_rdata,
-    output wire         i_tlbr,
-    output wire         i_pif,
-    output wire         i_ppi,
+    output logic        i_addr_ok,
+    output logic        i_data_ok,
+    output logic [63:0] i_rdata,
+    output logic        i_tlbr,
+    output logic        i_pif,
+    output logic        i_ppi,
 
     input wire          d1_valid,
     input wire [31:0]   d1_va,
@@ -28,14 +29,14 @@ module mmu(
     input wire [1:0]    d1_size,
     input wire [3:0]    d1_wstrb,
     input wire [31:0]   d1_wdata,
-    output wire         d1_addr_ok,
-    output wire         d1_data_ok,
-    output wire [31:0]  d1_rdata,
-    output wire         d1_tlbr,
-    output wire         d1_pil,
-    output wire         d1_pis,
-    output wire         d1_ppi,
-    output wire         d1_pme,
+    output logic        d1_addr_ok,
+    output logic        d1_data_ok,
+    output logic [31:0] d1_rdata,
+    output logic        d1_tlbr,
+    output logic        d1_pil,
+    output logic        d1_pis,
+    output logic        d1_ppi,
+    output logic        d1_pme,
 
     input wire          d2_valid,
     input wire [31:0]   d2_va,
@@ -43,14 +44,14 @@ module mmu(
     input wire [1:0]    d2_size,
     input wire [3:0]    d2_wstrb,
     input wire [31:0]   d2_wdata,
-    output wire         d2_addr_ok,
-    output wire         d2_data_ok,
-    output wire [31:0]  d2_rdata,
-    output wire         d2_tlbr,
-    output wire         d2_pil,
-    output wire         d2_pis,
-    output wire         d2_ppi,
-    output wire         d2_pme,
+    output logic        d2_addr_ok,
+    output logic        d2_data_ok,
+    output logic [31:0] d2_rdata,
+    output logic        d2_tlbr,
+    output logic        d2_pil,
+    output logic        d2_pis,
+    output logic        d2_ppi,
+    output logic        d2_pme,
 
     input wire          invtlb_valid,
     input wire [4:0]    invtlb_op,
@@ -69,11 +70,7 @@ module mmu(
     output logic [TLBIDLEN-1:0] tlbsrch_index,
 
     output logic        icache_req,
-    output logic        icache_wr,
-    output logic [ 1:0] icache_size,
-    output logic [ 3:0] icache_wstrb,
     output logic [31:0] icache_addr,
-    output logic [31:0] icache_wdata,
     output logic        icache_uncached,
     input wire          icache_addr_ok,
     input wire          icache_data_ok,
@@ -241,11 +238,7 @@ tlb tlb_0(
 );
 
 assign icache_req = i_valid;
-assign icache_wr  = 1'b0;
-assign icache_size = 2'd2;
-assign icache_wstrb = 4'b0000;
 assign icache_addr = i_pa;
-assign icache_wdata = 32'h0;
 assign icache_uncached = i_mat == 2'd0;
 assign i_addr_ok = icache_addr_ok;
 assign i_data_ok = icache_data_ok;

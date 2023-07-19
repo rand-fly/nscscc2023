@@ -8,7 +8,7 @@ module ro_stage (
     input wire               ex_stall,
     output logic             ro_valid, // 有指令吗
     output logic             ro_ready, // 工作完成了吗
-    output logic             ro_stall, // 是否暂停（上�?阶段可以进来吗）
+    output logic             ro_stall, // 是否暂停（上�?阶段可以进来吗）
 
     input wire               id_a_ready,
     input wire [31:0]        id_a_pc,
@@ -132,6 +132,13 @@ module ro_stage (
     output logic [31:0]      ro_b_st_data,
     output logic             ro_b_is_spec_op,
     output spec_op_t         ro_b_spec_op
+
+`ifdef DIFFTEST_EN
+   ,input wire difftest_t    id_a_difftest,
+    input wire difftest_t    id_b_difftest,
+    output difftest_t        ro_a_difftest,
+    output difftest_t        ro_b_difftest
+`endif
 );
 
 logic        forward_valid1;
@@ -417,5 +424,14 @@ forwarding_unit forwarding_unit4(
     .wb_b_dest(wb_b_dest),
     .wb_b_result(wb_b_result)
 );
+
+`ifdef DIFFTEST_EN
+always_ff @(posedge clk) begin
+    if (!ro_stall) begin
+        ro_a_difftest <= id_a_difftest;
+        ro_b_difftest <= id_b_difftest;
+    end
+end
+`endif
 
 endmodule
