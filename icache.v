@@ -379,7 +379,7 @@ assign rdata_h_valid = offset_reg[`OFFSET_WIDTH-1:2] != {(`OFFSET_WIDTH-2){1'b1}
 assign data_ok = !finished & ((lookup & cache_hit_and_cached) 
                                 | prefetch_hit
                                 | (uncached_reg
-                                    ?   ret_valid_last
+                                    ?   (refill & ret_valid_last)
                                     :   ((refill | (prefetching & prefetch_same_line)) & ret_valid & (rdata_h_valid
                                                                                                                 ? (buffer_read_data_count > offset_reg[`OFFSET_WIDTH-1:2])
                                                                                                                 : (buffer_read_data_count >= offset_reg[`OFFSET_WIDTH-1:2]))
