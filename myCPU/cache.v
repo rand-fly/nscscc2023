@@ -677,7 +677,7 @@ assign prefetch_next_same_line = (prefetch_index == index_reg) & (prefetch_tag =
 assign prefetch_same_line = (prefetch_index_reg == index_reg) & (prefetch_tag_reg == tag_reg);
 
 assign prefetch_cached = prefetch_cached_way != 0;
-assign prefetch_hit = prefetch_valid_reg & prefetch_same_line;
+assign prefetch_hit = !uncached_reg & prefetch_valid_reg & prefetch_same_line;
 
 assign fetch_ok = prefetch_hit | ret_valid_last;
 
