@@ -6,4 +6,4 @@
 
 ## chiplab
 
-参考 [Chiplab用户手册](https://chiplab.readthedocs.io/zh/latest/Quick-Start.html) 完成配置。注意设置 `chip/config-generator.mak` 中的 `CPU_2CMT` 为 `y`。
+参考 [Chiplab用户手册](https://chiplab.readthedocs.io/zh/latest/Quick-Start.html) 完成配置，将 `IP/myCPU` 设置为本仓库的 `myCPU` 的符号链接。注意设置 `chip/config-generator.mak` 中的 `CPU_2CMT` 为 `y`。
