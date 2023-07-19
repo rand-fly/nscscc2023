@@ -15,11 +15,33 @@ parameter PALEN  = 32;
 `define CACHE_LINE_32B
 
 `ifdef CACHE_LINE_16B
+`define LINE_SIZE 16
 `define LINE_WIDTH 128
 `define LINE_WORD_NUM 4
-`elsif CACHE_LINE_32B
+`define TAG_WIDTH 20
+`define INDEX_WIDTH 8
+`define LINE_NUM 256
+`define OFFSET_WIDTH 4
+`endif
+
+`ifdef CACHE_LINE_32B
+`define LINE_SIZE 32
 `define LINE_WIDTH 256
 `define LINE_WORD_NUM 8
+`define TAG_WIDTH 20
+`define INDEX_WIDTH 7
+`define LINE_NUM 128
+`define OFFSET_WIDTH 5
+`endif
+
+`ifdef CACHE_LINE_64B
+`define LINE_SIZE 64
+`define LINE_WIDTH 512
+`define LINE_WORD_NUM 16
+`define TAG_WIDTH 20
+`define INDEX_WIDTH 6
+`define LINE_NUM 64
+`define OFFSET_WIDTH 6
 `endif
 
 typedef enum logic [4:0] {

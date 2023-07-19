@@ -1,20 +1,4 @@
-`define CACHE_LINE_32B
-
-`ifdef CACHE_LINE_16B
-`define LINE_SIZE 16
-`define LINE_WIDTH 128
-`define TAG_WIDTH 20
-`define INDEX_WIDTH 8
-`define LINE_NUM 256
-`define OFFSET_WIDTH 4
-`elsif CACHE_LINE_32B
-`define LINE_SIZE 32
-`define LINE_WIDTH 256
-`define TAG_WIDTH 20
-`define INDEX_WIDTH 7
-`define LINE_NUM 128
-`define OFFSET_WIDTH 5
-`endif
+`include "definitions.svh"
 
 module cache(
     // Clock and reset
@@ -72,6 +56,7 @@ reg [`INDEX_WIDTH-1:0] index_reg;
 reg [`INDEX_WIDTH-1:0] index_reg_miss;
 reg [`TAG_WIDTH-1:0] tag_reg;
 reg [`OFFSET_WIDTH-1:0] offset_reg;
+wire [`OFFSET_WIDTH-1:0] offset_cell_w;
 // reg [1:0] offset_w_reg; // word offset
 wire [`OFFSET_WIDTH-3:0] offset_w_reg; // word offset
 reg uncached_reg;
@@ -195,6 +180,20 @@ reg [`LINE_NUM-1:0] dirty_way3;
     |   {32{offset_==6}} & data_[223:192]\
     |   {32{offset_==7}} & data_[255:224]\
 `endif\
+`ifdef CACHE_LINE_64B\
+    |   {32{offset_==4  }} & data_[159:128]\
+    |   {32{offset_==5  }} & data_[191:160]\
+    |   {32{offset_==6  }} & data_[223:192]\
+    |   {32{offset_==7  }} & data_[255:224]\
+    |   {32{offset_==8  }} & data_[287:256]\
+    |   {32{offset_==9  }} & data_[319:288]\
+    |   {32{offset_==10 }} & data_[351:320]\
+    |   {32{offset_==11 }} & data_[383:352]\
+    |   {32{offset_==12 }} & data_[415:384]\
+    |   {32{offset_==13 }} & data_[447:416]\
+    |   {32{offset_==14 }} & data_[479:448]\
+    |   {32{offset_==15 }} & data_[511:480]\
+`endif\
 )
 
 reg [2:0] main_state;
@@ -287,7 +286,7 @@ wire prefetch_next_same_line;
 
 wire fetch_ok;
 
-assign cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{wstrb[3]}},{8{wstrb[2]}},{8{wstrb[1]}},{8{wstrb[0]}}} << (offset*8);
+assign cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{wstrb[3]}},{8{wstrb[2]}},{8{wstrb[1]}},{8{wstrb[0]}}} << (offset_cell_w*8);
 
 // generate
 //     genvar i;
@@ -302,6 +301,7 @@ assign cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{wstrb[3]}},{8{wstr
 //     end
 // end
 
+assign offset_cell_w = {offset_reg[`OFFSET_WIDTH-1:2],2'b0};
 assign offset_w_reg = offset_reg[`OFFSET_WIDTH-1:2];
 
 assign idle = (main_state == MAIN_ST_IDLE);
@@ -351,9 +351,9 @@ always @(posedge clk) begin
             size_reg <= size;
             wstrb_reg <= wstrb;
             wdata_reg <= wdata;
-            if (op == OP_WRITE) begin
-                cache_wstrb_reg <= cache_wstrb_reg | ({{(32-4){1'b0}},wstrb} << offset);
-                cache_write_data_reg <= (cache_write_data_reg & ~cache_write_data_strobe) | (({{(`LINE_WIDTH-32){1'b0}},wdata} << (offset*8)) & cache_write_data_strobe);
+            if (!uncached & (op == OP_WRITE)) begin
+                cache_wstrb_reg <= cache_wstrb_reg | ({{(`LINE_SIZE-4){1'b0}},wstrb} << offset_cell_w);
+                cache_write_data_reg <= (cache_write_data_reg & ~cache_write_data_strobe) | (({{(`LINE_WIDTH-32){1'b0}},wdata} << (offset_cell_w*8)) & cache_write_data_strobe);
             end
         end
         else if (refill_write | hit_write) begin
@@ -700,6 +700,25 @@ always @(posedge clk) begin
         prefetch_valid_reg <= 1;
         prefetch_data_reg <= buffer_read_data_new;
     end
+end
+
+always @(posedge clk) begin
+    // if (index_reg == 6'h30) begin
+        if (data_ok) begin
+            if (op_reg == OP_WRITE) begin
+                $display("[%t] write %h(%h,%h,%h) : %h",$time,{tag_reg,index_reg,offset_reg},tag_reg,index_reg,offset_reg,wdata_reg);
+            end
+            else begin
+                $display("[%t] read  %h(%h,%h,%h) : %h",$time,{tag_reg,index_reg,offset_reg},tag_reg,index_reg,offset_reg,rdata_l);
+                // if ({tag_reg,index_reg,offset_reg} == 32'h3154) begin
+                //     $finish;
+                // end
+            end
+        end
+        // if (refill_write) begin
+        //     $display("[%t] refill_write way: %h, line: %h",$time,replace_way_id, cache_write_data_actually);
+        // end
+    // end
 end
 
 

@@ -1,21 +1,5 @@
 // test only
-
-`define CACHE_LINE_64B
-
-`ifdef CACHE_LINE_16B
-`define LINE_WIDTH 128
-`define LINE_WORD_NUM 4
-`endif
-
-`ifdef CACHE_LINE_32B
-`define LINE_WIDTH 256
-`define LINE_WORD_NUM 8
-`endif
-
-`ifdef CACHE_LINE_64B
-`define LINE_WIDTH 512
-`define LINE_WORD_NUM 16
-`endif
+`include "definitions.svh"
 
 
 module axi_bridge(
@@ -26,71 +10,71 @@ module axi_bridge(
     output   reg[31:0] araddr,
     output   reg[ 7:0] arlen,
     output   reg[ 2:0] arsize,
-    output      [ 1:0] arburst,
-    output      [ 1:0] arlock,
-    output      [ 3:0] arcache,
-    output      [ 2:0] arprot,
+    output   wire[ 1:0] arburst,
+    output   wire[ 1:0] arlock,
+    output   wire[ 3:0] arcache,
+    output   wire[ 2:0] arprot,
     output   reg       arvalid,
-    input              arready,
+    input    wire      arready,
 
-    input    [ 3:0] rid,
-    input    [31:0] rdata,
-    input    [ 1:0] rresp,
-    input           rlast,
-    input           rvalid,
+    input    wire[ 3:0] rid,
+    input    wire[31:0] rdata,
+    input    wire[ 1:0] rresp,
+    input    wire       rlast,
+    input    wire       rvalid,
     output   reg    rready,
 
-    output      [ 3:0] awid,
+    output   wire[ 3:0] awid,
     output   reg[31:0] awaddr,
     output   reg[ 7:0] awlen,
     output   reg[ 2:0] awsize,
-    output      [ 1:0] awburst,
-    output      [ 1:0] awlock,
-    output      [ 3:0] awcache,
-    output      [ 2:0] awprot,
+    output   wire[ 1:0] awburst,
+    output   wire[ 1:0] awlock,
+    output   wire[ 3:0] awcache,
+    output   wire[ 2:0] awprot,
     output   reg       awvalid,
-    input              awready,
+    input    wire       awready,
 
-    output      [ 3:0] wid,
+    output   wire[ 3:0] wid,
     output   reg[31:0] wdata,
     output   reg[ 3:0] wstrb,
     output   reg       wlast,
     output   reg       wvalid,
-    input              wready,
+    input    wire      wready,
 
-    input    [ 3:0] bid,
-    input    [ 1:0] bresp,
-    input           bvalid,
+    input    wire[ 3:0] bid,
+    input    wire[ 1:0] bresp,
+    input    wire       bvalid,
     output   reg    bready,
     //cache sign
-    input                       inst_rd_req     ,
-    input  [ 2:0]               inst_rd_type    ,
-    input  [31:0]               inst_rd_addr    ,
-    output                      inst_rd_rdy     ,
-    output                      inst_ret_valid  ,
-    output                      inst_ret_last   ,
-    output [31:0]               inst_ret_data   ,
-    input                       inst_wr_req     ,
-    input  [ 2:0]               inst_wr_type    ,
-    input  [31:0]               inst_wr_addr    ,
-    input  [ 3:0]               inst_wr_wstrb   ,
-    input  [`LINE_WIDTH-1:0]    inst_wr_data    ,
-    output                      inst_wr_rdy     ,
+    input  wire                     inst_rd_req     ,
+    input  wire[ 2:0]               inst_rd_type    ,
+    input  wire[31:0]               inst_rd_addr    ,
+    output wire                     inst_rd_rdy     ,
+    output wire                     inst_ret_valid  ,
+    output wire                     inst_ret_last   ,
+    output wire[31:0]               inst_ret_data   ,
+    input  wire                     inst_wr_req     ,
+    input  wire[ 2:0]               inst_wr_type    ,
+    input  wire[31:0]               inst_wr_addr    ,
+    input  wire[ 3:0]               inst_wr_wstrb   ,
+    input  wire[`LINE_WIDTH-1:0]    inst_wr_data    ,
+    output wire                     inst_wr_rdy     ,
 
-    input                       data_rd_req     ,
-    input  [ 2:0]               data_rd_type    ,
-    input  [31:0]               data_rd_addr    ,
-    output                      data_rd_rdy     ,
-    output                      data_ret_valid  ,
-    output                      data_ret_last   ,
-    output [31:0]               data_ret_data   ,
-    input                       data_wr_req     ,
-    input  [ 2:0]               data_wr_type    ,
-    input  [31:0]               data_wr_addr    ,
-    input  [ 3:0]               data_wr_wstrb   ,
-    input  [`LINE_WIDTH-1:0]    data_wr_data    ,
-    output                      data_wr_rdy     ,
-    output                      write_buffer_empty
+    input  wire                     data_rd_req     ,
+    input  wire[ 2:0]               data_rd_type    ,
+    input  wire[31:0]               data_rd_addr    ,
+    output wire                     data_rd_rdy     ,
+    output wire                     data_ret_valid  ,
+    output wire                     data_ret_last   ,
+    output wire[31:0]               data_ret_data   ,
+    input  wire                     data_wr_req     ,
+    input  wire[ 2:0]               data_wr_type    ,
+    input  wire[31:0]               data_wr_addr    ,
+    input  wire[ 3:0]               data_wr_wstrb   ,
+    input  wire[`LINE_WIDTH-1:0]    data_wr_data    ,
+    output wire                     data_wr_rdy     ,
+    output wire                     write_buffer_empty
 );
 
 //fixed signal
@@ -140,12 +124,12 @@ wire        data_wr_cache_line;
 wire [ 2:0] data_real_wr_size;
 wire [ 7:0] data_real_wr_len ;
 
-reg [`LINE_WIDTH-1:0]   write_buffer_data;
-reg [ 2:0]              write_buffer_num;
+reg [`LINE_WIDTH-1:0]                write_buffer_data;
+reg [`OFFSET_WIDTH-3:0]              write_buffer_num;
 
 wire                    write_buffer_last;
 
-assign write_buffer_empty = (write_buffer_num == 3'b0) && !write_wait_enable;
+assign write_buffer_empty = (write_buffer_num == {(`OFFSET_WIDTH-2){1'b0}}) && !write_wait_enable;
 
 assign rd_requst_can_receive = rd_requst_state_is_empty && !(write_wait_enable && !(bvalid && bready));
 
@@ -175,7 +159,7 @@ assign data_ret_data  = rdata;
 
 assign data_wr_rdy = (write_requst_state == write_request_empty);
 
-assign write_buffer_last = write_buffer_num == 3'b1;
+assign write_buffer_last = write_buffer_num == {(`OFFSET_WIDTH-2){1'b1}};
 
 always @(posedge clk) begin
     if (reset) begin
@@ -265,7 +249,7 @@ always @(posedge clk) begin
         wlast   <= 1'b0;
         bready  <= 1'b0;
         
-        write_buffer_num   <= 3'b0;
+        write_buffer_num   <= 0;
         write_buffer_data  <= 0;
     end
     else case (write_requst_state)
@@ -283,10 +267,10 @@ always @(posedge clk) begin
                 write_buffer_data <= {32'b0, data_wr_data[`LINE_WIDTH-1:32]};
 
                 if (data_wr_type == 3'b100) begin
-                    write_buffer_num <= `LINE_WORD_NUM-1;
+                    write_buffer_num <= {(`OFFSET_WIDTH-2){1'b1}};
                 end
                 else begin
-                    write_buffer_num <= 3'b0;
+                    write_buffer_num <= 0;
                     wlast <= 1'b1;
                 end
             end

@@ -1,13 +1,5 @@
 `include "definitions.svh"
 
-`define CACHE_LINE_32B
-`ifdef CACHE_LINE_16B
-`define LINE_WIDTH 128
-`define LINE_WORD_NUM 4
-`elsif CACHE_LINE_32B
-`define LINE_WIDTH 256
-`define LINE_WORD_NUM 8
-`endif
 `ifdef SIMU
 module core_top(
 `else
@@ -182,8 +174,8 @@ icache icache(
 
     .valid(icache_req),
     .tag(icache_addr[31:12]),
-    .index(icache_addr[11:6]),
-    .offset(icache_addr[5:0]),
+    .index(icache_addr[11:5]),
+    .offset(icache_addr[4:0]),
     .uncached(icache_uncached),
     .addr_ok(icache_addr_ok),
     .data_ok(icache_data_ok),

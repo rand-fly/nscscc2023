@@ -77,8 +77,8 @@ module id_stage (
 logic a_branch_mistaken;
 logic b_branch_mistaken;
 
-assign id_a_branch_mistaken = a_branch_mistaken && !allowout;
-assign id_b_branch_mistaken = b_branch_mistaken && !allowout;
+assign id_a_branch_mistaken = a_branch_mistaken && id_a_ready && !allowout;
+assign id_b_branch_mistaken = b_branch_mistaken && id_b_ready && !allowout;
 
 logic a_is_complex_op;
 logic b_is_complex_op;
@@ -92,7 +92,8 @@ assign load_use_hazard = raw_hazard && (id_a_mem_type == MEM_LOAD_S || id_b_mem_
 
 assign id_a_ready = a_valid;
 // assign ro_b_ready = ro_a_ready && r3_valid && r4_valid && !RO_a_is_csr_op && !(raw_hazard && (a_is_complex_op || b_is_complex_op || load_use_hazard));
-assign id_b_ready = b_valid && id_a_ready && !id_a_is_spec_op && !raw_hazard && id_b_mem_type == MEM_NOP;
+// assign id_b_ready = b_valid && id_a_ready && !id_a_is_spec_op && !raw_hazard && id_b_mem_type == MEM_NOP;
+assign id_b_ready = 1'b0;
 
 assign id_a_pc = a_pc;
 assign id_b_pc = b_pc;
