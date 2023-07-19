@@ -181,8 +181,8 @@ assign                 {match, opcode,   rf_src1, rf_src2, src2_is_imm, imm,    
 {54{inst_st_w     }} & {1'b1,  OP_ADD,   rj,      rd,      1'b1,        si12,   `R0  } | // special use of src2
 {54{inst_syscall  }} & {1'b1,  OP_OUT1, `R0,     `R0,      1'b0,        32'd0,  `R0  } |
 {54{inst_break    }} & {1'b1,  OP_OUT1, `R0,     `R0,      1'b0,        32'd0,  `R0  } |
-{54{inst_rdcntvl_w}} & {1'b1,  OP_OUT1, `R0,     `R0,      1'b0, counter[31: 0], rd  } |
-{54{inst_rdcntvh_w}} & {1'b1,  OP_OUT1, `R0,     `R0,      1'b0, counter[63:32], rd  } |
+{54{inst_rdcntvl_w}} & {1'b1,  OP_OUT2, `R0,     `R0,      1'b1, counter[31: 0], rd  } |
+{54{inst_rdcntvh_w}} & {1'b1,  OP_OUT2, `R0,     `R0,      1'b1, counter[63:32], rd  } |
 {54{inst_rdcntid_w}} & {1'b1,  OP_OUT2, `R0,     `R0,      1'b0,        32'h40,  rj  } | // special use of src1 and imm
 {54{inst_csrx     }} & {1'b1,  OP_OUT2,  rj,      rd,      1'b0,        csr_addr,rd  } | // special use of src1 and imm
 {54{inst_tlbsrch  }} & {1'b1,  OP_OUT1, `R0,     `R0,      1'b0,        32'b0,  `R0  } |

@@ -46,6 +46,11 @@ module mem_ctrl(
     input wire             mmu_pis,
     input wire             mmu_ppi,
     input wire             mmu_pme
+
+`ifdef DIFFTEST_EN
+   ,input wire difftest_t  ex_difftest,
+    output difftest_t      mem_difftest
+`endif
 );
 
 logic        MEM_valid;
@@ -176,6 +181,5 @@ always_comb begin
         mem_exception_type = ALE;
     end
 end
-
 
 endmodule

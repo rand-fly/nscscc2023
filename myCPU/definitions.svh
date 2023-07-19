@@ -1,10 +1,14 @@
 `default_nettype none
-`timescale 1ns/1ps
 
 `ifndef DEFINITIONS_SVH_
 `define DEFINITIONS_SVH_
 
+`ifdef DIFFTEST_EN
+parameter TLBNUM = 32;
+`else
 parameter TLBNUM = 16;
+`endif
+
 parameter TLBIDLEN = $clog2(TLBNUM);
 parameter PALEN  = 32;
 
@@ -135,5 +139,58 @@ typedef struct packed {
     logic                d;
     logic                v;
 } tlb_result_t;
+
+typedef struct packed {
+    logic        valid;
+    logic [31:0] instr;
+    logic        is_TLBFILL;
+    logic [TLBIDLEN-1:0] TLBFILL_index;
+    logic        is_CNTinst;
+    logic [63:0] timer_64_value;
+    logic        csr_rstat;
+    logic [31:0] csr_data;
+    logic [ 7:0] store_valid;
+    logic [31:0] storePAddr;
+    logic [31:0] storeVAddr;
+    logic [31:0] storeData;
+    logic [ 7:0] load_valid;
+    logic [31:0] loadPAddr;
+    logic [31:0] loadVAddr;
+} difftest_t;
+
+typedef struct packed {
+    logic        excp_valid;
+    logic        eret;
+    logic [10:0] intrNo;
+    logic [ 5:0] cause;
+    logic [31:0] exceptionPC;
+    logic [31:0] exceptionInst;
+} difftest_excp_t;
+
+typedef struct packed {
+    logic [31:0] CRMD     ;
+    logic [31:0] PRMD     ;
+    logic [31:0] ECFG     ;
+    logic [31:0] ESTAT    ;
+    logic [31:0] ERA      ;
+    logic [31:0] BADV     ;
+    logic [31:0] EENTRY   ;
+    logic [31:0] TLBIDX   ;
+    logic [31:0] TLBEHI   ;
+    logic [31:0] TLBELO0  ;
+    logic [31:0] TLBELO1  ;
+    logic [31:0] ASID     ;
+    logic [31:0] SAVE0    ;
+    logic [31:0] SAVE1    ;
+    logic [31:0] SAVE2    ;
+    logic [31:0] SAVE3    ;
+    logic [31:0] TID      ;
+    logic [31:0] TCFG     ;
+    logic [31:0] TVAL     ;
+    logic [31:0] TLBRENTRY;
+    logic [31:0] DMW0     ;
+    logic [31:0] DMW1     ;
+} difftest_csr_t;
+
 
 `endif

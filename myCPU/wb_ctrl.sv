@@ -28,6 +28,11 @@ module wb_ctrl(
     output logic [31:0]   wb_pc,
     output logic [ 4:0]   wb_dest,
     output logic [31:0]   wb_result
+
+`ifdef DIFFTEST_EN
+   ,input wire difftest_t  mem_difftest,
+    output difftest_t      wb_difftest
+`endif
 );
 
 logic          WB_valid;

@@ -1,0 +1,2 @@
+/myCpu/*_gen_*/*
+!/myCpu/*_gen_*/*.xci

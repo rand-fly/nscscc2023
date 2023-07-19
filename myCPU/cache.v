@@ -387,7 +387,7 @@ always @(posedge clk) begin
         preload_tag_way3 <= 0;
 `endif
     end
-    else if ((idle | lookup) & valid) begin
+    else if ((idle | lookup) & pipe_interface_latch) begin
         preload_data_way0 <= data_way0[index];
         preload_data_way1 <= data_way1[index];
         preload_tag_way0 <= tag_way0[index];
@@ -427,21 +427,23 @@ always @(posedge clk) begin
                 end
             end
             MAIN_ST_MISS: begin
-                if (uncached_reg) begin
-                    if ((op_reg == OP_READ) & rd_rdy & !prefetching) begin
+                if (!prefetching) begin    
+                    if (uncached_reg) begin
+                        if ((op_reg == OP_READ) & rd_rdy & !prefetching) begin
+                            main_state <= MAIN_ST_REFILL;
+                        end
+                        else if ((op_reg == OP_WRITE) & wr_rdy) begin
+                            main_state <= MAIN_ST_REPLACE;
+                        end
+                    end
+                    else if (replace_dirty) begin
+                        if (wr_rdy) begin
+                            main_state <= MAIN_ST_REPLACE;
+                        end
+                    end
+                    else if (!prefetching) begin
                         main_state <= MAIN_ST_REFILL;
                     end
-                    else if ((op_reg == OP_WRITE) & wr_rdy) begin
-                        main_state <= MAIN_ST_REPLACE;
-                    end
-                end
-                else if (replace_dirty) begin
-                    if (wr_rdy) begin
-                        main_state <= MAIN_ST_REPLACE;
-                    end
-                end
-                else if (!prefetching) begin
-                    main_state <= MAIN_ST_REFILL;
                 end
             end
             MAIN_ST_REPLACE: begin
@@ -497,11 +499,11 @@ assign rdata_l = uncached_reg ? ret_data : `get_word(cache_rd_data, offset_w_reg
 assign rdata_h = `get_word(cache_rd_data, offset_w_reg+1);
 
 // assign data_ok = (op_reg == OP_READ) ? ((lookup & cache_hit) | ret_valid_last) : wdata_ok_reg;
-assign data_ok = (op_reg == OP_READ)
+assign data_ok = !finished & ((op_reg == OP_READ)
                     ? ((lookup & cache_hit_and_cached) | prefetch_hit | (uncached_reg
                                                     ? ret_valid_last
-                                                    : ((refill | (prefetching & prefetch_same_line)) & !finished & ret_valid & (buffer_read_data_count >= offset_reg[`OFFSET_WIDTH-1:2]))))
-                    : wdata_ok_reg;
+                                                    : ((refill | (prefetching & prefetch_same_line)) & ret_valid & (buffer_read_data_count >= offset_reg[`OFFSET_WIDTH-1:2]))))
+                    : wdata_ok_reg);
 
 always @(posedge clk) begin
     if (miss) begin
@@ -545,7 +547,7 @@ always @(posedge clk) begin
             buffer_read_data <= buffer_read_data_new;
             buffer_read_data_count <= buffer_read_data_count + 1;
         end
-        if (ret_last) begin
+        if (ret_valid_last) begin
             buffer_read_data <= 0;
             buffer_read_data_count <= 0;
         end

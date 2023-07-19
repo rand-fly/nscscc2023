@@ -82,6 +82,13 @@ module ex_stage(
     output logic [31:0]    ex_b_st_data,
     output logic           ex_b_is_spec_op,
     output spec_op_t       ex_b_spec_op
+
+`ifdef DIFFTEST_EN
+   ,input wire difftest_t  ro_a_difftest,
+    input wire difftest_t  ro_b_difftest,
+    output difftest_t      ex_a_difftest,
+    output difftest_t      ex_b_difftest
+`endif
 );
 
 logic            EX_a_valid;
@@ -379,4 +386,70 @@ assign ex_b_branch_mistaken = ex_b_valid && !ex_stall && (ex_b_branch_taken != E
 
 assign ex_b_branch_target  = EX_b_is_jirl ? b_alu_result : EX_b_branch_target;
 
+`ifdef DIFFTEST_EN
+always_ff @(posedge clk) begin
+    if (!ex_stall) begin
+        ex_a_difftest <= ro_a_difftest;
+        ex_b_difftest <= ro_b_difftest;
+    end
+end
+`endif
+
 endmodule
+
+// for verilator simulation
+`ifdef SIMU
+module mult_gen_0(
+    input wire          CLK,
+    input wire   [32:0] A,
+    input wire   [32:0] B,
+    input wire          CE,
+    output logic [63:0] P
+);
+
+always_ff @(posedge CLK) begin
+    if (CE) P <= $signed(A) * $signed(B);
+end
+
+endmodule
+
+// not pipelined
+module div_gen_0(
+    input wire          aclk,
+    input wire          s_axis_divisor_tvalid,
+    input wire  [31:0]  s_axis_divisor_tdata,
+    input wire          s_axis_dividend_tvalid,
+    input wire  [31:0]  s_axis_dividend_tdata,
+    output logic        m_axis_dout_tvalid,
+    output logic [63:0] m_axis_dout_tdata
+);
+
+logic        valid;
+logic [ 4:0] counter;
+logic [31:0] divisor;
+logic [31:0] dividend;
+
+always_ff @(posedge aclk) begin
+    if (s_axis_divisor_tvalid && s_axis_dividend_tvalid) begin
+        valid <= 1'd1;
+        counter <= 5'd30;
+        divisor <= s_axis_divisor_tdata;
+        dividend <= s_axis_dividend_tdata;
+    end
+    else if (valid) begin
+        if (counter == 5'd0) begin
+            valid <= 1'b0;
+            m_axis_dout_tvalid <= 1'b1;
+            m_axis_dout_tdata <= {dividend / divisor, dividend % divisor};
+        end
+        else begin
+            counter <= counter - 5'd1;
+        end
+    end
+    else begin
+        m_axis_dout_tvalid <= 1'b0;
+    end
+end
+
+endmodule
+`endif

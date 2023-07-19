@@ -154,6 +154,8 @@ wire [12: 0] int_vec = ESTAT.IS & ECFG.LIE;
 
 assign interrupt = CRMD.IE && int_vec != 13'h0;
 
+logic timer_en;
+
 always_comb begin
     unique case (addr)
         14'h00: rdata = CRMD;
@@ -352,7 +354,10 @@ always_ff @(posedge clk) begin
             14'h40: TID[31:0] <= wdata_m[31:0];
             14'h41: begin
                 TCFG[31:0] <= wdata_m[31:0];
-                if (wdata_m[0]) TVAL.TimeVal <= {wdata_m[31:2], 2'b00};
+                timer_en <= wdata_m[0];
+                if (wdata_m[0]) begin
+                    TVAL.TimeVal <= {wdata_m[31:2], 2'b00};
+                end
             end
             14'h42: ; // TVAL
             14'h44: if (wdata_m[0]) ESTAT.IS[11] <= 1'h0; // TICLR
@@ -368,12 +373,12 @@ always_ff @(posedge clk) begin
     if (vppn_we) TLBEHI.VPPN <= vppn_data;
 
     // timer
-    if (TCFG.En) begin
+    if (timer_en) begin
         if (TVAL.TimeVal == 32'h0) begin
             if (TCFG.Periodic)
                 TVAL.TimeVal <= {TCFG.InitVal, 2'b00};
             else
-                TCFG.En <= 1'h0;
+                timer_en <= 1'h0;
             ESTAT.IS[11] <= 1'h1;
         end
         else begin
