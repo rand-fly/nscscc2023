@@ -501,7 +501,7 @@ assign rdata_h = `get_word(cache_rd_data, offset_w_reg+1);
 // assign data_ok = (op_reg == OP_READ) ? ((lookup & cache_hit) | ret_valid_last) : wdata_ok_reg;
 assign data_ok = !finished & ((op_reg == OP_READ)
                     ? ((lookup & cache_hit_and_cached) | prefetch_hit | (uncached_reg
-                                                    ? ret_valid_last
+                                                    ? (refill & ret_valid_last)
                                                     : ((refill | (prefetching & prefetch_same_line)) & ret_valid & (buffer_read_data_count >= offset_reg[`OFFSET_WIDTH-1:2]))))
                     : wdata_ok_reg);
 
