@@ -53,7 +53,10 @@ always_ff @(posedge clk) begin
         WB_valid    <= 1'b0;
     end
     else if (!wb_stall) begin
-        WB_valid   <= mem_valid;
+        WB_valid <= mem_valid && mem_ready;
+    end
+
+    if (!wb_stall && mem_valid && mem_ready) begin
         WB_pc      <= mem_pc;
         WB_result  <= mem_result;
         WB_mem_type<= mem_mem_type;

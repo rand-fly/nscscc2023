@@ -88,6 +88,8 @@ always_ff @(posedge clk) begin
     end
     else if (allowout) begin
         RO_valid <= id_ready;
+    end
+    if (allowout && id_ready) begin
         RO_pc <= id_pc;
         RO_have_exception <= id_have_exception;
         RO_exception_type <= id_exception_type;

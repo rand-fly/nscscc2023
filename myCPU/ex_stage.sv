@@ -6,9 +6,8 @@ module ex_stage(
 
     input wire             flush,
     input wire             allowout,
-    input wire             ro_ready,
-    output logic           ex_valid,
-    output logic           ex_ready,
+    input wire             ro_both_ready,
+    output logic           ex_both_ready,
     output logic           ex_stall,
 
     input wire             ro_a_valid,
@@ -169,20 +168,25 @@ logic            b_mod_sign;
 logic [31:0]     b_div_result;
 logic [31:0]     b_mod_result;
 
+logic ex_valid;
 logic ex_a_ready;
 logic ex_b_ready;
 
 assign ex_valid = EX_a_valid || EX_b_valid;
-assign ex_ready = ex_valid && (!EX_a_valid || ex_a_ready) && (!EX_b_valid || ex_b_ready);
-assign ex_stall = ex_valid && (!ex_ready || !allowout);
+assign ex_both_ready = ex_valid && (!EX_a_valid || ex_a_ready) && (!EX_b_valid || ex_b_ready);
+assign ex_stall = ex_valid && (!ex_both_ready || !allowout);
 
 always_ff @(posedge clk) begin
-    if (reset || flush || (!ex_stall && !ro_ready)) begin
+    if (reset || flush) begin
         EX_a_valid <= 1'b0;
         EX_b_valid <= 1'b0;
     end
     else if (!ex_stall) begin
-        EX_a_valid              <= ro_a_valid;
+        EX_a_valid <= ro_both_ready & ro_a_valid;
+        EX_b_valid <= ro_both_ready & ro_b_valid;
+    end
+
+    if (!ex_stall && ro_both_ready && ro_a_valid) begin
         EX_a_pc                 <= ro_a_pc;
         EX_a_have_exception     <= ro_a_have_exception;
         EX_a_exception_type     <= ro_a_exception_type;
@@ -201,8 +205,9 @@ always_ff @(posedge clk) begin
         EX_a_st_data            <= ro_a_st_data;
         EX_a_is_spec_op         <= ro_a_is_spec_op;
         EX_a_spec_op            <= ro_a_spec_op;
-        
-        EX_b_valid              <= ro_b_valid;
+    end
+
+    if (!ex_stall && ro_both_ready && ro_b_valid) begin
         EX_b_pc                 <= ro_b_pc;
         EX_b_have_exception     <= ro_b_have_exception;
         EX_b_exception_type     <= ro_b_exception_type;

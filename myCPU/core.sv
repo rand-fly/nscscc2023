@@ -121,10 +121,8 @@ mem_size_t   id_b_mem_size;
 logic        id_b_is_spec_op;
 spec_opcode_t id_b_spec_opcode;
 
-logic        ro_valid;
-logic        ro_ready;
+logic        ro_both_ready;
 logic        ro_stall;
-
 logic        ro_a_valid;
 logic [31:0] ro_a_pc;
 logic        ro_a_have_exception;
@@ -168,8 +166,7 @@ logic        ro_b_is_spec_op;
 spec_op_t    ro_b_spec_op;
 
 
-logic        ex_valid;
-logic        ex_ready;
+logic        ex_both_ready;
 logic        ex_stall;
 logic        ex_a_valid;
 logic        ex_a_forwardable;
@@ -203,6 +200,8 @@ logic [31:0] ex_b_st_data;
 logic        ex_b_is_spec_op;
 spec_op_t    ex_b_spec_op;
 
+
+logic        mem_both_ready;
 
 logic        mem_a_valid;
 logic        mem_a_ready;
@@ -370,8 +369,6 @@ difftest_t mem_b_difftest;
 difftest_t WB_a_difftest;
 difftest_t WB_b_difftest;
 difftest_excp_t WB_excp_difftest;
-
-difftest_csr_t WB_csr_difftest;
 `endif
 
 ifu ifu_0(
@@ -455,7 +452,7 @@ always_ff @(posedge clk) begin
 end
 
 id_stage id_stage_0(
-    .ro_stall(ro_stall),
+    .allowout(ro_stall),
     .counter(counter),
     .id_consume_inst(id_consume_inst),
 
@@ -533,8 +530,7 @@ ro_stage ro_stage_0(
 
     .flush(flush_ro || flush_all),
     .ex_stall(ex_stall),
-    .ro_valid(ro_valid),
-    .ro_ready(ro_ready),
+    .ro_both_ready(ro_both_ready),
     .ro_stall(ro_stall),
 
     .id_a_ready(id_a_ready),
@@ -554,13 +550,12 @@ ro_stage ro_stage_0(
     .id_a_is_jirl(id_a_is_jirl),
     .id_a_pred_branch_taken(id_a_pred_branch_taken),
     .id_a_pred_branch_target(id_a_pred_branch_target),
-    .id_a_branch_mistaken(id_a_branch_mistaken),
     .id_a_mem_type(id_a_mem_type),
     .id_a_mem_size(id_a_mem_size),
     .id_a_is_spec_op(id_a_is_spec_op),
     .id_a_spec_opcode(id_a_spec_opcode),
 
-    .id_b_ready(id_b_ready),
+    .id_b_ready(id_b_ready && !id_a_branch_mistaken),
     .id_b_pc(id_b_pc),
     .id_b_have_exception(id_b_have_exception),
     .id_b_exception_type(id_b_exception_type),
@@ -673,9 +668,8 @@ ex_stage ex_stage_0(
     .reset(reset),
     .flush(flush_ex || flush_all),
     .allowout(!mem_a_stall && !mem_b_stall),
-    .ro_ready(ro_ready),
-    .ex_valid(ex_valid),
-    .ex_ready(ex_ready),
+    .ro_both_ready(ro_both_ready),
+    .ex_both_ready(ex_both_ready),
     .ex_stall(ex_stall),
 
     .ro_a_valid(ro_a_valid),
@@ -762,7 +756,7 @@ mem_ctrl mem_ctrl_a(
     .clk(clk),
     .reset(reset),
     .flush(flush_all && (mem_a_have_exception || !mem_a_stall)),
-    .ex_ready(ex_ready && !mem_b_stall),
+    .ex_both_ready(ex_both_ready && !mem_b_stall),
     .allowout(!wb_a_stall && !wb_b_stall && (!mem_b_valid || mem_b_ready)),
     .cancel(1'b0),
     .mem_valid(mem_a_valid),
@@ -809,7 +803,7 @@ mem_ctrl mem_ctrl_b(
     .clk(clk),
     .reset(reset),
     .flush(flush_all),
-    .ex_ready(ex_ready && !mem_a_stall),
+    .ex_both_ready(ex_both_ready && !mem_a_stall),
     .allowout(!wb_a_stall && !wb_b_stall && (!mem_a_valid || mem_a_ready)),
     .cancel(mem_a_have_exception),
     .mem_valid(mem_b_valid),
@@ -872,6 +866,8 @@ always_ff @(posedge clk) begin
         end
     end
 end
+
+assign mem_both_ready = (mem_a_valid || mem_b_valid) && (!mem_a_valid || mem_a_ready) && (!mem_b_valid || mem_b_ready);
 
 `ifdef DIFFTEST_EN
 always_ff @(posedge clk) begin
@@ -1034,7 +1030,7 @@ wb_ctrl wb_ctrl_a(
     .clk(clk),
     .reset(reset),
 
-    .mem_ready((!mem_a_valid || mem_a_ready) && (!mem_b_valid || mem_b_ready) && !wb_b_stall),
+    .mem_ready(mem_both_ready && !wb_b_stall),
     .allowout(!wb_b_valid || wb_b_ready),
     .wb_valid(wb_a_valid),
     .wb_ready(wb_a_ready),
@@ -1064,7 +1060,7 @@ wb_ctrl wb_ctrl_b(
     .clk(clk),
     .reset(reset),
 
-    .mem_ready((!mem_a_valid || mem_a_ready) && (!mem_b_valid || mem_b_ready) && !wb_a_stall),
+    .mem_ready(mem_both_ready && !wb_a_stall),
     .allowout(!wb_a_valid || wb_a_ready),
     .wb_valid(wb_b_valid),
     .wb_ready(wb_b_ready),
@@ -1284,8 +1280,6 @@ always_ff @(posedge clk) begin
         wb_csr_difftest.DMW0      <= csr_0.DMW0     ;
         wb_csr_difftest.DMW1      <= csr_0.DMW1     ;
     end
-
-    // wb_csr_difftest           <= WB_csr_difftest;
 end
 
 `endif

@@ -5,7 +5,7 @@ module mem_ctrl(
     input wire             reset,
 
     input wire             flush,
-    input wire             ex_ready,
+    input wire             ex_both_ready,
     input wire             allowout,
     input wire             cancel,
     output logic           mem_valid,
@@ -70,11 +70,14 @@ assign mem_ready = MEM_valid && (!mmu_valid || mmu_addr_ok);
 assign mem_stall = MEM_valid && (!mem_ready || !allowout);
 
 always_ff @(posedge clk) begin
-    if (reset || flush || (!mem_stall && !ex_ready)) begin
-        MEM_valid     <= 1'b0;
+    if (reset || flush) begin
+        MEM_valid <= 1'b0;
     end
     else if (!mem_stall) begin
-        MEM_valid          <= ex_valid;
+        MEM_valid <= ex_valid && ex_both_ready;
+    end
+
+    if (!mem_stall && ex_valid && ex_both_ready) begin
         MEM_pc             <= ex_pc;
         MEM_have_exception <= ex_have_exception;
         MEM_exception_type <= ex_exception_type;
@@ -86,9 +89,9 @@ always_ff @(posedge clk) begin
     end
 end
 
-assign mem_pc      = MEM_pc;
-assign mem_result  = mem_csr_result_valid ? mem_csr_result : MEM_result;
-assign mem_dest    = MEM_dest;
+assign mem_pc       = MEM_pc;
+assign mem_result   = mem_csr_result_valid ? mem_csr_result : MEM_result;
+assign mem_dest     = MEM_dest;
 assign mem_mem_type = MEM_mem_type;
 assign mem_mem_size = MEM_mem_size;
 

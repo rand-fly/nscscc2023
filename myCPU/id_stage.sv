@@ -1,7 +1,7 @@
 `include "definitions.svh"
 
 module id_stage (
-    input wire             ro_stall,
+    input wire             allowout,
     input wire [63:0]      counter,
 
     output logic [1:0]     id_consume_inst,
@@ -77,8 +77,8 @@ module id_stage (
 logic a_branch_mistaken;
 logic b_branch_mistaken;
 
-assign id_a_branch_mistaken = a_branch_mistaken && !ro_stall;
-assign id_b_branch_mistaken = b_branch_mistaken && !ro_stall;
+assign id_a_branch_mistaken = a_branch_mistaken && !allowout;
+assign id_b_branch_mistaken = b_branch_mistaken && !allowout;
 
 logic a_is_complex_op;
 logic b_is_complex_op;
@@ -97,7 +97,7 @@ assign id_b_ready = b_valid && id_a_ready && !id_a_is_spec_op && !raw_hazard && 
 assign id_a_pc = a_pc;
 assign id_b_pc = b_pc;
 
-assign id_consume_inst = ro_stall   ? 2'd0 :
+assign id_consume_inst = allowout   ? 2'd0 :
                          id_b_ready ? 2'd2 :
                          id_a_ready ? 2'd1 :
                                       2'd0 ;

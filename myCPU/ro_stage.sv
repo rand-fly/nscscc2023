@@ -6,9 +6,8 @@ module ro_stage (
 
     input wire               flush,
     input wire               ex_stall,
-    output logic             ro_valid, // 有指令吗
-    output logic             ro_ready, // 工作完成了吗
-    output logic             ro_stall, // 是否暂停（上�?阶段可以进来吗）
+    output logic             ro_both_ready,
+    output logic             ro_stall,
 
     input wire               id_a_ready,
     input wire [31:0]        id_a_pc,
@@ -25,7 +24,6 @@ module ro_stage (
     input wire               id_a_branch_condition,
     input wire [31:0]        id_a_branch_target,
     input wire               id_a_is_jirl,
-    input wire               id_a_branch_mistaken,
     input wire               id_a_pred_branch_taken,
     input wire [31:0]        id_a_pred_branch_target,
     input wire mem_type_t    id_a_mem_type,
@@ -154,12 +152,13 @@ logic        forward_valid4;
 logic [ 4:0] forward_addr4;
 logic [31:0] forward_data4;
 
+logic        ro_valid;
 logic        ro_a_ready;
 logic        ro_b_ready;
 
 assign ro_valid = ro_a_valid || ro_b_valid;
-assign ro_ready = ro_valid && (!ro_a_valid || ro_a_ready) && (!ro_b_valid || ro_b_ready);
-assign ro_stall = ro_valid && (!ro_ready || ex_stall);
+assign ro_both_ready = ro_valid && (!ro_a_valid || ro_a_ready) && (!ro_b_valid || ro_b_ready);
+assign ro_stall = ro_valid && (!ro_both_ready || ex_stall);
 
 read_operands read_operands_a(
     .clk(clk),
@@ -228,7 +227,7 @@ read_operands read_operands_b(
     .flush(flush),
     .allowout(!ro_stall),
 
-    .id_ready(id_b_ready && !id_a_branch_mistaken),
+    .id_ready(id_b_ready),
     .id_pc(id_b_pc),
     .id_have_exception(id_b_have_exception),
     .id_exception_type(id_b_exception_type),
