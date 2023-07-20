@@ -92,8 +92,7 @@ assign load_use_hazard = raw_hazard && (id_a_mem_type == MEM_LOAD_S || id_b_mem_
 
 assign id_a_ready = a_valid;
 // assign ro_b_ready = ro_a_ready && r3_valid && r4_valid && !RO_a_is_csr_op && !(raw_hazard && (a_is_complex_op || b_is_complex_op || load_use_hazard));
-// assign id_b_ready = b_valid && id_a_ready && !id_a_is_spec_op && !raw_hazard && id_b_mem_type == MEM_NOP;
-assign id_b_ready = 1'b0;
+assign id_b_ready = b_valid && id_a_ready && !id_a_is_spec_op && !raw_hazard && id_b_mem_type == MEM_NOP;
 
 assign id_a_pc = a_pc;
 assign id_b_pc = b_pc;

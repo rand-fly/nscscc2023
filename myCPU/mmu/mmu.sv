@@ -241,7 +241,7 @@ assign icache_req = i_valid;
 assign icache_addr = i_pa;
 assign icache_uncached = i_mat == 2'd0;
 assign i_addr_ok = icache_addr_ok;
-assign i_double = 1'b0;//i_mat == 2'd1 && i_va[5:2] != 4'b1111;
+assign i_double = i_mat == 2'd1 && i_va[`OFFSET_WIDTH-1:2] != {(`OFFSET_WIDTH-2){1'b1}};
 assign i_data_ok = icache_data_ok;
 assign i_rdata = icache_rdata;
 
