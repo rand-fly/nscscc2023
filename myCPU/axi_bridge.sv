@@ -159,7 +159,7 @@ assign data_ret_data  = rdata;
 
 assign data_wr_rdy = (write_requst_state == write_request_empty);
 
-assign write_buffer_last = write_buffer_num == {(`OFFSET_WIDTH-2){1'b1}};
+assign write_buffer_last = write_buffer_num == 1;//{{(`OFFSET_WIDTH-3){1'b0}},1'b1};
 
 always @(posedge clk) begin
     if (reset) begin
@@ -300,7 +300,7 @@ always @(posedge clk) begin
                     wdata   <= write_buffer_data[31:0];
                     wvalid  <= 1'b1;
                     write_buffer_data <= {32'b0, write_buffer_data[`LINE_WIDTH-1:32]};
-                    write_buffer_num  <= write_buffer_num - 3'b1;
+                    write_buffer_num  <= write_buffer_num - 1;
                 end
             end
         end
