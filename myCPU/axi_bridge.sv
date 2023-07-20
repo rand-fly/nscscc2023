@@ -3,8 +3,8 @@
 
 
 module axi_bridge(
-    input   clk,
-    input   reset,
+    input    wire clk,
+    input    wire reset,
 
     output   reg[ 3:0] arid,
     output   reg[31:0] araddr,

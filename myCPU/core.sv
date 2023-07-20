@@ -59,6 +59,7 @@ exception_t  if_exception_type;
 
 logic [1:0]  ibuf_input_size;
 logic        ibuf_input_ready;
+
 logic        ibuf_output_valid1;
 logic [31:0] ibuf_output_pc1;
 logic [31:0] ibuf_output_inst1;
@@ -72,6 +73,9 @@ logic [31:0] ibuf_output_pc2;
 logic [31:0] ibuf_output_inst2;
 logic        ibuf_output_pred_branch_taken2;
 logic [31:0] ibuf_output_pred_branch_target2;
+logic        ibuf_output_have_exception2;
+exception_t  ibuf_output_exception_type2;
+
 
 logic [ 1:0] id_consume_inst;
 
@@ -417,13 +421,13 @@ ibuf ibuf_0(
     .input_inst1(if_inst1),
     .input_pred_branch_taken1(if_pred_branch_taken1),
     .input_pred_branch_target1(if_pred_branch_target1),
+    .input_have_exception1(if_have_exception),
+    .input_exception_type1(if_exception_type),
+
     .input_pc2(if_pc2),
     .input_inst2(if_inst2),
     .input_pred_branch_taken2(if_pred_branch_taken2),
     .input_pred_branch_target2(if_pred_branch_target2),
-
-    .have_exception(if_have_exception),
-    .exception_type(if_exception_type),
 
     .output_valid1(ibuf_output_valid1),
     .output_pc1(ibuf_output_pc1),
@@ -438,6 +442,8 @@ ibuf ibuf_0(
     .output_inst2(ibuf_output_inst2),
     .output_pred_branch_taken2(ibuf_output_pred_branch_taken2),
     .output_pred_branch_target2(ibuf_output_pred_branch_target2),
+    .output_have_exception2(ibuf_output_have_exception2),
+    .output_exception_type2(ibuf_output_exception_type2),
 
     .consume_inst(id_consume_inst)
 );
@@ -469,8 +475,8 @@ id_stage id_stage_0(
     .b_inst(ibuf_output_inst2),
     .b_pred_branch_taken(ibuf_output_pred_branch_taken2),
     .b_pred_branch_target(ibuf_output_pred_branch_target2),
-    .b_have_exception(1'b0),
-    .b_exception_type(INT),
+    .b_have_exception(ibuf_output_have_exception2),
+    .b_exception_type(ibuf_output_exception_type2),
 
     .id_a_ready(id_a_ready),
     .id_a_pc(id_a_pc),

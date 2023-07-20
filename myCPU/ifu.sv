@@ -51,7 +51,7 @@ assign pred_branch_target2 = 32'd0;
 assign pc1 = have_exception ? pc_start : pc_start_sent;
 assign pc2 = pc1 + 32'd4;
 
-assign inst1 = mmu_i_rdata[31: 0];
+assign inst1 = have_exception ? 32'h03400000 /* NOP */ : mmu_i_rdata[31: 0];
 assign inst2 = mmu_i_rdata[63:32];
 
 always_ff @(posedge clk) begin
