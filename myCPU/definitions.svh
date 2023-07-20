@@ -12,7 +12,7 @@ parameter TLBNUM = 16;
 parameter TLBIDLEN = $clog2(TLBNUM);
 parameter PALEN  = 32;
 
-`define CACHE_LINE_64B
+`define CACHE_LINE_32B
 
 `ifdef CACHE_LINE_16B
 `define LINE_SIZE 16
