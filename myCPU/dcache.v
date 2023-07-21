@@ -297,6 +297,7 @@ wire [`LINE_WIDTH-1:0]  p2_cache_write_data_actually;
 reg [`LINE_SIZE-1:0]    p2_cache_wstrb_reg;
 wire [`LINE_WIDTH-1:0]  p2cache_write_data_strobe;
 
+wire next_p2_next_p1_same_line;
 wire next_p1_p1_same_line;
 wire next_p1_p2_same_line;
 wire next_p2_p1_same_line;
@@ -332,6 +333,7 @@ assign p2_refill = (main_state == MAIN_ST_REFILL);
 
 assign ret_valid_last = (ret_valid & ret_last);
 
+assign next_p2_next_p1_same_line = (p2_index == p1_index) & (P2_tag == P1_tag);
 assign next_p1_p1_same_line = (p1_index == p1_index_reg) & (P1_tag == P1_tag_reg);
 assign next_p1_p2_same_line = (p1_index == p2_index_reg) & (P1_tag == P2_tag_reg);
 assign next_p2_p1_same_line = (p2_index == p1_index_reg) & (P2_tag == P1_tag_reg);
