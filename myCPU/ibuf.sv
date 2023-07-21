@@ -4,6 +4,7 @@ module ibuf(
     input wire             clk,
     input wire             reset,
     input wire             flush,
+    input wire             interrupt,
 
     input wire   [ 1:0]    input_size,
     output logic           input_ready,
@@ -58,8 +59,8 @@ assign output_pc1 = pc[head];
 assign output_inst1 = inst[head];
 assign output_pred_branch_taken1 = pred_branch_taken[head];
 assign output_pred_branch_target1 = pred_branch_target[head];
-assign output_have_exception1 = have_exception[head];
-assign output_exception_type1 = exception_type[head];
+assign output_have_exception1 = interrupt || have_exception[head];
+assign output_exception_type1 = interrupt ? INT : exception_type[head];
 
 assign output_valid2 = length >= 4'd2;
 assign output_pc2 = pc[head + 3'b1];

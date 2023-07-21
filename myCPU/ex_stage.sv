@@ -60,9 +60,11 @@ module ex_stage(
     output logic           ex_a_branch_taken,
     output logic [31:0]    ex_a_branch_target,
     output logic           ex_a_branch_mistaken,
+    output logic [31:0]    ex_a_addr,
     output mem_type_t      ex_a_mem_type,
     output mem_size_t      ex_a_mem_size,
-    output logic [31:0]    ex_a_st_data,
+    output logic           ex_a_got_data_ok,
+    output logic [31:0]    ex_a_ld_data,
     output logic           ex_a_is_spec_op,
     output spec_op_t       ex_a_spec_op,
 
@@ -76,18 +78,43 @@ module ex_stage(
     output logic           ex_b_branch_taken,
     output logic [31:0]    ex_b_branch_target,
     output logic           ex_b_branch_mistaken,
+    output logic [31:0]    ex_b_addr,
     output mem_type_t      ex_b_mem_type,
     output mem_size_t      ex_b_mem_size,
-    output logic [31:0]    ex_b_st_data,
+    output logic           ex_b_got_data_ok,
+    output logic [31:0]    ex_b_ld_data,
     output logic           ex_b_is_spec_op,
-    output spec_op_t       ex_b_spec_op
+    output spec_op_t       ex_b_spec_op,
 
-`ifdef DIFFTEST_EN
-   ,input wire difftest_t  ro_a_difftest,
-    input wire difftest_t  ro_b_difftest,
-    output difftest_t      ex_a_difftest,
-    output difftest_t      ex_b_difftest
-`endif
+    output logic           mmu_d1_valid,
+    output logic [31:0]    mmu_d1_addr,
+    output logic           mmu_d1_we,
+    output logic [ 1:0]    mmu_d1_size,
+    output logic [ 3:0]    mmu_d1_wstrb,
+    output logic [31:0]    mmu_d1_wdata,
+    input wire             mmu_d1_addr_ok,
+    input wire             mmu_d1_data_ok,
+    input wire [31:0]      mmu_d1_rdata,
+    input wire             mmu_d1_tlbr,
+    input wire             mmu_d1_pil,
+    input wire             mmu_d1_pis,
+    input wire             mmu_d1_ppi,
+    input wire             mmu_d1_pme,
+
+    output logic           mmu_d2_valid,
+    output logic [31:0]    mmu_d2_addr,
+    output logic           mmu_d2_we,
+    output logic [ 1:0]    mmu_d2_size,
+    output logic [ 3:0]    mmu_d2_wstrb,
+    output logic [31:0]    mmu_d2_wdata,
+    input wire             mmu_d2_addr_ok,
+    input wire             mmu_d2_data_ok,
+    input wire [31:0]      mmu_d2_rdata,
+    input wire             mmu_d2_tlbr,
+    input wire             mmu_d2_pil,
+    input wire             mmu_d2_pis,
+    input wire             mmu_d2_ppi,
+    input wire             mmu_d2_pme
 );
 
 logic            EX_a_valid;
@@ -167,6 +194,14 @@ logic            b_div_sign;
 logic            b_mod_sign;
 logic [31:0]     b_div_result;
 logic [31:0]     b_mod_result;
+
+logic            a_mem_ready;
+logic            a_mem_have_exception;
+exception_t      a_mem_exception_type;
+
+logic            b_mem_ready;
+logic            b_mem_have_exception;
+exception_t      b_mem_exception_type;
 
 logic ex_valid;
 logic ex_a_ready;
@@ -260,28 +295,28 @@ always_ff @(posedge clk) begin
 end
 
 assign ex_a_valid          = EX_a_valid;
-assign ex_a_ready          = EX_a_valid && !((a_is_mul_op && !a_mul_ready) || (a_is_div_op && !a_div_ready));
+assign ex_a_ready          = EX_a_valid && !((a_is_mul_op && !a_mul_ready) || (a_is_div_op && !a_div_ready) || (EX_a_mem_type != MEM_NOP && !a_mem_ready));
 assign ex_a_forwardable    = ex_a_ready && !EX_a_have_exception && EX_a_mem_type == MEM_NOP && !EX_a_is_spec_op;
 assign ex_a_pc             = EX_a_pc;
-assign ex_a_have_exception = EX_a_have_exception;
-assign ex_a_exception_type = EX_a_exception_type;
+assign ex_a_have_exception = a_mem_have_exception || EX_a_have_exception;
+assign ex_a_exception_type = a_mem_have_exception ? a_mem_exception_type : EX_a_exception_type;
 assign ex_a_dest           = EX_a_dest;
-assign ex_a_mem_type       = EX_a_mem_type;
+assign ex_a_addr           = EX_a_src1 + EX_a_src2;
+assign ex_a_mem_type       = ex_a_have_exception ? MEM_NOP : EX_a_mem_type;
 assign ex_a_mem_size       = EX_a_mem_size;
-assign ex_a_st_data        = EX_a_st_data;
 assign ex_a_is_spec_op     = EX_a_valid && EX_a_is_spec_op;
 assign ex_a_spec_op        = EX_a_spec_op;
 
 assign ex_b_valid          = EX_b_valid;
-assign ex_b_ready          = EX_b_valid && !((b_is_mul_op && !b_mul_ready) || (b_is_div_op && !b_div_ready));
+assign ex_b_ready          = EX_b_valid && !((b_is_mul_op && !b_mul_ready) || (b_is_div_op && !b_div_ready) || (EX_b_mem_type != MEM_NOP && !b_mem_ready));
 assign ex_b_forwardable    = ex_b_ready && !EX_b_have_exception && EX_b_mem_type == MEM_NOP && !EX_b_is_spec_op;
 assign ex_b_pc             = EX_b_pc;
-assign ex_b_have_exception = EX_b_have_exception;
-assign ex_b_exception_type = EX_b_exception_type;
+assign ex_b_have_exception = b_mem_have_exception || EX_b_have_exception;
+assign ex_b_exception_type = b_mem_have_exception ? b_mem_exception_type : EX_b_exception_type;
 assign ex_b_dest           = EX_b_dest;
-assign ex_b_mem_type       = EX_b_mem_type;
+assign ex_b_addr           = EX_b_src1 + EX_b_src2;
+assign ex_b_mem_type       = ex_b_have_exception ? MEM_NOP : EX_b_mem_type;
 assign ex_b_mem_size       = EX_b_mem_size;
-assign ex_b_st_data        = EX_b_st_data;
 assign ex_b_is_spec_op     = EX_b_valid && EX_b_is_spec_op;
 assign ex_b_spec_op        = EX_b_spec_op;
 
@@ -391,15 +426,71 @@ assign ex_b_branch_mistaken = ex_b_valid && !ex_stall && (ex_b_branch_taken != E
 
 assign ex_b_branch_target  = EX_b_is_jirl ? b_alu_result : EX_b_branch_target;
 
-`ifdef DIFFTEST_EN
-always_ff @(posedge clk) begin
-    if (!ex_stall) begin
-        ex_a_difftest <= ro_a_difftest;
-        ex_b_difftest <= ro_b_difftest;
-    end
-end
-`endif
+mem_ctrl mem_ctrl_a(
+    .clk(clk),
+    .reset(reset),
 
+    .valid(EX_a_valid && !flush),
+    .addr(ex_a_addr),
+    .mem_type(EX_a_mem_type),
+    .mem_size(EX_a_mem_size),
+    .st_data(EX_a_st_data),
+    .allowout(allowout && (!ex_b_valid || ex_b_ready)),
+
+    .ready(a_mem_ready),
+    .have_exception(a_mem_have_exception),
+    .exception_type(a_mem_exception_type),
+    .got_data_ok(ex_a_got_data_ok),
+    .ld_data(ex_a_ld_data),
+
+    .mmu_valid(mmu_d1_valid),
+    .mmu_addr(mmu_d1_addr),
+    .mmu_we(mmu_d1_we),
+    .mmu_size(mmu_d1_size),
+    .mmu_wstrb(mmu_d1_wstrb),
+    .mmu_wdata(mmu_d1_wdata),
+    .mmu_addr_ok(mmu_d1_addr_ok),
+    .mmu_data_ok(mmu_d1_data_ok),
+    .mmu_rdata(mmu_d1_rdata),
+    .mmu_tlbr(mmu_d1_tlbr),
+    .mmu_pil(mmu_d1_pil),
+    .mmu_pis(mmu_d1_pis),
+    .mmu_ppi(mmu_d1_ppi),
+    .mmu_pme(mmu_d1_pme)
+);
+
+mem_ctrl mem_ctrl_b(
+    .clk(clk),
+    .reset(reset),
+
+    .valid(EX_b_valid && !ex_a_have_exception && !flush),
+    .addr(ex_b_addr),
+    .mem_type(EX_b_mem_type),
+    .mem_size(EX_b_mem_size),
+    .st_data(EX_b_st_data),
+    .allowout(allowout && (!ex_a_valid || ex_a_ready)),
+
+    .ready(b_mem_ready),
+    .have_exception(b_mem_have_exception),
+    .exception_type(b_mem_exception_type),
+    .got_data_ok(ex_b_got_data_ok),
+    .ld_data(ex_b_ld_data),
+
+    .mmu_valid(mmu_d2_valid),
+    .mmu_addr(mmu_d2_addr),
+    .mmu_we(mmu_d2_we),
+    .mmu_size(mmu_d2_size),
+    .mmu_wstrb(mmu_d2_wstrb),
+    .mmu_wdata(mmu_d2_wdata),
+    .mmu_addr_ok(mmu_d2_addr_ok),
+    .mmu_data_ok(mmu_d2_data_ok),
+    .mmu_rdata(mmu_d2_rdata),
+    .mmu_tlbr(mmu_d2_tlbr),
+    .mmu_pil(mmu_d2_pil),
+    .mmu_pis(mmu_d2_pis),
+    .mmu_ppi(mmu_d2_ppi),
+    .mmu_pme(mmu_d2_pme)
+);
 endmodule
 
 // for verilator simulation
