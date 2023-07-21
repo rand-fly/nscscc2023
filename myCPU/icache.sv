@@ -160,6 +160,7 @@ parameter OP_CACOP1 =   3'b101;
 parameter OP_CACOP2 =   3'b110;
 parameter OP_CACOP3 =   3'b111;
 
+parameter RD_TYPE_WORD = 3'b010;
 parameter RD_TYPE_CACHELINE = 3'b100;
 parameter WR_TYPE_CACHELINE = 3'b100;
 
