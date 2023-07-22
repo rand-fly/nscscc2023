@@ -252,6 +252,8 @@ dcache dcache_0(
     .p0_data_ok(dcache_data_ok),
     .p0_rdata(dcache_rdata_l),
 
+    .p1_valid(0),
+
     .rd_req(data_rd_req),
     .rd_type(data_rd_type),
     .rd_addr(data_rd_addr),

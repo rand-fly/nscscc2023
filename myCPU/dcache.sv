@@ -49,32 +49,35 @@ module dcache(
     input wire wr_rdy
 );
 
-wire [31:0] p0_data_way0;
-wire [31:0] p0_data_way1;
-wire [31:0] p1_data_way0;
-wire [31:0] p1_data_way1;
-bkl_mem_gen_cache_32 data_way0_ram(
-    .addra(p0_index_reg),
+wire [`LINE_WIDTH-1:0] p0_data_way0;
+wire [`LINE_WIDTH-1:0] p0_data_way1;
+wire [`LINE_WIDTH-1:0] p1_data_way0;
+wire [`LINE_WIDTH-1:0] p1_data_way1;
+wire [`INDEX_WIDTH-1:0] p0_data_addr;
+wire [`INDEX_WIDTH-1:0] p1_data_addr;
+
+blk_mem_gen_cache_32 data_way0_ram(
+    .addra(p0_data_addr),
     .clka(clk),
     .dina(p0_cache_write_data_actually),
     .douta(p0_data_way0),
     .wea(p0_cache_write & (p0_cache_write_way_id == 0)),
 
-    .addrb(p1_index_reg),
+    .addrb(p1_data_addr),
     .clkb(clk),
     .dinb(p1_cache_write_data_actually),
     .doutb(p1_data_way0),
     .web(p1_cache_write & (p1_cache_write_way_id == 0))
 );
 
-bkl_mem_gen_cache_32 data_way1_ram(
-    .addra(p0_index_reg),
+blk_mem_gen_cache_32 data_way1_ram(
+    .addra(p0_data_addr),
     .clka(clk),
     .dina(p0_cache_write_data_actually),
     .douta(p0_data_way1),
     .wea(p0_cache_write & (p0_cache_write_way_id == 1)),
 
-    .addrb(p1_index_reg),
+    .addrb(p1_data_addr),
     .clkb(clk),
     .dinb(p1_cache_write_data_actually),
     .doutb(p1_data_way1),
@@ -82,36 +85,36 @@ bkl_mem_gen_cache_32 data_way1_ram(
 );
 
 `ifdef CACHE_4WAY
-wire [31:0] p0_data_way2;
-wire [31:0] p0_data_way3;
-wire [31:0] p1_data_way2;
-wire [31:0] p1_data_way3;
+wire [`LINE_WIDTH-1:0] p0_data_way2;
+wire [`LINE_WIDTH-1:0] p0_data_way3;
+wire [`LINE_WIDTH-1:0] p1_data_way2;
+wire [`LINE_WIDTH-1:0] p1_data_way3;
 bkl_mem_gen_cache_32 data_way2_ram(
-    .addra(p0_index_reg),
+    .addra(p0_data_addr),
     .clka(clk),
-    .dina(),
+    .dina(p0_cache_write_data_actually),
     .douta(p0_data_way2),
-    .wea(),
+    .wea(p0_cache_write & (p0_cache_write_way_id == 2)),
 
-    .addrb(p1_index_reg),
+    .addrb(p1_data_addr),
     .clkb(clk),
-    .dinb(),
+    .dinb(p1_cache_write_data_actually),
     .doutb(p1_data_way2),
-    .web()
+    .web(p1_cache_write & (p1_cache_write_way_id == 2))
 );
 
 bkl_mem_gen_cache_32 data_way3_ram(
-    .addra(),
+    .addra(p0_data_addr),
     .clka(clk),
-    .dina(),
+    .dina(p0_cache_write_data_actually),
     .douta(p0_data_way3),
-    .wea(),
+    .wea(p0_cache_write & (p0_cache_write_way_id == 3)),
 
-    .addrb(),
+    .addrb(p1_data_addr),
     .clkb(clk),
-    .dinb(),
+    .dinb(p1_cache_write_data_actually),
     .doutb(p1_data_way3),
-    .web()
+    .web(p1_cache_write & (p1_cache_write_way_id == 3))
 );
 `endif
 
@@ -155,7 +158,9 @@ reg [1:0]                   p1_size_reg;
 reg [3:0]                   p1_wstrb_reg;
 reg [31:0]                  p1_wdata_reg;
 reg                         p1_wdata_ok_reg;
-
+wire [3:0]                  p1_wstrb_valid;
+wire [`OFFSET_WIDTH-1:0]    p1_offset_valid;
+wire [31:0]                 p1_wdata_valid;
 
 // port1
 
@@ -426,8 +431,6 @@ reg [`LINE_SIZE-1:0]            p1_cache_wstrb_reg;
 wire [`LINE_WIDTH-1:0]          p1_cache_write_data_strobe;
 wire [`CACHE_WAY_NUM_LOG2-1:0]  p1_cache_write_way_id;
 
-wire [`LINE_WIDTH-1:0] cache_write_data_strobe;
-
 
 wire next_p0_p0_same_line;
 wire next_p0_p1_same_line;
@@ -451,11 +454,18 @@ reg merge_p0_p1_reg;
 //     end
 // end
 
+assign p0_data_addr = (p0_addr_ok) ? p0_index : p0_index_reg;
+assign p1_data_addr = (p1_addr_ok) ? p1_index : p1_index_reg;
+
+assign p1_offset_valid = p1_offset & {(`OFFSET_WIDTH-1){p1_valid}};
+assign p1_wstrb_valid = p1_wstrb & {4{p1_valid}};
+assign p1_wdata_valid = p1_wdata & {32{p1_valid}};
+
 assign p0_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{p0_wstrb[3]}},{8{p0_wstrb[2]}},{8{p0_wstrb[1]}},{8{p0_wstrb[0]}}} << (p0_offset_cell_w*8);
-assign p1_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{p1_wstrb[3]}},{8{p1_wstrb[2]}},{8{p1_wstrb[1]}},{8{p1_wstrb[0]}}} << (p1_offset_cell_w*8);
+assign p1_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{p1_wstrb_valid[3]}},{8{p1_wstrb_valid[2]}},{8{p1_wstrb_valid[1]}},{8{p1_wstrb_valid[0]}}} << (p1_offset_cell_w*8);
 
 assign p0_offset_cell_w = {p0_offset[`OFFSET_WIDTH-1:2],2'b0};
-assign p1_offset_cell_w = {p1_offset[`OFFSET_WIDTH-1:2],2'b0};
+assign p1_offset_cell_w = {p1_offset_valid[`OFFSET_WIDTH-1:2],2'b0};
 
 assign p0_offset_w_reg = p0_offset_reg[`OFFSET_WIDTH-1:2];
 assign p1_offset_w_reg = p1_offset_reg[`OFFSET_WIDTH-1:2];
@@ -512,6 +522,10 @@ end
 always @(posedge clk) begin
     if (!resetn) begin
         merge_p0_p1_reg <= 0;
+        p0_cache_wstrb_reg <= 0;
+        p0_cache_write_data_reg <= 0;
+        p1_cache_wstrb_reg <= 0;
+        p1_cache_write_data_reg <= 0;
     end
     else begin
         // p0
@@ -527,10 +541,10 @@ always @(posedge clk) begin
             if (!p0_uncached & (p0_op == OP_WRITE)) begin
                 p0_cache_wstrb_reg <= p0_cache_wstrb_reg
                                     | ({{(`LINE_SIZE-4){1'b0}},p0_wstrb} << p0_offset_cell_w)
-                                    | ({{(`LINE_SIZE-4){1'b0}},p1_wstrb} << p1_offset_cell_w);
+                                    | ({{(`LINE_SIZE-4){1'b0}},p1_wstrb_valid} << p1_offset_cell_w);
                 p0_cache_write_data_reg <= (p0_cache_write_data_reg & ~(p0_cache_write_data_strobe | p1_cache_write_data_strobe))
                                     | (({{(`LINE_WIDTH-32){1'b0}},p0_wdata} << (p0_offset_cell_w*8)) & p0_cache_write_data_strobe)
-                                    | (({{(`LINE_WIDTH-32){1'b0}},p1_wdata} << (p1_offset_cell_w*8)) & p1_cache_write_data_strobe);
+                                    | (({{(`LINE_WIDTH-32){1'b0}},p1_wdata_valid} << (p1_offset_cell_w*8)) & p1_cache_write_data_strobe);
             end
 
             merge_p0_p1_reg <= merge_next_p0_next_p1;
@@ -573,11 +587,44 @@ assign p1_addr_ok = p1_valid & pipe_interface_latch;
 
 always @(posedge clk) begin
     p0_wdata_ok_reg <= (p0_op == OP_WRITE) & pipe_interface_latch;
-    p0_wdata_ok_reg <= (p1_op == OP_WRITE) & pipe_interface_latch & p0_valid;
+    p1_wdata_ok_reg <= (p1_op == OP_WRITE) & pipe_interface_latch & p0_valid;
 end
 
 assign p0_hit_write = p0_lookup & p0_cache_hit_and_cached & (p0_op_reg == OP_WRITE);
 assign p1_hit_write = p1_lookup & p1_cache_hit_and_cached & (p1_op_reg == OP_WRITE);
+
+always @(posedge clk) begin
+    if (!resetn) begin
+        p0_preload_tag_way0 <= 0;
+        p1_preload_tag_way0 <= 0;
+        p0_preload_tag_way1 <= 0;
+        p1_preload_tag_way1 <= 0;
+`ifdef CACHE_4WAY
+        p0_preload_tag_way2 <= 0;
+        p1_preload_tag_way2 <= 0;
+        p0_preload_tag_way3 <= 0;
+        p1_preload_tag_way3 <= 0;
+`endif
+    end
+    else begin
+        if ((p0_idle | p0_lookup) & pipe_interface_latch) begin
+            p0_preload_tag_way0 <= p0_tag_way0[p0_index];
+            p0_preload_tag_way1 <= p0_tag_way1[p0_index];
+`ifdef CACHE_4WAY
+            p0_preload_tag_way2 <= p0_tag_way2[p0_index];
+            p0_preload_tag_way3 <= p0_tag_way3[p0_index];
+`endif
+        end
+        if ((p1_idle | p1_lookup) & pipe_interface_latch) begin
+            p1_preload_tag_way0 <= p1_tag_way0[p1_index];
+            p1_preload_tag_way1 <= p1_tag_way1[p1_index];
+`ifdef CACHE_4WAY
+            p1_preload_tag_way2 <= p1_tag_way2[p1_index];
+            p1_preload_tag_way3 <= p1_tag_way3[p1_index];
+`endif
+        end
+    end
+end
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -595,7 +642,7 @@ always @(posedge clk) begin
                 end
             end
             MAIN_ST_LOOKUP: begin
-                if (p0_cache_hit_and_cached & p1_cache_hit_and_cached) begin
+                if (p0_cache_hit_and_cached & (p1_idle | p1_cache_hit_and_cached)) begin
                     if (!p0_addr_ok) begin
                         p0_main_state <= MAIN_ST_IDLE;
                     end
@@ -733,29 +780,33 @@ assign p1_cache_hit_way_id =    {2{p1_cache_hit_way[0]}} & 0 |
 
 assign p0_cache_rd_data = p0_cache_hit
                         ? `p0_get_data(p0_cache_hit_way_id)
-                        : p0_buffer_read_data;
+                        : p0_buffer_read_data_count[`OFFSET_WIDTH-3+1]
+                            ? p0_buffer_read_data
+                            : p0_buffer_read_data_new;
 assign p1_cache_rd_data = p1_cache_hit
                         ? `p1_get_data(p1_cache_hit_way_id)
-                        : p1_buffer_read_data;
+                        : p1_buffer_read_data_count[`OFFSET_WIDTH-3+1]
+                            ? p1_buffer_read_data
+                            : p1_buffer_read_data_new;
 
-assign p0_rdata = p0_uncached_reg ? p0_buffer_read_data[31:0] : `get_word(p0_cache_rd_data, p0_offset_w_reg);
-assign p1_rdata = p1_uncached_reg ? p1_buffer_read_data[31:0] : `get_word(p1_cache_rd_data, p1_offset_w_reg);
+assign p0_rdata = p0_uncached_reg ? ret_data : `get_word(p0_cache_rd_data, p0_offset_w_reg);
+assign p1_rdata = p1_uncached_reg ? ret_data : `get_word(p1_cache_rd_data, p1_offset_w_reg);
 
 assign p0_data_ok = !p0_finished & ((p0_op_reg == OP_READ)
                     ? ((p0_lookup & p0_cache_hit_and_cached) | (p0_uncached_reg
                                                     ? (p0_refill & ret_valid_last)
-                                                    : (p0_refill & ret_valid & (p0_buffer_read_data_count > p0_offset_reg[`OFFSET_WIDTH-1:2]))))
+                                                    : (p0_refill & ret_valid & (p0_buffer_read_data_count >= p0_offset_reg[`OFFSET_WIDTH-1:2]))))
                     : p0_wdata_ok_reg);
 assign p1_data_ok = merge_p0_p1_reg
                         ? (!p0_finished & ((p0_op_reg == OP_READ)
                                             ? ((p0_lookup & p0_cache_hit_and_cached) | (p0_uncached_reg
                                                                             ? (p0_refill & ret_valid_last)
-                                                                            : (p0_refill & ret_valid & (p0_buffer_read_data_count > p1_offset_reg[`OFFSET_WIDTH-1:2]))))
+                                                                            : (p0_refill & ret_valid & (p0_buffer_read_data_count >= p1_offset_reg[`OFFSET_WIDTH-1:2]))))
                                             : p0_wdata_ok_reg))
                         : (!p1_finished & ((p1_op_reg == OP_READ)
                                             ? ((p1_lookup & p1_cache_hit_and_cached) | (p1_uncached_reg
                                                                             ? (p1_refill & ret_valid_last)
-                                                                            : (p1_refill & ret_valid & (p1_buffer_read_data_count > p1_offset_reg[`OFFSET_WIDTH-1:2]))))
+                                                                            : (p1_refill & ret_valid & (p1_buffer_read_data_count >= p1_offset_reg[`OFFSET_WIDTH-1:2]))))
                                             : p1_wdata_ok_reg));
 
 always @(posedge clk) begin
@@ -818,20 +869,20 @@ always @(posedge clk) begin
         p1_buffer_read_data_count <= 0;
     end
     else begin
-        if (p0_refill & ret_valid) begin
+        if (!p0_uncached_reg & p0_refill & ret_valid) begin
             p0_buffer_read_data         <= p0_buffer_read_data_new;
             p0_buffer_read_data_count   <= p0_buffer_read_data_count + 1;
         end
-        if (p0_hit_write) begin
+        if (p0_lookup) begin
             p0_buffer_read_data <= 0;
             p0_buffer_read_data_count <= 0;
         end
 
-        if (p1_refill & ret_valid) begin
+        if (!p1_uncached_reg & p1_refill & ret_valid) begin
             p1_buffer_read_data         <= p1_buffer_read_data_new;
             p1_buffer_read_data_count   <= p1_buffer_read_data_count + 1;
         end
-        if (p1_hit_write) begin
+        if (p1_lookup) begin
             p1_buffer_read_data <= 0;
             p1_buffer_read_data_count <= 0;
         end
@@ -978,5 +1029,71 @@ always @(posedge clk) begin
     end
 end
 
+// always @(posedge clk) begin
+//     if (p0_index_reg == 7'h50) begin
+//         if (p0_data_ok) begin
+//             if (p0_op_reg == OP_WRITE) begin
+//                 $display("[%t] write %h(%h,%h,%h) : %h",$time,{p0_tag_reg,p0_index_reg,p0_offset_reg},p0_tag_reg,p0_index_reg,p0_offset_reg,p0_wdata_reg);
+//             end
+//             else begin
+//                 $display("[%t] read  %h(%h,%h,%h) : %h",$time,{p0_tag_reg,p0_index_reg,p0_offset_reg},p0_tag_reg,p0_index_reg,p0_offset_reg,p0_rdata);
+//                 // if ({tag_reg,index_reg,offset_reg} == 32'h3154) begin
+//                 //     $finish;
+//                 // end
+//             end
+//         end
+//         if (p0_refill_write) begin
+//             $display("[%t] refill_write way: %h, line: %h",$time,replace_way_id, p0_cache_write_data_actually);
+//         end
+//         if (p0_hit_write) begin
+//             $display("[%t] hit_write way   : %h, line: %h",$time,replace_way_id, p0_cache_write_data_actually);
+//         end
+//         if (p0_replace & !p0_uncached_reg) begin
+//             $display("[%t] replace (%h,%h), line: %h",$time, p0_tag_reg,p0_index_reg, p0_wr_data);
+//         end
+//     end
+// end
+
+
+
 
 endmodule
+
+
+// for verilator simulation
+`ifdef SIMU
+
+module blk_mem_gen_cache_32(
+  input wire clka,
+  input wire [0:0]wea,
+  input wire [6:0]addra,
+  input wire [255:0]dina,
+  output reg [255:0]douta,
+
+  input wire clkb,
+  input wire [0:0]web,
+  input wire [6:0]addrb,
+  input wire [255:0]dinb,
+  output reg [255:0]doutb
+);
+
+reg [255:0] mem [0:127];
+
+always @(posedge clka) begin
+    if (wea) begin
+        mem[addra] <= dina;
+    end
+    douta <= mem[addra];
+end
+
+always @(posedge clkb) begin
+    if (web) begin
+        mem[addrb] <= dinb;
+    end
+    doutb <= mem[addrb];
+end
+
+endmodule
+
+
+`endif
