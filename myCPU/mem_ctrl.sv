@@ -38,7 +38,7 @@ logic got_addr_ok;
 
 assign mmu_addr = addr;
 assign mmu_valid = valid && !got_addr_ok && mem_type != MEM_NOP && !have_exception;
-assign ready = mmu_addr_ok || got_addr_ok || have_exception;
+assign ready = mmu_addr_ok || got_addr_ok;
 
 always_ff @(posedge clk) begin
     if (reset || allowout) begin
