@@ -243,6 +243,10 @@ always_ff @(posedge clk) begin
         EX_a_is_spec_op         <= ro_a_is_spec_op;
         EX_a_spec_op            <= ro_a_spec_op;
     end
+    else if (a_mem_have_exception) begin
+        EX_a_have_exception     <= 1'b1;
+        EX_a_exception_type     <= a_mem_exception_type;
+    end
 
     if (!ex_stall && ro_both_ready && ro_b_valid) begin
         EX_b_pc                 <= ro_b_pc;
@@ -263,6 +267,10 @@ always_ff @(posedge clk) begin
         EX_b_st_data            <= ro_b_st_data;
         EX_b_is_spec_op         <= ro_b_is_spec_op;
         EX_b_spec_op            <= ro_b_spec_op;
+    end
+    else if (b_mem_have_exception) begin
+        EX_b_have_exception     <= 1'b1;
+        EX_b_exception_type     <= b_mem_exception_type;
     end
 end
 
@@ -301,8 +309,8 @@ assign a_arth_ready        = EX_a_valid && (a_is_alu_op || (a_is_mul_op && a_mul
 assign ex_a_ready          = (EX_a_mem_type == MEM_NOP && a_arth_ready) || (EX_a_mem_type != MEM_NOP && a_mem_ready);
 assign ex_a_forwardable    = a_arth_ready && !EX_a_have_exception && EX_a_mem_type == MEM_NOP && !EX_a_is_spec_op;
 assign ex_a_pc             = EX_a_pc;
-assign ex_a_have_exception = a_mem_have_exception || EX_a_have_exception;
-assign ex_a_exception_type = a_mem_have_exception ? a_mem_exception_type : EX_a_exception_type;
+assign ex_a_have_exception = EX_a_have_exception;
+assign ex_a_exception_type = EX_a_exception_type;
 assign ex_a_dest           = EX_a_dest;
 assign ex_a_addr           = EX_a_src1 + EX_a_src2;
 assign ex_a_mem_type       = ex_a_have_exception ? MEM_NOP : EX_a_mem_type;
@@ -315,8 +323,8 @@ assign b_arth_ready        = EX_b_valid && (b_is_alu_op || (b_is_mul_op && b_mul
 assign ex_b_ready          = (EX_b_mem_type == MEM_NOP && b_arth_ready) || (EX_b_mem_type != MEM_NOP && b_mem_ready);
 assign ex_b_forwardable    = b_arth_ready && !EX_b_have_exception && EX_b_mem_type == MEM_NOP && !EX_b_is_spec_op;
 assign ex_b_pc             = EX_b_pc;
-assign ex_b_have_exception = b_mem_have_exception || EX_b_have_exception;
-assign ex_b_exception_type = b_mem_have_exception ? b_mem_exception_type : EX_b_exception_type;
+assign ex_b_have_exception = EX_b_have_exception;
+assign ex_b_exception_type = EX_b_exception_type;
 assign ex_b_dest           = EX_b_dest;
 assign ex_b_addr           = EX_b_src1 + EX_b_src2;
 assign ex_b_mem_type       = ex_b_have_exception ? MEM_NOP : EX_b_mem_type;
