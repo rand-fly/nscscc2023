@@ -21,11 +21,13 @@ module ifu(
     input wire   [31:0] correct_target,
     input wire          raise_exception,
     input wire   [31:0] exception_target,
+    input wire          rewind,
+    input wire   [31:0] rewind_target,
 
     output logic        mmu_i_valid,
     output logic [31:0] mmu_i_addr,
-    output logic        mmu_i_double,
     input wire          mmu_i_addr_ok,
+    input wire          mmu_i_double,
     input wire          mmu_i_data_ok,
     input wire [63:0]   mmu_i_rdata,
     input wire          mmu_i_tlbr,
@@ -35,6 +37,7 @@ module ifu(
 
 logic [31:0] pc_start;
 logic [31:0] pc_start_sent;
+logic        is_sent_double;
 logic        pending_data;
 logic        cancel; 
 logic [31:0] pred_pc_start;
@@ -48,7 +51,7 @@ assign pred_branch_target2 = 32'd0;
 assign pc1 = have_exception ? pc_start : pc_start_sent;
 assign pc2 = pc1 + 32'd4;
 
-assign inst1 = pc_start_sent[2] == 1'b1 ? mmu_i_rdata[63:32] : mmu_i_rdata[31: 0];
+assign inst1 = have_exception ? 32'h03400000 /* NOP */ : mmu_i_rdata[31: 0];
 assign inst2 = mmu_i_rdata[63:32];
 
 always_ff @(posedge clk) begin
@@ -58,7 +61,7 @@ always_ff @(posedge clk) begin
         cancel <= 1'b0;
     end
     else begin
-        if (branch_mistaken || raise_exception) begin
+        if (branch_mistaken || raise_exception || rewind) begin
             if ((mmu_i_valid && mmu_i_addr_ok) || (pending_data && !mmu_i_data_ok)) begin
                 cancel <= 1'b1;
                 pending_data <= 1'b1;
@@ -71,6 +74,9 @@ always_ff @(posedge clk) begin
             end
             if (raise_exception) begin
                 pc_start <= exception_target;
+            end
+            else if (rewind) begin
+                pc_start <= rewind_target;
             end
             else begin
                 pc_start <= correct_target;
@@ -85,6 +91,7 @@ always_ff @(posedge clk) begin
             end
             if (mmu_i_valid && mmu_i_addr_ok) begin
                 pc_start_sent <= pc_start;
+                is_sent_double <= mmu_i_double;
                 pc_start <= pred_pc_start;
                 pending_data <= 1'b1;
             end
@@ -94,12 +101,10 @@ end
 
 assign mmu_i_valid = !reset && !have_exception && ibuf_ready && (!pending_data || mmu_i_data_ok);
 assign mmu_i_addr = pc_start;
-assign mmu_i_double = pc_start[2] != 1'b1;
-
 assign ibuf_input_size = have_exception           ? 2'd1 :
                          !mmu_i_data_ok || cancel ? 2'd0 :
-                         pc_start_sent[2] == 1'b1 ? 2'd1 :
-                                                    2'd2 ;
+                         is_sent_double           ? 2'd2 :
+                                                    2'd1 ;
 
 always_comb begin
     if (pc_start[1:0] != 2'h0) begin

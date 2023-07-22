@@ -1,141 +1,142 @@
 `include "definitions.svh"
 
 module ro_stage (
-    input wire             clk,
-    input wire             reset,
+    input wire               clk,
+    input wire               reset,
 
-    input wire             flush,
-    input wire             ex_stall,
-    output logic           ro_valid,
-    output logic           ro_ready, // 工作完成了吗
-    output logic           ro_stall, // 是否暂停（上一阶段可以进来吗）
+    input wire               flush,
+    input wire               ex_stall,
+    output logic             ro_both_ready,
+    output logic             ro_stall,
 
-    input wire             id_a_ready,
-    input wire [31:0]      id_a_pc,
-    input wire             id_a_have_exception,
-    input wire exception_t id_a_exception_type,
-    input wire opcode_t    id_a_opcode,
-    input wire [ 4:0]      id_a_rf_src1,
-    input wire [ 4:0]      id_a_rf_src2,
-    input wire             id_a_src2_is_imm,
-    input wire [31:0]      id_a_imm,
-    input wire [4 :0]      id_a_dest,
-    input wire             id_a_is_branch,
-    input wire             id_a_branch_taken,
-    input wire             id_a_branch_condition,
-    input wire [31:0]      id_a_branch_target,
-    input wire             id_a_is_jirl,
-    input wire             id_a_branch_mistaken,
-    input wire             id_a_pred_branch_taken,
-    input wire [31:0]      id_a_pred_branch_target,
-    input wire mem_type_t  id_a_mem_type,
-    input wire mem_size_t  id_a_mem_size,
-    input wire             id_a_is_csr_op,
-    input wire [13:0]      id_a_csr_addr,
-    input wire [31:0]      id_a_csr_mask,
+    input wire               id_a_ready,
+    input wire [31:0]        id_a_pc,
+    input wire               id_a_have_exception,
+    input wire exception_t   id_a_exception_type,
+    input wire opcode_t      id_a_opcode,
+    input wire [ 4:0]        id_a_rf_src1,
+    input wire [ 4:0]        id_a_rf_src2,
+    input wire               id_a_src2_is_imm,
+    input wire [31:0]        id_a_imm,
+    input wire [4 :0]        id_a_dest,
+    input wire               id_a_is_branch,
+    input wire               id_a_branch_taken,
+    input wire               id_a_branch_condition,
+    input wire [31:0]        id_a_branch_target,
+    input wire               id_a_is_jirl,
+    input wire               id_a_pred_branch_taken,
+    input wire [31:0]        id_a_pred_branch_target,
+    input wire mem_type_t    id_a_mem_type,
+    input wire mem_size_t    id_a_mem_size,
+    input wire               id_a_is_spec_op,
+    input wire spec_opcode_t id_a_spec_opcode,
 
-    input wire             id_b_ready,
-    input wire [31:0]      id_b_pc,
-    input wire             id_b_have_exception,
-    input wire exception_t id_b_exception_type,
-    input wire opcode_t    id_b_opcode,
-    input wire [ 4:0]      id_b_rf_src1,
-    input wire [ 4:0]      id_b_rf_src2,
-    input wire             id_b_src2_is_imm,
-    input wire [31:0]      id_b_imm,
-    input wire [4 :0]      id_b_dest,
-    input wire             id_b_is_branch,
-    input wire             id_b_branch_taken,
-    input wire             id_b_branch_condition,
-    input wire [31:0]      id_b_branch_target,
-    input wire             id_b_is_jirl,
-    input wire             id_b_pred_branch_taken,
-    input wire [31:0]      id_b_pred_branch_target,
-    input wire mem_type_t  id_b_mem_type,
-    input wire mem_size_t  id_b_mem_size,
-    input wire             id_b_is_csr_op,
-    input wire [13:0]      id_b_csr_addr,
-    input wire [31:0]      id_b_csr_mask,
+    input wire               id_b_ready,
+    input wire [31:0]        id_b_pc,
+    input wire               id_b_have_exception,
+    input wire exception_t   id_b_exception_type,
+    input wire opcode_t      id_b_opcode,
+    input wire [ 4:0]        id_b_rf_src1,
+    input wire [ 4:0]        id_b_rf_src2,
+    input wire               id_b_src2_is_imm,
+    input wire [31:0]        id_b_imm,
+    input wire [4 :0]        id_b_dest,
+    input wire               id_b_is_branch,
+    input wire               id_b_branch_taken,
+    input wire               id_b_branch_condition,
+    input wire [31:0]        id_b_branch_target,
+    input wire               id_b_is_jirl,
+    input wire               id_b_pred_branch_taken,
+    input wire [31:0]        id_b_pred_branch_target,
+    input wire mem_type_t    id_b_mem_type,
+    input wire mem_size_t    id_b_mem_size,
+    input wire               id_b_is_spec_op,
+    input wire spec_opcode_t id_b_spec_opcode,
 
-    output logic [4:0]     r1_addr,
-    input wire [31:0]      r1_data,
-    output logic [4:0]     r2_addr,
-    input wire [31:0]      r2_data,
-    output logic [4:0]     r3_addr,
-    input wire [31:0]      r3_data,
-    output logic [4:0]     r4_addr,
-    input wire [31:0]      r4_data,
+    output logic [4:0]       r1_addr,
+    input wire [31:0]        r1_data,
+    output logic [4:0]       r2_addr,
+    input wire [31:0]        r2_data,
+    output logic [4:0]       r3_addr,
+    input wire [31:0]        r3_data,
+    output logic [4:0]       r4_addr,
+    input wire [31:0]        r4_data,
 
-    input wire             ex_a_valid,
-    input wire             ex_a_forwardable,
-    input wire    [ 4:0]   ex_a_dest,
-    input wire    [31:0]   ex_a_result,
-    input wire             ex_b_valid,
-    input wire             ex_b_forwardable,
-    input wire    [ 4:0]   ex_b_dest,
-    input wire    [31:0]   ex_b_result,
+    input wire               ex_a_valid,
+    input wire               ex_a_forwardable,
+    input wire    [ 4:0]     ex_a_dest,
+    input wire    [31:0]     ex_a_result,
+    input wire               ex_b_valid,
+    input wire               ex_b_forwardable,
+    input wire    [ 4:0]     ex_b_dest,
+    input wire    [31:0]     ex_b_result,
 
-    input wire             mem_a_valid,
-    input wire             mem_a_forwardable,
-    input wire    [ 4:0]   mem_a_dest,
-    input wire    [31:0]   mem_a_result,
-    input wire             mem_b_valid,
-    input wire             mem_b_forwardable,
-    input wire    [ 4:0]   mem_b_dest,
-    input wire    [31:0]   mem_b_result,
+    input wire               mem_a_valid,
+    input wire               mem_a_forwardable,
+    input wire    [ 4:0]     mem_a_dest,
+    input wire    [31:0]     mem_a_result,
+    input wire               mem_b_valid,
+    input wire               mem_b_forwardable,
+    input wire    [ 4:0]     mem_b_dest,
+    input wire    [31:0]     mem_b_result,
 
-    input wire             wb_a_valid,
-    input wire             wb_a_forwardable,
-    input wire    [ 4:0]   wb_a_dest,
-    input wire    [31:0]   wb_a_result,
-    input wire             wb_b_valid,
-    input wire             wb_b_forwardable,
-    input wire    [ 4:0]   wb_b_dest,
-    input wire    [31:0]   wb_b_result,
+    input wire               wb_a_valid,
+    input wire               wb_a_forwardable,
+    input wire    [ 4:0]     wb_a_dest,
+    input wire    [31:0]     wb_a_result,
+    input wire               wb_b_valid,
+    input wire               wb_b_forwardable,
+    input wire    [ 4:0]     wb_b_dest,
+    input wire    [31:0]     wb_b_result,
 
-    output logic           ro_a_valid,
-    output logic [31:0]    ro_a_pc,
-    output logic           ro_a_have_exception,
-    output exception_t     ro_a_exception_type,
-    output opcode_t        ro_a_opcode,
-    output logic [31:0]    ro_a_src1,
-    output logic [31:0]    ro_a_src2,
-    output logic [4 :0]    ro_a_dest,
-    output logic           ro_a_is_branch,
-    output logic           ro_a_branch_taken,
-    output logic           ro_a_branch_condition,
-    output logic [31:0]    ro_a_branch_target,
-    output logic           ro_a_is_jirl,
-    output logic           ro_a_pred_branch_taken,
-    output logic [31:0]    ro_a_pred_branch_target,
-    output mem_type_t      ro_a_mem_type,
-    output mem_size_t      ro_a_mem_size,
-    output logic [31:0]    ro_a_st_data,
-    output logic           ro_a_is_csr_op,
-    output logic [13:0]    ro_a_csr_addr,
-    output logic [31:0]    ro_a_csr_mask,
+    output logic             ro_a_valid,
+    output logic [31:0]      ro_a_pc,
+    output logic             ro_a_have_exception,
+    output exception_t       ro_a_exception_type,
+    output opcode_t          ro_a_opcode,
+    output logic [31:0]      ro_a_src1,
+    output logic [31:0]      ro_a_src2,
+    output logic [4 :0]      ro_a_dest,
+    output logic             ro_a_is_branch,
+    output logic             ro_a_branch_taken,
+    output logic             ro_a_branch_condition,
+    output logic [31:0]      ro_a_branch_target,
+    output logic             ro_a_is_jirl,
+    output logic             ro_a_pred_branch_taken,
+    output logic [31:0]      ro_a_pred_branch_target,
+    output mem_type_t        ro_a_mem_type,
+    output mem_size_t        ro_a_mem_size,
+    output logic [31:0]      ro_a_st_data,
+    output logic             ro_a_is_spec_op,
+    output spec_op_t         ro_a_spec_op,
 
-    output logic           ro_b_valid,
-    output logic [31:0]    ro_b_pc,
-    output logic           ro_b_have_exception,
-    output exception_t     ro_b_exception_type,
-    output opcode_t        ro_b_opcode,
-    output logic [31:0]    ro_b_src1,
-    output logic [31:0]    ro_b_src2,
-    output logic [4 :0]    ro_b_dest,
-    output logic           ro_b_is_branch,
-    output logic           ro_b_branch_taken,
-    output logic           ro_b_branch_condition,
-    output logic [31:0]    ro_b_branch_target,
-    output logic           ro_b_is_jirl,
-    output logic           ro_b_pred_branch_taken,
-    output logic [31:0]    ro_b_pred_branch_target,
-    output mem_type_t      ro_b_mem_type,
-    output mem_size_t      ro_b_mem_size,
-    output logic [31:0]    ro_b_st_data,
-    output logic           ro_b_is_csr_op,
-    output logic [13:0]    ro_b_csr_addr,
-    output logic [31:0]    ro_b_csr_mask
+    output logic             ro_b_valid,
+    output logic [31:0]      ro_b_pc,
+    output logic             ro_b_have_exception,
+    output exception_t       ro_b_exception_type,
+    output opcode_t          ro_b_opcode,
+    output logic [31:0]      ro_b_src1,
+    output logic [31:0]      ro_b_src2,
+    output logic [4 :0]      ro_b_dest,
+    output logic             ro_b_is_branch,
+    output logic             ro_b_branch_taken,
+    output logic             ro_b_branch_condition,
+    output logic [31:0]      ro_b_branch_target,
+    output logic             ro_b_is_jirl,
+    output logic             ro_b_pred_branch_taken,
+    output logic [31:0]      ro_b_pred_branch_target,
+    output mem_type_t        ro_b_mem_type,
+    output mem_size_t        ro_b_mem_size,
+    output logic [31:0]      ro_b_st_data,
+    output logic             ro_b_is_spec_op,
+    output spec_op_t         ro_b_spec_op
+
+`ifdef DIFFTEST_EN
+   ,input wire difftest_t    id_a_difftest,
+    input wire difftest_t    id_b_difftest,
+    output difftest_t        ro_a_difftest,
+    output difftest_t        ro_b_difftest
+`endif
 );
 
 logic        forward_valid1;
@@ -151,12 +152,13 @@ logic        forward_valid4;
 logic [ 4:0] forward_addr4;
 logic [31:0] forward_data4;
 
+logic        ro_valid;
 logic        ro_a_ready;
 logic        ro_b_ready;
 
 assign ro_valid = ro_a_valid || ro_b_valid;
-assign ro_ready = ro_valid && (!ro_a_valid || ro_a_ready) && (!ro_b_valid || ro_b_ready);
-assign ro_stall = ro_valid && (!ro_ready || ex_stall);
+assign ro_both_ready = ro_valid && (!ro_a_valid || ro_a_ready) && (!ro_b_valid || ro_b_ready);
+assign ro_stall = ro_valid && (!ro_both_ready || ex_stall);
 
 read_operands read_operands_a(
     .clk(clk),
@@ -184,9 +186,8 @@ read_operands read_operands_a(
     .id_pred_branch_target(id_a_pred_branch_target),
     .id_mem_type(id_a_mem_type),
     .id_mem_size(id_a_mem_size),
-    .id_is_csr_op(id_a_is_csr_op),
-    .id_csr_addr(id_a_csr_addr),
-    .id_csr_mask(id_a_csr_mask),
+    .id_is_spec_op(id_a_is_spec_op),
+    .id_spec_opcode(id_a_spec_opcode),
 
     .r1_addr(forward_addr1),
     .r1_valid(forward_valid1),
@@ -215,9 +216,8 @@ read_operands read_operands_a(
     .ro_mem_type(ro_a_mem_type),
     .ro_mem_size(ro_a_mem_size),
     .ro_st_data(ro_a_st_data),
-    .ro_is_csr_op(ro_a_is_csr_op),
-    .ro_csr_addr(ro_a_csr_addr),
-    .ro_csr_mask(ro_a_csr_mask)
+    .ro_is_spec_op(ro_a_is_spec_op),
+    .ro_spec_op(ro_a_spec_op)
 );
 
 read_operands read_operands_b(
@@ -227,7 +227,7 @@ read_operands read_operands_b(
     .flush(flush),
     .allowout(!ro_stall),
 
-    .id_ready(id_b_ready && !id_a_branch_mistaken),
+    .id_ready(id_b_ready),
     .id_pc(id_b_pc),
     .id_have_exception(id_b_have_exception),
     .id_exception_type(id_b_exception_type),
@@ -246,9 +246,8 @@ read_operands read_operands_b(
     .id_pred_branch_target(id_b_pred_branch_target),
     .id_mem_type(id_b_mem_type),
     .id_mem_size(id_b_mem_size),
-    .id_is_csr_op(id_b_is_csr_op),
-    .id_csr_addr(id_b_csr_addr),
-    .id_csr_mask(id_b_csr_mask),
+    .id_is_spec_op(id_b_is_spec_op),
+    .id_spec_opcode(id_b_spec_opcode),
 
     .r1_addr(forward_addr3),
     .r1_valid(forward_valid3),
@@ -277,9 +276,8 @@ read_operands read_operands_b(
     .ro_mem_type(ro_b_mem_type),
     .ro_mem_size(ro_b_mem_size),
     .ro_st_data(ro_b_st_data),
-    .ro_is_csr_op(ro_b_is_csr_op),
-    .ro_csr_addr(ro_b_csr_addr),
-    .ro_csr_mask(ro_b_csr_mask)
+    .ro_is_spec_op(ro_b_is_spec_op),
+    .ro_spec_op(ro_b_spec_op)
 );
 
 forwarding_unit forwarding_unit1(
@@ -425,5 +423,14 @@ forwarding_unit forwarding_unit4(
     .wb_b_dest(wb_b_dest),
     .wb_b_result(wb_b_result)
 );
+
+`ifdef DIFFTEST_EN
+always_ff @(posedge clk) begin
+    if (!ro_stall) begin
+        ro_a_difftest <= id_a_difftest;
+        ro_b_difftest <= id_b_difftest;
+    end
+end
+`endif
 
 endmodule
