@@ -16,8 +16,8 @@ module orien_pred
 	output			taken_1		,
 
 	//update port
-	input			operate_en	,
-	input [31:0]	operate_pc	,
+	input			update_orien_en	,
+	input [31:0]	retire_pc	,
 	input 			right_orien	
 );
 
@@ -73,10 +73,10 @@ logic	[BHRLEN - 1:0]		bht_val_o	;
 logic	[BHRLEN - 1:0]		pc_o		;
 logic	[BHRLEN - 1:0]		pht_index_o	;
 
-assign bht_index_o = operate_pc[BHRLEN + BHTIDLEN + 2:BHRLEN + 3];
+assign bht_index_o = retire_pc[BHRLEN + BHTIDLEN + 2:BHRLEN + 3];
 assign bht_val_o = bht[bht_index_o];
 
-assign pc_o = operate_pc[BHRLEN + 2 :3];
+assign pc_o = retire_pc[BHRLEN + 2 :3];
 assign pht_index_o = bht_val_o ^ pc_o;
 integer i;
 always @(posedge clk) begin
@@ -89,9 +89,9 @@ always @(posedge clk) begin
 			pht_1[i] <= 0;
 		end
 	end
-	else if(operate_en) begin
+	else if(update_orien_en) begin
 		//update PHT
-		if(operate_pc[2] == 0) begin
+		if(retire_pc[2] == 0) begin
 			if(right_orien) begin
 				if(pht_0[pht_index_o] != 2'b11)begin	
 					pht_0[pht_index_o] <= pht_0[pht_index_o] + 1;
