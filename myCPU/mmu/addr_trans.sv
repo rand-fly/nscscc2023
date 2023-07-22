@@ -24,25 +24,27 @@ module addr_trans(
 
 logic use_tlb;
 
+assign pa[11:0] = va[11:0];
+
 always_comb begin
     if (direct_access) begin
-        pa = va;
+        pa[31:12] = va[31:12];
         mat = direct_access_mat;
         use_tlb = 1'b0;
     end
     else if (va[31:29] == dmw0.vseg && (plv == 2'd0 && dmw0.plv0 || plv == 2'd3 && dmw0.plv3)) begin
-        pa = {dmw0.pseg, va[28:0]};
+        pa[31:12] = {dmw0.pseg, va[28:12]};
         mat = dmw0.mat;
         use_tlb = 1'b0;
     end
     else if (va[31:29] == dmw1.vseg && (plv == 2'd0 && dmw1.plv0 || plv == 2'd3 && dmw1.plv3)) begin
-        pa = {dmw1.pseg, va[28:0]};
+        pa[31:12] = {dmw1.pseg, va[28:12]};
         mat = dmw1.mat;
         use_tlb = 1'b0;
     end
     else begin
         // only 4KB
-        pa = {tlb_s_result.ppn, va[11:0]};
+        pa[31:12] = tlb_s_result.ppn;
         mat = tlb_s_result.mat;
         use_tlb = 1'b1;
     end

@@ -210,7 +210,7 @@ cache dcache(
     .op(dcache_wr),
     .tag(dcache_addr[31:12]),
     .index(dcache_addr[11:`OFFSET_WIDTH]),
-    .offset(dcache_addr[`OFFSET_WIDTH:0]),
+    .offset(dcache_addr[`OFFSET_WIDTH-1:0]),
     .wstrb(dcache_wstrb),
     .wdata(dcache_wdata),
     .uncached(dcache_uncached),
