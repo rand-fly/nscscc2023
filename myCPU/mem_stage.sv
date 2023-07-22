@@ -77,7 +77,7 @@ assign mem_valid = MEM_valid;
 assign mem_pc = MEM_pc;
 assign mem_result = (MEM_mem_type == MEM_LOAD_S || MEM_mem_type == MEM_LOAD_U) ? load_result : MEM_result;
 assign mem_dest = MEM_dest;
-assign mem_forwardable = MEM_mem_type == MEM_NOP;
+assign mem_forwardable = MEM_mem_type == MEM_NOP || MEM_got_data_ok;
 
 always_comb begin
     unique case (MEM_mem_size)
