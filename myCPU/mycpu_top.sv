@@ -202,23 +202,55 @@ logic [31:0] dcache_rdata_h;
 
 assign dcache_rdata = dcache_rdata_l;
 
-cache dcache(
+// cache dcache_0(
+//     .clk(aclk),
+//     .resetn(aresetn),
+
+//     .valid(dcache_req),
+//     .op(dcache_wr),
+//     .tag(dcache_addr[31:12]),
+//     .index(dcache_addr[11:`OFFSET_WIDTH]),
+//     .offset(dcache_addr[`OFFSET_WIDTH:0]),
+//     .wstrb(dcache_wstrb),
+//     .wdata(dcache_wdata),
+//     .uncached(dcache_uncached),
+//     .size(dcache_size),
+//     .addr_ok(dcache_addr_ok),
+//     .data_ok(dcache_data_ok),
+//     .rdata_l(dcache_rdata_l),
+//     .rdata_h(dcache_rdata_h),
+
+//     .rd_req(data_rd_req),
+//     .rd_type(data_rd_type),
+//     .rd_addr(data_rd_addr),
+//     .rd_rdy(data_rd_rdy),
+//     .ret_valid(data_ret_valid),
+//     .ret_last(data_ret_last),
+//     .ret_data(data_ret_data),
+//     .wr_req(data_wr_req),
+//     .wr_type(data_wr_type),
+//     .wr_addr(data_wr_addr),
+//     .wr_wstrb(data_wr_wstrb),
+//     .wr_data(data_wr_data),
+//     .wr_rdy(data_wr_rdy)
+// );
+
+dcache dcache_0(
     .clk(aclk),
     .resetn(aresetn),
 
-    .valid(dcache_req),
-    .op(dcache_wr),
-    .tag(dcache_addr[31:12]),
-    .index(dcache_addr[11:`OFFSET_WIDTH]),
-    .offset(dcache_addr[`OFFSET_WIDTH:0]),
-    .wstrb(dcache_wstrb),
-    .wdata(dcache_wdata),
-    .uncached(dcache_uncached),
-    .size(dcache_size),
-    .addr_ok(dcache_addr_ok),
-    .data_ok(dcache_data_ok),
-    .rdata_l(dcache_rdata_l),
-    .rdata_h(dcache_rdata_h),
+    .p0_valid(dcache_req),
+    .p0_op(dcache_wr),
+    .p0_tag(dcache_addr[31:12]),
+    .p0_index(dcache_addr[11:`OFFSET_WIDTH]),
+    .p0_offset(dcache_addr[`OFFSET_WIDTH:0]),
+    .p0_wstrb(dcache_wstrb),
+    .p0_wdata(dcache_wdata),
+    .p0_uncached(dcache_uncached),
+    .p0_size(dcache_size),
+    .p0_addr_ok(dcache_addr_ok),
+    .p0_data_ok(dcache_data_ok),
+    .p0_rdata(dcache_rdata_l),
 
     .rd_req(data_rd_req),
     .rd_type(data_rd_type),
