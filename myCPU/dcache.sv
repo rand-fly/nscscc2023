@@ -138,6 +138,7 @@ reg [`INDEX_WIDTH-1:0]      p0_index_reg;
 reg [`INDEX_WIDTH-1:0]      p0_index_reg_miss;
 reg [`TAG_WIDTH-1:0]        p0_tag_reg;
 reg [`OFFSET_WIDTH-1:0]     p0_offset_reg;
+reg [`OFFSET_WIDTH-1:0]     p0_offset_reg_miss;
 wire [`OFFSET_WIDTH-1:0]    p0_offset_cell_w;
 wire [`OFFSET_WIDTH-3:0]    p0_offset_w_reg; // word offset
 reg                         p0_uncached_reg;
@@ -151,6 +152,7 @@ reg [`INDEX_WIDTH-1:0]      p1_index_reg;
 reg [`INDEX_WIDTH-1:0]      p1_index_reg_miss;
 reg [`TAG_WIDTH-1:0]        p1_tag_reg;
 reg [`OFFSET_WIDTH-1:0]     p1_offset_reg;
+reg [`OFFSET_WIDTH-1:0]     p1_offset_reg_miss;
 wire [`OFFSET_WIDTH-1:0]    p1_offset_cell_w;
 wire [`OFFSET_WIDTH-3:0]    p1_offset_w_reg; // word offset
 reg                         p1_uncached_reg;
@@ -555,6 +557,7 @@ always @(posedge clk) begin
         end
         if (p0_lookup) begin
             p0_index_reg_miss <= p0_index_reg;
+            p0_offset_reg_miss <= p0_offset_reg;
         end
 
         // p1
@@ -578,6 +581,7 @@ always @(posedge clk) begin
         end
         if (p1_lookup) begin
             p1_index_reg_miss <= p1_index_reg;
+            p1_offset_reg_miss <= p1_offset_reg;
         end
     end
 end
@@ -780,12 +784,12 @@ assign p1_cache_hit_way_id =    {2{p1_cache_hit_way[0]}} & 0 |
 
 assign p0_cache_rd_data = p0_cache_hit
                         ? `p0_get_data(p0_cache_hit_way_id)
-                        : p0_buffer_read_data_count[`OFFSET_WIDTH-3+1]
+                        : (p0_buffer_read_data_count[`OFFSET_WIDTH-3+1] & (p0_buffer_read_data_count[`OFFSET_WIDTH-3:0] == p0_offset_reg_miss[`OFFSET_WIDTH-1:2]))
                             ? p0_buffer_read_data
                             : p0_buffer_read_data_new;
 assign p1_cache_rd_data = p1_cache_hit
                         ? `p1_get_data(p1_cache_hit_way_id)
-                        : p1_buffer_read_data_count[`OFFSET_WIDTH-3+1]
+                        : (p1_buffer_read_data_count[`OFFSET_WIDTH-3+1] & (p1_buffer_read_data_count[`OFFSET_WIDTH-3:0] == p1_offset_reg_miss[`OFFSET_WIDTH-1:2]))
                             ? p1_buffer_read_data
                             : p1_buffer_read_data_new;
 
@@ -842,11 +846,11 @@ assign wr_req    = p0_wr_req | p1_wr_req;
 assign wr_wstrb  = p0_wr_req ? p0_wr_wstrb : p1_wr_wstrb;
 
 assign p0_rd_type   = p0_uncached_reg ? {1'b0,p0_size_reg} : RD_TYPE_CACHELINE;
-assign p0_rd_addr   = p0_uncached_reg ? {p0_tag_reg,p0_index_reg,p0_offset_reg} : {p0_tag_reg, p0_index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
+assign p0_rd_addr   = p0_uncached_reg ? {p0_tag_reg,p0_index_reg,p0_offset_reg} : {p0_tag_reg, p0_index_reg_miss,p0_offset_reg_miss[`OFFSET_WIDTH-1:2],2'b0};
 assign p0_rd_req    = p0_refill & ~rd_addr_ok;
 
 assign p1_rd_type   = p1_uncached_reg ? {1'b0,p1_size_reg} : RD_TYPE_CACHELINE;
-assign p1_rd_addr   = p1_uncached_reg ? {p1_tag_reg,p1_index_reg,p1_offset_reg} : {p1_tag_reg, p1_index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
+assign p1_rd_addr   = p1_uncached_reg ? {p1_tag_reg,p1_index_reg,p1_offset_reg} : {p1_tag_reg, p1_index_reg_miss,p1_offset_reg_miss[`OFFSET_WIDTH-1:2],2'b0};
 assign p1_rd_req    = p1_refill & ~rd_addr_ok;
 
 assign rd_type   = p0_refill ? p0_rd_type : p1_rd_type;
@@ -856,8 +860,8 @@ assign rd_req    = p0_rd_req | p1_rd_req;
 // fetch data from memory
 
 // assign buffer_read_data_new = (buffer_read_data >> 32) | (ret_data << (32*3));
-assign p0_buffer_read_data_new = p0_buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*p0_buffer_read_data_count));
-assign p1_buffer_read_data_new = p1_buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*p1_buffer_read_data_count));
+assign p0_buffer_read_data_new = p0_buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*p0_buffer_read_data_count[`OFFSET_WIDTH-3:0]));
+assign p1_buffer_read_data_new = p1_buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*p1_buffer_read_data_count[`OFFSET_WIDTH-3:0]));
 
 always @(posedge clk) begin
     // TODO 优化，此处反复写?
@@ -873,18 +877,18 @@ always @(posedge clk) begin
             p0_buffer_read_data         <= p0_buffer_read_data_new;
             p0_buffer_read_data_count   <= p0_buffer_read_data_count + 1;
         end
-        if (p0_lookup) begin
+        if (p0_rd_req) begin
             p0_buffer_read_data <= 0;
-            p0_buffer_read_data_count <= 0;
+            p0_buffer_read_data_count <= p0_rd_addr[`OFFSET_WIDTH-1:2];
         end
 
         if (!p1_uncached_reg & p1_refill & ret_valid) begin
             p1_buffer_read_data         <= p1_buffer_read_data_new;
             p1_buffer_read_data_count   <= p1_buffer_read_data_count + 1;
         end
-        if (p1_lookup) begin
+        if (p1_rd_req) begin
             p1_buffer_read_data <= 0;
-            p1_buffer_read_data_count <= 0;
+            p1_buffer_read_data_count <= p1_rd_addr[`OFFSET_WIDTH-1:2];
         end
     end
     
@@ -1030,7 +1034,7 @@ always @(posedge clk) begin
 end
 
 // always @(posedge clk) begin
-//     if (p0_index_reg == 7'h50) begin
+//     if (p0_index_reg == 7'hf) begin
 //         if (p0_data_ok) begin
 //             if (p0_op_reg == OP_WRITE) begin
 //                 $display("[%t] write %h(%h,%h,%h) : %h",$time,{p0_tag_reg,p0_index_reg,p0_offset_reg},p0_tag_reg,p0_index_reg,p0_offset_reg,p0_wdata_reg);
