@@ -316,9 +316,9 @@ assign next_same_line = (index == index_reg) & (tag == tag_reg);
 
 assign pipe_interface_latch = valid & (
     (idle & !(prefetching & (op_reg == OP_READ) & prefetch_next_same_line & ret_valid_last)) | 
-    (lookup & (op_reg == OP_READ) & cache_hit_and_cached) |
-    (refill & !uncached_reg & (op_reg == OP_READ) & (data_ok | finished) & next_same_line & !fetch_ok) |
-    ((op_reg == OP_WRITE) & cache_hit_and_cached & !hit_write & !refill_write & (op == OP_WRITE) & next_same_line)
+    (lookup & (op_reg == OP_READ) & cache_hit_and_cached) //|
+    // (refill & !uncached_reg & (op_reg == OP_READ) & (data_ok | finished) & next_same_line & !fetch_ok) |
+    // ((op_reg == OP_WRITE) & cache_hit_and_cached & !hit_write & !refill_write & (op == OP_WRITE) & next_same_line)
     );
 
 assign replace_dirty = `get_valid(replace_way_id,index_reg_miss) & `get_dirty(replace_way_id, index_reg_miss);
