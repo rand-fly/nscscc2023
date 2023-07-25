@@ -10,12 +10,16 @@ module btb
     input             reset         ,
 
     //from/to if
-    input  	[31:0]    fetch_pc     	,
-    output	[31:0]	  target_pc		,
-    output	[1:0]	  btb_hit_num	,
+    input  	[31:0]    fetch_pc_0     	,
+    input  	[31:0]    fetch_pc_1    	,
+    output	[31:0]	  target_pc_0		,
+    output	[31:0]	  target_pc_1		,
+    output 	[2:0]	  ins_type_0		,
+    output 	[2:0]	  ins_type_1		,
 
     //update btb
     input             branch_mistaken  ,
+    input			  ins_type_w	   ,
     input  	[31:0]    wrong_pc         ,
     input  	[31:0]    right_target     
 );
@@ -36,6 +40,7 @@ logic 	[31:0]     		target_1 ;
 reg     [BTBNUM-1:0]    btb_valid;
 reg     [BTBTAGLEN-1:0] btb_tag     [BTBNUM-1:0];
 reg     [31:0]          btb_target  [BTBNUM-1:0];
+reg     [2:0]			btb_ins_type[BTBNUM-1:0];
 reg   	[$clog2(BTBGROUP)-1:0]	btb_replace_counter	[BTBNUM/BTBGROUP -1:0] ;   
 
 //search
@@ -58,8 +63,8 @@ logic   [$clog2(BTBGROUP)-1:0]  btb_index_in_group_w;
 logic   [$clog2(BTBGROUP)-1:0]  btb_index_in_group_inv;
 
 
-assign pc_0_32to2 = fetch_pc[31:2];
-assign pc_1_32to2 = pc_0_32to2 + 1;
+assign pc_0_32to2 = fetch_pc_0[31:2];
+assign pc_1_32to2 = fetch_pc_1[31:2];
 assign pc_w_32to2 = wrong_pc[31:2];
 
 assign btb_group_num_0 = pc_0_32to2[$clog2(BTBNUM/BTBGROUP)-1:0];
@@ -116,12 +121,11 @@ assign hit_inv = |btb_hit_inv;
 assign target_0 = btb_target[index_0];
 assign target_1 = btb_target[index_1];
 
-assign target_pc = 	btb_hit_0 ? target_0 :
-					btb_hit_0 ? target_1 :
-					fetch_pc + 4'h8;
-assign btb_hit_num = 	btb_hit_0 ? 2'b01 :
-						btb_hit_1 ? 2'b10 :
-						2'b00;
+assign target_pc_0 = target_0;
+assign target_pc_1 = target_1;
+
+assign ins_type_0 = btb_ins_type[index_0];
+assign ins_type_1 = btb_ins_type[index_1];
 integer k;
 always @(posedge clk) begin
     if(reset) begin
@@ -137,17 +141,20 @@ always @(posedge clk) begin
             if(hit_w) begin
                 btb_tag[index_w] <= btb_fetch_tag_w;
                 btb_target[index_w] <= right_target;
+                btb_ins_type[index_w] <= ins_type_w;
             end
             //fill empty line
             else if(hit_inv) begin
                 btb_tag[index_inv] <= btb_fetch_tag_w;
                 btb_target[index_inv] <= right_target;
+                btb_ins_type[index_inv] <= ins_type_w;
                 btb_valid[index_inv] <= 1'b1;
             end
             //random replace
             else begin
             	btb_tag[index_replace] <= btb_fetch_tag_w;
                 btb_target[index_replace] <= right_target;
+                btb_ins_type[index_replace] <= ins_type_w;
                 btb_valid[index_replace] <= 1'b1;
             end
         end
