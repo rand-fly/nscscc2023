@@ -459,12 +459,18 @@ reg merge_p0_p1_reg;
 assign p0_data_addr = (p0_addr_ok) ? p0_index : p0_index_reg;
 assign p1_data_addr = (p1_addr_ok) ? p1_index : p1_index_reg;
 
-assign p1_offset_valid = p1_offset & {(`OFFSET_WIDTH-1){p1_valid}};
+assign p1_offset_valid = p1_offset & {(`OFFSET_WIDTH){p1_valid}};
 assign p1_wstrb_valid = p1_wstrb & {4{p1_valid}};
 assign p1_wdata_valid = p1_wdata & {32{p1_valid}};
 
-assign p0_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{p0_wstrb[3]}},{8{p0_wstrb[2]}},{8{p0_wstrb[1]}},{8{p0_wstrb[0]}}} << (p0_offset_cell_w*8);
-assign p1_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{p1_wstrb_valid[3]}},{8{p1_wstrb_valid[2]}},{8{p1_wstrb_valid[1]}},{8{p1_wstrb_valid[0]}}} << (p1_offset_cell_w*8);
+assign p0_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},
+                                        {8{p0_wstrb[3]}},{8{p0_wstrb[2]}},
+                                        {8{p0_wstrb[1]}},{8{p0_wstrb[0]}}} << (p0_offset_cell_w*8);
+assign p1_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},
+                                        {8{p1_wstrb_valid[3]}},
+                                        {8{p1_wstrb_valid[2]}},
+                                        {8{p1_wstrb_valid[1]}},
+                                        {8{p1_wstrb_valid[0]}}} << (p1_offset_cell_w*8);
 
 assign p0_offset_cell_w = {p0_offset[`OFFSET_WIDTH-1:2],2'b0};
 assign p1_offset_cell_w = {p1_offset_valid[`OFFSET_WIDTH-1:2],2'b0};
@@ -490,12 +496,16 @@ assign next_p0_p0_same_line = (p0_index == p0_index_reg) & (p0_tag == p0_tag_reg
 assign next_p0_p1_same_line = (p0_index == p1_index_reg) & (p0_tag == p1_tag_reg);
 assign next_p1_p0_same_line = (p1_index == p0_index_reg) & (p1_tag == p0_tag_reg);
 assign next_p1_p1_same_line = (p1_index == p1_index_reg) & (p1_tag == p1_tag_reg);
-assign next_p1_next_p0_same_line = (next_p1_p0_same_line & next_p0_p0_same_line) | (next_p1_p1_same_line & next_p0_p1_same_line);
-assign next_all_same_line = next_p0_p0_same_line | next_p0_p1_same_line | next_p1_p0_same_line | next_p1_p1_same_line;
-assign merge_next_p0_next_p1 = next_p1_next_p0_same_line & (p0_valid & p1_valid) & (p0_op == p1_op) & (p0_uncached == p1_uncached);
+assign next_p1_next_p0_same_line = (p1_tag == p0_tag)
+                                & (p1_index == p0_index);
+assign next_all_same_line = next_p0_p0_same_line | next_p0_p1_same_line
+                            | next_p1_p0_same_line | next_p1_p1_same_line;
+assign merge_next_p0_next_p1 = next_p1_next_p0_same_line
+                                & (p0_valid & p1_valid) & (p0_op == OP_WRITE) & (p1_op == OP_WRITE)
+                                & (p0_uncached == p1_uncached);
 
 assign pipe_interface_latch = p0_valid & (
-    (p0_idle & p1_idle) | 
+    (p0_idle & p1_idle) |
     (p0_lookup & (p0_op_reg == OP_READ) & p0_cache_hit_and_cached & (p1_idle | ((p1_op_reg == OP_READ) & p1_cache_hit_and_cached)))
     );
 
@@ -507,17 +517,19 @@ always @(posedge clk) begin
         p0_finished <= 1;
         p1_finished <= 1;
     end
-    else if (p0_addr_ok) begin
-        p0_finished <= 0;
-    end
-    else if (!p0_addr_ok & p0_data_ok) begin
-        p0_finished <= 1;
-    end
-    else if (p1_addr_ok) begin
-        p1_finished <= 0;
-    end
-    else if (!p1_addr_ok & p1_data_ok) begin
-        p1_finished <= 1;
+    else begin
+        if (p0_addr_ok) begin
+            p0_finished <= 0;
+        end
+        else if (!p0_addr_ok & p0_data_ok) begin
+            p0_finished <= 1;
+        end
+        if (p1_addr_ok) begin
+            p1_finished <= 0;
+        end
+        else if (!p1_addr_ok & p1_data_ok) begin
+            p1_finished <= 1;
+        end
     end
 end
 
@@ -572,7 +584,7 @@ always @(posedge clk) begin
             p1_wdata_reg       <= p1_wdata;
             if (!p1_uncached & (p1_op == OP_WRITE)) begin
                 p1_cache_wstrb_reg <= p1_cache_wstrb_reg | ({{(`LINE_SIZE-4){1'b0}},p1_wstrb} << p1_offset_cell_w);
-                p1_cache_write_data_reg <= (p1_cache_write_data_reg & ~p1_cache_write_data_strobe) | (({{(`LINE_WIDTH-32){1'b0}},p1_wdata} << (p1_offset_cell_w*8)) & p0_cache_write_data_strobe);
+                p1_cache_write_data_reg <= (p1_cache_write_data_reg & ~p1_cache_write_data_strobe) | (({{(`LINE_WIDTH-32){1'b0}},p1_wdata} << (p1_offset_cell_w*8)) & p1_cache_write_data_strobe);
             end
         end
         else if (p1_refill_write | p1_hit_write) begin
@@ -690,7 +702,7 @@ always @(posedge clk) begin
                 end
             end
         endcase
-        
+
         // p1 state
         case(p1_main_state)
             MAIN_ST_IDLE: begin
@@ -1033,30 +1045,55 @@ always @(posedge clk) begin
     end
 end
 
-// always @(posedge clk) begin
-//     if (p0_index_reg == 7'hf) begin
-//         if (p0_data_ok) begin
-//             if (p0_op_reg == OP_WRITE) begin
-//                 $display("[%t] write %h(%h,%h,%h) : %h",$time,{p0_tag_reg,p0_index_reg,p0_offset_reg},p0_tag_reg,p0_index_reg,p0_offset_reg,p0_wdata_reg);
-//             end
-//             else begin
-//                 $display("[%t] read  %h(%h,%h,%h) : %h",$time,{p0_tag_reg,p0_index_reg,p0_offset_reg},p0_tag_reg,p0_index_reg,p0_offset_reg,p0_rdata);
-//                 // if ({tag_reg,index_reg,offset_reg} == 32'h3154) begin
-//                 //     $finish;
-//                 // end
-//             end
-//         end
-//         if (p0_refill_write) begin
-//             $display("[%t] refill_write way: %h, line: %h",$time,replace_way_id, p0_cache_write_data_actually);
-//         end
-//         if (p0_hit_write) begin
-//             $display("[%t] hit_write way   : %h, line: %h",$time,replace_way_id, p0_cache_write_data_actually);
-//         end
-//         if (p0_replace & !p0_uncached_reg) begin
-//             $display("[%t] replace (%h,%h), line: %h",$time, p0_tag_reg,p0_index_reg, p0_wr_data);
-//         end
-//     end
-// end
+always @(posedge clk) begin
+    if (p0_index_reg == 7'h5d && p0_tag_reg == 20'h202) begin
+        $display("p0");
+        if (p0_data_ok) begin
+            if (p0_op_reg == OP_WRITE) begin
+                $display("[%t] write %h(%h,%h,%h) : %h",$time,{p0_tag_reg,p0_index_reg,p0_offset_reg},p0_tag_reg,p0_index_reg,p0_offset_reg,p0_wdata_reg);
+            end
+            else begin
+                $display("[%t] read  %h(%h,%h,%h) : %h",$time,{p0_tag_reg,p0_index_reg,p0_offset_reg},p0_tag_reg,p0_index_reg,p0_offset_reg,p0_rdata);
+                // if ({tag_reg,index_reg,offset_reg} == 32'h3154) begin
+                //     $finish;
+                // end
+            end
+        end
+        if (p0_refill_write) begin
+            $display("[%t] refill_write way: %h, line: %h",$time,replace_way_id, p0_cache_write_data_actually);
+        end
+        if (p0_hit_write) begin
+            $display("[%t] hit_write way   : %h, line: %h",$time,replace_way_id, p0_cache_write_data_actually);
+        end
+        if (p0_replace & !p0_uncached_reg) begin
+            $display("[%t] replace (%h,%h), line: %h",$time, p0_tag_reg,p0_index_reg, p0_wr_data);
+        end
+    end
+
+    if (p1_index_reg == 7'h5d && p1_tag_reg == 20'h202) begin
+        $display("p1");
+        if (p1_data_ok) begin
+            if (p1_op_reg == OP_WRITE) begin
+                $display("[%t] write %h(%h,%h,%h) : %h",$time,{p1_tag_reg,p1_index_reg,p1_offset_reg},p1_tag_reg,p1_index_reg,p1_offset_reg,p1_wdata_reg);
+            end
+            else begin
+                $display("[%t] read  %h(%h,%h,%h) : %h",$time,{p1_tag_reg,p1_index_reg,p1_offset_reg},p1_tag_reg,p1_index_reg,p1_offset_reg,p1_rdata);
+                // if ({tag_reg,index_reg,offset_reg} == 32'h3154) begin
+                //     $finish;
+                // end
+            end
+        end
+        if (p1_refill_write) begin
+            $display("[%t] refill_write way: %h, line: %h",$time,replace_way_id, p1_cache_write_data_actually);
+        end
+        if (p1_hit_write) begin
+            $display("[%t] hit_write way   : %h, line: %h",$time,replace_way_id, p1_cache_write_data_actually);
+        end
+        if (p1_replace & !p1_uncached_reg) begin
+            $display("[%t] replace (%h,%h), line: %h",$time, p1_tag_reg,p1_index_reg, p1_wr_data);
+        end
+    end
+end
 
 
 

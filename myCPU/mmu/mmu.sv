@@ -72,24 +72,34 @@ module mmu (
     output                tlbsrch_found,
     output [TLBIDLEN-1:0] tlbsrch_index,
 
-    // to icache
+    // to and from icache
     output        icache_req,
     output [31:0] icache_addr,
     output        icache_uncached,
     input         icache_addr_ok,
     input         icache_data_ok,
     input  [63:0] icache_rdata,
-    // to dcache
-    output        dcache_req,
-    output        dcache_wr,
-    output [ 1:0] dcache_size,
-    output [ 3:0] dcache_wstrb,
-    output [31:0] dcache_addr,
-    output [31:0] dcache_wdata,
-    output        dcache_uncached,
-    input         dcache_addr_ok,
-    input         dcache_data_ok,
-    input  [31:0] dcache_rdata
+    // to and from dcache
+    output logic        dcache0_req,
+    output logic        dcache0_wr,
+    output logic [ 1:0] dcache0_size,
+    output logic [ 3:0] dcache0_wstrb,
+    output logic [31:0] dcache0_addr,
+    output logic [31:0] dcache0_wdata,
+    output logic        dcache0_uncached,
+    input  wire         dcache0_addr_ok,
+    input  wire         dcache0_data_ok,
+    input  wire  [31:0] dcache0_rdata,
+    output logic        dcache1_req,
+    output logic        dcache1_wr,
+    output logic [ 1:0] dcache1_size,
+    output logic [ 3:0] dcache1_wstrb,
+    output logic [31:0] dcache1_addr,
+    output logic [31:0] dcache1_wdata,
+    output logic        dcache1_uncached,
+    input  wire         dcache1_addr_ok,
+    input  wire         dcache1_data_ok,
+    input  wire  [31:0] dcache1_rdata
 );
 
   logic        [31:0] i_pa;
@@ -249,19 +259,26 @@ module mmu (
   assign i_data_ok = icache_data_ok;
   assign i_rdata = icache_rdata;
 
-  assign dcache_req = d1_req;
-  assign dcache_wr = d1_we;
-  assign dcache_size = d1_size;
-  assign dcache_wstrb = d1_wstrb;
-  assign dcache_addr = d1_pa;
-  assign dcache_wdata = d1_wdata;
-  assign dcache_uncached = d1_mat == 2'd0;
-  assign d1_addr_ok = dcache_addr_ok;
-  assign d1_data_ok = dcache_data_ok;
-  assign d1_rdata = dcache_rdata;
+  assign dcache0_req = d1_req;
+  assign dcache0_wr = d1_we;
+  assign dcache0_size = d1_size;
+  assign dcache0_wstrb = d1_wstrb;
+  assign dcache0_addr = d1_pa;
+  assign dcache0_wdata = d1_wdata;
+  assign dcache0_uncached = d1_mat == 2'd0;
+  assign d1_addr_ok = dcache0_addr_ok;
+  assign d1_data_ok = dcache0_data_ok;
+  assign d1_rdata = dcache0_rdata;
 
-  assign d2_addr_ok = 1'b0;
-  assign d2_data_ok = 1'b0;
-  assign d2_rdata = 32'h0;
+  assign dcache1_req = d2_req;
+  assign dcache1_wr = d2_we;
+  assign dcache1_size = d2_size;
+  assign dcache1_wstrb = d2_wstrb;
+  assign dcache1_addr = d2_pa;
+  assign dcache1_wdata = d2_wdata;
+  assign dcache1_uncached = d2_mat == 2'd0;
+  assign d2_addr_ok = dcache1_addr_ok;
+  assign d2_data_ok = dcache1_data_ok;
+  assign d2_rdata = dcache1_rdata;
 
 endmodule
