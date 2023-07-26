@@ -7,9 +7,9 @@ module mycpu_top(
 `endif
     input wire          aclk,
     input wire          aresetn,
-    input wire   [ 7:0] intrpt, 
+    input wire   [ 7:0] intrpt,
 
-    //AXI interface 
+    //AXI interface
     //read reqest
     output logic [ 3:0] arid,
     output logic [31:0] araddr,
@@ -117,10 +117,10 @@ logic [`LINE_WIDTH-1:0]    data_wr_data;
 logic                      data_wr_rdy;
 
 `ifdef DIFFTEST_EN
-difftest_t wb_a_difftest;
-difftest_t wb_b_difftest;
-difftest_excp_t wb_excp_difftest;
-difftest_csr_t wb_csr_difftest;
+difftest_t a_difftest;
+difftest_t b_difftest;
+difftest_excp_t excp_difftest;
+difftest_csr_t csr_difftest;
 `endif
 
 core core_0(
@@ -156,10 +156,10 @@ core core_0(
     .debug1_wb_rf_wdata(debug1_wb_rf_wdata)
 
 `ifdef DIFFTEST_EN
-,   .wb_a_difftest(wb_a_difftest),
-    .wb_b_difftest(wb_b_difftest),
-    .wb_excp_difftest(wb_excp_difftest),
-    .wb_csr_difftest(wb_csr_difftest)
+,   .a_difftest(a_difftest),
+    .b_difftest(b_difftest),
+    .excp_difftest(excp_difftest),
+    .csr_difftest(csr_difftest)
 `endif
 );
 
@@ -315,156 +315,156 @@ DifftestInstrCommit DifftestInstrCommit0(
     .clock              (aclk                       ),
     .coreid             (0                          ),
     .index              (0                          ),
-    .valid              (wb_a_difftest.valid        ),
+    .valid              (a_difftest.valid        ),
     .pc                 (debug0_wb_pc               ),
-    .instr              (wb_a_difftest.instr        ),
+    .instr              (a_difftest.instr        ),
     .skip               (0                          ),
-    .is_TLBFILL         (wb_a_difftest.is_TLBFILL   ),
-    .TLBFILL_index      (wb_a_difftest.TLBFILL_index),
-    .is_CNTinst         (wb_a_difftest.is_CNTinst   ),
-    .timer_64_value     (wb_a_difftest.timer_64_value),
+    .is_TLBFILL         (a_difftest.is_TLBFILL   ),
+    .TLBFILL_index      (a_difftest.TLBFILL_index),
+    .is_CNTinst         (a_difftest.is_CNTinst   ),
+    .timer_64_value     (a_difftest.timer_64_value),
     .wen                (debug0_wb_rf_wen           ),
     .wdest              (debug0_wb_rf_wnum          ),
     .wdata              (debug0_wb_rf_wdata         ),
-    .csr_rstat          (wb_a_difftest.csr_rstat    ),
-    .csr_data           (wb_a_difftest.csr_data     )
+    .csr_rstat          (a_difftest.csr_rstat    ),
+    .csr_data           (a_difftest.csr_data     )
 );
 
 DifftestStoreEvent DifftestStoreEvent0(
     .clock              (aclk                       ),
     .coreid             (0                          ),
     .index              (0                          ),
-    .valid              (wb_a_difftest.store_valid  ),
-    .storePAddr         (wb_a_difftest.storePAddr   ),
-    .storeVAddr         (wb_a_difftest.storeVAddr   ),
-    .storeData          (wb_a_difftest.storeData    )
+    .valid              (a_difftest.store_valid  ),
+    .storePAddr         (a_difftest.storePAddr   ),
+    .storeVAddr         (a_difftest.storeVAddr   ),
+    .storeData          (a_difftest.storeData    )
 );
 
 DifftestLoadEvent DifftestLoadEvent0(
     .clock              (aclk                       ),
     .coreid             (0                          ),
     .index              (0                          ),
-    .valid              (wb_a_difftest.load_valid   ),
-    .paddr              (wb_a_difftest.loadPAddr    ),
-    .vaddr              (wb_a_difftest.loadVAddr    )
+    .valid              (a_difftest.load_valid   ),
+    .paddr              (a_difftest.loadPAddr    ),
+    .vaddr              (a_difftest.loadVAddr    )
 );
 
 DifftestInstrCommit DifftestInstrCommit1(
     .clock              (aclk                       ),
     .coreid             (0                          ),
     .index              (1                          ),
-    .valid              (wb_b_difftest.valid        ),
+    .valid              (b_difftest.valid        ),
     .pc                 (debug1_wb_pc               ),
-    .instr              (wb_b_difftest.instr        ),
+    .instr              (b_difftest.instr        ),
     .skip               (0                          ),
-    .is_TLBFILL         (wb_b_difftest.is_TLBFILL   ),
-    .TLBFILL_index      (wb_b_difftest.TLBFILL_index),
-    .is_CNTinst         (wb_b_difftest.is_CNTinst   ),
-    .timer_64_value     (wb_b_difftest.timer_64_value),
+    .is_TLBFILL         (b_difftest.is_TLBFILL   ),
+    .TLBFILL_index      (b_difftest.TLBFILL_index),
+    .is_CNTinst         (b_difftest.is_CNTinst   ),
+    .timer_64_value     (b_difftest.timer_64_value),
     .wen                (debug1_wb_rf_wen           ),
     .wdest              (debug1_wb_rf_wnum          ),
     .wdata              (debug1_wb_rf_wdata         ),
-    .csr_rstat          (wb_b_difftest.csr_rstat    ),
-    .csr_data           (wb_b_difftest.csr_data     )
+    .csr_rstat          (b_difftest.csr_rstat    ),
+    .csr_data           (b_difftest.csr_data     )
 );
 
 DifftestStoreEvent DifftestStoreEvent1(
     .clock              (aclk                       ),
     .coreid             (0                          ),
     .index              (1                          ),
-    .valid              (wb_b_difftest.store_valid  ),
-    .storePAddr         (wb_b_difftest.storePAddr   ),
-    .storeVAddr         (wb_b_difftest.storeVAddr   ),
-    .storeData          (wb_b_difftest.storeData    )
+    .valid              (b_difftest.store_valid  ),
+    .storePAddr         (b_difftest.storePAddr   ),
+    .storeVAddr         (b_difftest.storeVAddr   ),
+    .storeData          (b_difftest.storeData    )
 );
 
 DifftestLoadEvent DifftestLoadEvent1(
     .clock              (aclk                       ),
     .coreid             (0                          ),
     .index              (1                          ),
-    .valid              (wb_b_difftest.load_valid   ),
-    .paddr              (wb_b_difftest.loadPAddr    ),
-    .vaddr              (wb_b_difftest.loadVAddr    )
+    .valid              (b_difftest.load_valid   ),
+    .paddr              (b_difftest.loadPAddr    ),
+    .vaddr              (b_difftest.loadVAddr    )
 );
 
 DifftestGRegState DifftestGRegState(
     .clock              (aclk                   ),
     .coreid             (0                      ),
     .gpr_0              (0                      ),
-    .gpr_1              (core_0.regfile_0.rf[1] ),
-    .gpr_2              (core_0.regfile_0.rf[2] ),
-    .gpr_3              (core_0.regfile_0.rf[3] ),
-    .gpr_4              (core_0.regfile_0.rf[4] ),
-    .gpr_5              (core_0.regfile_0.rf[5] ),
-    .gpr_6              (core_0.regfile_0.rf[6] ),
-    .gpr_7              (core_0.regfile_0.rf[7] ),
-    .gpr_8              (core_0.regfile_0.rf[8] ),
-    .gpr_9              (core_0.regfile_0.rf[9] ),
-    .gpr_10             (core_0.regfile_0.rf[10]),
-    .gpr_11             (core_0.regfile_0.rf[11]),
-    .gpr_12             (core_0.regfile_0.rf[12]),
-    .gpr_13             (core_0.regfile_0.rf[13]),
-    .gpr_14             (core_0.regfile_0.rf[14]),
-    .gpr_15             (core_0.regfile_0.rf[15]),
-    .gpr_16             (core_0.regfile_0.rf[16]),
-    .gpr_17             (core_0.regfile_0.rf[17]),
-    .gpr_18             (core_0.regfile_0.rf[18]),
-    .gpr_19             (core_0.regfile_0.rf[19]),
-    .gpr_20             (core_0.regfile_0.rf[20]),
-    .gpr_21             (core_0.regfile_0.rf[21]),
-    .gpr_22             (core_0.regfile_0.rf[22]),
-    .gpr_23             (core_0.regfile_0.rf[23]),
-    .gpr_24             (core_0.regfile_0.rf[24]),
-    .gpr_25             (core_0.regfile_0.rf[25]),
-    .gpr_26             (core_0.regfile_0.rf[26]),
-    .gpr_27             (core_0.regfile_0.rf[27]),
-    .gpr_28             (core_0.regfile_0.rf[28]),
-    .gpr_29             (core_0.regfile_0.rf[29]),
-    .gpr_30             (core_0.regfile_0.rf[30]),
-    .gpr_31             (core_0.regfile_0.rf[31])
+    .gpr_1              (core_0.u_regfile.rf[1] ),
+    .gpr_2              (core_0.u_regfile.rf[2] ),
+    .gpr_3              (core_0.u_regfile.rf[3] ),
+    .gpr_4              (core_0.u_regfile.rf[4] ),
+    .gpr_5              (core_0.u_regfile.rf[5] ),
+    .gpr_6              (core_0.u_regfile.rf[6] ),
+    .gpr_7              (core_0.u_regfile.rf[7] ),
+    .gpr_8              (core_0.u_regfile.rf[8] ),
+    .gpr_9              (core_0.u_regfile.rf[9] ),
+    .gpr_10             (core_0.u_regfile.rf[10]),
+    .gpr_11             (core_0.u_regfile.rf[11]),
+    .gpr_12             (core_0.u_regfile.rf[12]),
+    .gpr_13             (core_0.u_regfile.rf[13]),
+    .gpr_14             (core_0.u_regfile.rf[14]),
+    .gpr_15             (core_0.u_regfile.rf[15]),
+    .gpr_16             (core_0.u_regfile.rf[16]),
+    .gpr_17             (core_0.u_regfile.rf[17]),
+    .gpr_18             (core_0.u_regfile.rf[18]),
+    .gpr_19             (core_0.u_regfile.rf[19]),
+    .gpr_20             (core_0.u_regfile.rf[20]),
+    .gpr_21             (core_0.u_regfile.rf[21]),
+    .gpr_22             (core_0.u_regfile.rf[22]),
+    .gpr_23             (core_0.u_regfile.rf[23]),
+    .gpr_24             (core_0.u_regfile.rf[24]),
+    .gpr_25             (core_0.u_regfile.rf[25]),
+    .gpr_26             (core_0.u_regfile.rf[26]),
+    .gpr_27             (core_0.u_regfile.rf[27]),
+    .gpr_28             (core_0.u_regfile.rf[28]),
+    .gpr_29             (core_0.u_regfile.rf[29]),
+    .gpr_30             (core_0.u_regfile.rf[30]),
+    .gpr_31             (core_0.u_regfile.rf[31])
 );
 
 DifftestCSRRegState DifftestCSRRegState(
     .clock              (aclk                  ),
     .coreid             (0                     ),
-    .crmd               (wb_csr_difftest.CRMD     ),
-    .prmd               (wb_csr_difftest.PRMD     ),
+    .crmd               (csr_difftest.CRMD     ),
+    .prmd               (csr_difftest.PRMD     ),
     .euen               (0                     ),
-    .ecfg               (wb_csr_difftest.ECFG     ),
-    .estat              (wb_csr_difftest.ESTAT    ),
-    .era                (wb_csr_difftest.ERA      ),
-    .badv               (wb_csr_difftest.BADV     ),
-    .eentry             (wb_csr_difftest.EENTRY   ),
-    .tlbidx             (wb_csr_difftest.TLBIDX   ),
-    .tlbehi             (wb_csr_difftest.TLBEHI   ),
-    .tlbelo0            (wb_csr_difftest.TLBELO0  ),
-    .tlbelo1            (wb_csr_difftest.TLBELO1  ),
-    .asid               (wb_csr_difftest.ASID     ),
+    .ecfg               (csr_difftest.ECFG     ),
+    .estat              (csr_difftest.ESTAT    ),
+    .era                (csr_difftest.ERA      ),
+    .badv               (csr_difftest.BADV     ),
+    .eentry             (csr_difftest.EENTRY   ),
+    .tlbidx             (csr_difftest.TLBIDX   ),
+    .tlbehi             (csr_difftest.TLBEHI   ),
+    .tlbelo0            (csr_difftest.TLBELO0  ),
+    .tlbelo1            (csr_difftest.TLBELO1  ),
+    .asid               (csr_difftest.ASID     ),
     .pgdl               (0                     ),
     .pgdh               (0                     ),
-    .save0              (wb_csr_difftest.SAVE0    ),
-    .save1              (wb_csr_difftest.SAVE1    ),
-    .save2              (wb_csr_difftest.SAVE2    ),
-    .save3              (wb_csr_difftest.SAVE3    ),
-    .tid                (wb_csr_difftest.TID      ),
-    .tcfg               (wb_csr_difftest.TCFG     ),
-    .tval               (wb_csr_difftest.TVAL     ),
+    .save0              (csr_difftest.SAVE0    ),
+    .save1              (csr_difftest.SAVE1    ),
+    .save2              (csr_difftest.SAVE2    ),
+    .save3              (csr_difftest.SAVE3    ),
+    .tid                (csr_difftest.TID      ),
+    .tcfg               (csr_difftest.TCFG     ),
+    .tval               (csr_difftest.TVAL     ),
     .ticlr              (0                     ),
     .llbctl             (0                     ),
-    .tlbrentry          (wb_csr_difftest.TLBRENTRY),
-    .dmw0               (wb_csr_difftest.DMW0     ),
-    .dmw1               (wb_csr_difftest.DMW1     )
+    .tlbrentry          (csr_difftest.TLBRENTRY),
+    .dmw0               (csr_difftest.DMW0     ),
+    .dmw1               (csr_difftest.DMW1     )
 );
 
 DifftestExcpEvent DifftestExcpEvent(
-    .clock              (aclk           ),
-    .coreid             (0              ),
-    .excp_valid         (wb_excp_difftest.excp_valid),
-    .eret               (wb_excp_difftest.eret),
-    .intrNo             (wb_csr_difftest.ESTAT[12:2]),
-    .cause              (wb_csr_difftest.ESTAT[21:16]),
-    .exceptionPC        (wb_excp_difftest.exceptionPC),
-    .exceptionInst      (wb_excp_difftest.exceptionInst)
+    .clock              (aclk                      ),
+    .coreid             (0                         ),
+    .excp_valid         (excp_difftest.excp_valid  ),
+    .eret               (excp_difftest.eret        ),
+    .intrNo             (excp_difftest.intrNo      ),
+    .cause              (excp_difftest.cause       ),
+    .exceptionPC        (excp_difftest.exceptionPC ),
+    .exceptionInst      (excp_difftest.exceptionInst)
 );
 
 `endif
