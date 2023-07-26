@@ -7,7 +7,7 @@ module cache(
 
     // Pipe interface
     input wire valid,
-    input wire op,
+    input wire [2:0] op,
     input wire [`TAG_WIDTH-1:0] tag,
     input wire [`INDEX_WIDTH-1:0] index,
     input wire [`OFFSET_WIDTH-1:0] offset,
@@ -51,7 +51,12 @@ module cache(
 
 `endif
 
-reg op_reg;
+reg [2:0] op_reg;
+wire cacop_reg;
+wire [1:0] cacop_id_reg;
+wire cacop_iiw_reg;
+wire cacop_way_id;
+
 reg [`INDEX_WIDTH-1:0] index_reg;
 reg [`INDEX_WIDTH-1:0] index_reg_miss;
 reg [`TAG_WIDTH-1:0] tag_reg;
@@ -198,20 +203,30 @@ reg [`LINE_NUM-1:0] dirty_way3;
 
 reg [2:0] main_state;
 
-parameter OP_READ = 0;
-parameter OP_WRITE = 1;
+parameter OP_READ   =   3'b000;
+parameter OP_WRITE  =   3'b001;
+parameter OP_CACOP0 =   3'b100;
+parameter OP_CACOP1 =   3'b101;
+parameter OP_CACOP2 =   3'b110;
+parameter OP_CACOP3 =   3'b111;
 
 parameter RD_TYPE_CACHELINE = 3'b100;
 parameter WR_TYPE_CACHELINE = 3'b100;
 
-parameter MAIN_ST_IDLE = 0;
-parameter MAIN_ST_LOOKUP = 1;
-parameter MAIN_ST_MISS = 2;      // wait for memory finish writing previous data
-parameter MAIN_ST_REPLACE = 3;   // write data and wait for memory finish reading miss data
-parameter MAIN_ST_REFILL = 4;
+parameter MAIN_ST_IDLE      = 0;
+parameter MAIN_ST_LOOKUP    = 1;
+parameter MAIN_ST_MISS      = 2;      // wait for memory finish writing previous data
+parameter MAIN_ST_REPLACE   = 3;   // write data and wait for memory finish reading miss data
+parameter MAIN_ST_REFILL    = 4;
+parameter MAIN_ST_CACOP12   = 5;   // unvalid cache line
 
 parameter SUB_ST_IDLE = 0;
 parameter SUB_ST_WRITE = 1;
+
+assign cacop_reg = op_reg[2];
+assign cacop_id_reg = op_reg[1:0];
+assign cacop_iiw_reg = cacop_reg & (cacop_id_reg[0] ^ cacop_id_reg[1]);
+assign cacop_way_id = (op_reg == OP_CACOP2) ? cache_hit_way_id : offset[`CACHE_WAY_NUM_LOG2-1:0];
 
 wire [2:0]  rd_type_cache;
 wire [31:0] rd_addr_cache;
@@ -231,8 +246,13 @@ wire lookup;
 wire miss;
 wire replace;
 wire refill;
+wire cacop12;
+
 wire hit_write;
 wire refill_write;
+wire cacop0_write;
+wire cacop1_write;
+wire cacop2_write;
 
 wire cache_hit;
 wire cache_hit_and_cached;
@@ -252,7 +272,8 @@ reg [`LINE_WIDTH-1:0] buffer_read_data;
 reg [`OFFSET_WIDTH-3:0] buffer_read_data_count;
 
 reg [`TAG_WIDTH-1:0] replace_tag;
-reg [`CACHE_WAY_NUM_LOG2-1:0] replace_way_id;
+reg [`CACHE_WAY_NUM_LOG2-1:0] replace_way_id_counter;
+wire [`CACHE_WAY_NUM_LOG2-1:0] replace_way_id;
 wire replace_dirty;
 
 // wire [127+24:0] cache_write_data;
@@ -309,6 +330,7 @@ assign lookup = (main_state == MAIN_ST_LOOKUP);
 assign miss = (main_state == MAIN_ST_MISS);
 assign replace = (main_state == MAIN_ST_REPLACE);
 assign refill = (main_state == MAIN_ST_REFILL);
+assign cacop12 = (main_state == MAIN_ST_CACOP12);
 
 assign ret_valid_last = (ret_valid & ret_last);
 
@@ -372,7 +394,8 @@ always @(posedge clk) begin
     wdata_ok_reg <= (op == OP_WRITE) & pipe_interface_latch;
 end
 
-assign hit_write = lookup & cache_hit_and_cached & (op_reg == OP_WRITE);
+assign hit_write        = lookup & cache_hit_and_cached & (op_reg == OP_WRITE);
+assign cacop0_write     = lookup & (op_reg == OP_CACOP0);
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -404,7 +427,7 @@ end
 always @(posedge clk) begin
     if (!resetn) begin
         main_state <= 0;
-        replace_way_id <= 0;
+        replace_way_id_counter <= 0;
     end
     else begin
         case(main_state)
@@ -414,12 +437,12 @@ always @(posedge clk) begin
                 end
             end
             MAIN_ST_LOOKUP: begin
-                if (cache_hit_and_cached) begin
+                if ((!cacop_reg & cache_hit_and_cached) | (op_reg == OP_CACOP0) | ((op_reg == OP_CACOP2) & !cache_hit_and_cached)) begin
                     if (!valid | hit_write) begin
                         main_state <= MAIN_ST_IDLE;
                     end
                     else begin
-                        replace_way_id <= replace_way_id + 1;
+                        replace_way_id_counter <= replace_way_id_counter + 1;
                     end
                 end
                 else begin
@@ -441,7 +464,7 @@ always @(posedge clk) begin
                             main_state <= MAIN_ST_REPLACE;
                         end
                     end
-                    else if (!prefetching) begin
+                    else begin
                         main_state <= MAIN_ST_REFILL;
                     end
                 end
@@ -453,14 +476,22 @@ always @(posedge clk) begin
                     end
                 end
                 else if (rd_rdy & !prefetching) begin
-                    main_state <= MAIN_ST_REFILL;
+                    if (cacop_iiw_reg) begin
+                        main_state <= MAIN_ST_CACOP12;
+                    end
+                    else begin
+                        main_state <= MAIN_ST_REFILL;
+                    end
                 end
             end
             MAIN_ST_REFILL: begin
                 if (fetch_ok) begin
                     main_state <= MAIN_ST_IDLE;
-                    replace_way_id <= replace_way_id + 1;
+                    replace_way_id_counter <= replace_way_id_counter + 1;
                 end
+            end
+            MAIN_ST_CACOP12: begin
+                main_state <= MAIN_ST_IDLE;
             end
         endcase
     end
@@ -512,6 +543,7 @@ always @(posedge clk) begin
         replace_tag <= `get_preload_tag(replace_way_id);
     end
 end
+assign replace_way_id = cacop_reg ? cacop_way_id : replace_way_id_counter;
 
 // axi interface
 
@@ -582,6 +614,8 @@ endgenerate
 // assign cache_write_way_id = hit_write ? cache_hit_way_id : replace_way_id;
 
 assign refill_write = !uncached_reg & refill & fetch_ok;
+assign cacop1_write = cacop12 & (op_reg == OP_CACOP1);
+assign cacop2_write = cacop12 & (op_reg == OP_CACOP2);
 
 always @(posedge clk) begin
     if (!resetn) begin: valid_tb_reset
@@ -652,6 +686,24 @@ always @(posedge clk) begin
                 valid_way3[index_reg] <= 1;
                 data_way3[index_reg] <= cache_write_data_actually;
                 dirty_way3[index_reg] <= 1;
+            end
+`endif
+        endcase
+    end
+    else if (cacop0_write | cacop1_write | cacop2_write) begin
+        case (cacop_way_id)
+            0 : begin
+                valid_way0[index_reg] <= 0;
+            end
+            1 : begin
+                valid_way1[index_reg] <= 0;
+            end
+`ifdef CACHE_4WAY
+            2 : begin
+                valid_way2[index_reg] <= 0;
+            end
+            3 : begin
+                valid_way3[index_reg] <= 0;
             end
 `endif
         endcase

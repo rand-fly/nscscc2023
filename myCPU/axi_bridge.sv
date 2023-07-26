@@ -78,7 +78,8 @@ module axi_bridge(
 );
 
 //fixed signal
-assign  arburst = 2'b1;
+// assign  arburst = 2'b1;
+assign  arburst = (inst_rd_cache_line | data_rd_cache_line) ? 2'b10 : 2'b1;
 assign  arlock  = 2'b0;
 assign  arcache = 4'b0;
 assign  arprot  = 3'b0;
