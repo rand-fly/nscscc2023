@@ -3,12 +3,12 @@ module pred
     parameter RASNUM = 16,
     parameter RASIDLEN = $clog2(RASNUM),
     parameter RASCNTLEN = 8,
-    parameter RASCNTMAX = $pow(2,RASCNTLEN)-1,
-    parameter BHTNUM = 32,
-    parameter BHTIDLEN = 5,
-    parameter BHRLEN = 6,
-    parameter PHTNUM = 128,
-    parameter TCNUM = 128
+    parameter RASCNTMAX = (2**RASCNTLEN)-1,
+    parameter BHTNUM = 64,
+    parameter BHTIDLEN = $clog2(BHTNUM),
+    parameter BHRLEN = 8,
+    parameter PHTNUM = 2**BHRLEN,
+    parameter TCNUM = 2**BHRLEN
 )
 (
     input             clk           ,
@@ -16,16 +16,21 @@ module pred
     //from/to if
     input  [31:0]     fetch_pc_0    ,
     input  [31:0]     fetch_pc_1    ,
+
+    input             dual_issue    ,
     
 
-    output [31:0]     ret_pc        ,
-    output [1:0]      hit_num       ,
+    output [31:0]     ret_pc_0        ,
+    output [31:0]     ret_pc_1        ,
+
+    output            taken_0         ,
+    output            taken_1         ,
 
     //update
     input             branch_mistaken  ,
     input  [31:0]     wrong_pc         ,
     input  [31:0]     right_target     ,
-    input  [1:0]      ins_type_w        ,
+    input  [2:0]      ins_type_w        ,
     
     input             update_orien_en  ,
     input  [31:0]     retire_pc        ,
@@ -44,7 +49,7 @@ logic  [2:0]      ins_type_1    ;
   
 
 //BHT
-reg [BHRLEN - 1:0]  bht [BHTNUM - 1:0] ;//6bit bhr
+reg [BHRLEN - 1:0]  bht [BHTNUM - 1:0] ;//8bit bhr
 //search BHT
 logic   [BHTIDLEN - 1:0]    bht_index_0 ;
 logic   [BHTIDLEN - 1:0]    bht_index_1 ;
@@ -63,20 +68,22 @@ logic   [BHRLEN - 1:0]      hashed_index_1;
 logic   [BHRLEN - 1:0]      hashed_index_o ;
 logic   [BHRLEN - 1:0]      hashed_index_w ;
 
-assign bht_index_0 = fetch_pc_0[BHRLEN + BHTIDLEN + 2:BHRLEN + 3];
-assign bht_index_1 = fetch_pc_1[BHRLEN + BHTIDLEN + 2:BHRLEN + 3];
-assign bht_index_o = retire_pc[BHRLEN + BHTIDLEN + 2:BHRLEN + 3];
-assign bht_index_w = wrong_pc[BHRLEN + BHTIDLEN + 2:BHRLEN + 3];
+
+//adjust this hash while change BHTNUM/IDLEN
+assign bht_index_0 = fetch_pc_0[31:26]^fetch_pc_0[25:20]^fetch_pc_0[19:14]^fetch_pc_0[13:8]^fetch_pc_0[7:2];
+assign bht_index_1 = fetch_pc_1[31:26]^fetch_pc_1[25:20]^fetch_pc_1[19:14]^fetch_pc_1[13:8]^fetch_pc_1[7:2];
+assign bht_index_o = retire_pc[31:26]^retire_pc[25:20]^retire_pc[19:14]^retire_pc[13:8]^retire_pc[7:2];
+assign bht_index_w = wrong_pc[31:26]^wrong_pc[25:20]^wrong_pc[19:14]^wrong_pc[13:8]^wrong_pc[7:2];
 
 assign bht_val_0 = bht[bht_index_0];
 assign bht_val_1 = bht[bht_index_1];
 assign bht_val_o = bht[bht_index_o];
 assign bht_val_w = bht[bht_index_w];
 
-assign pc_frag_0 = fetch_pc_0[BHRLEN + 2 :3];
-assign pc_frag_1 = fetch_pc_1[BHRLEN + 2 :3];
-assign pc_frag_o = retire_pc[BHRLEN + 2 :3];
-assign pc_frag_w = wrong_pc[BHRLEN + 2 :3];
+assign pc_frag_0 = fetch_pc_0[BHRLEN + 1 :2];
+assign pc_frag_1 = fetch_pc_1[BHRLEN + 1 :2];
+assign pc_frag_o = retire_pc[BHRLEN + 1 :2];
+assign pc_frag_w = wrong_pc[BHRLEN + 1 :2];
 
 assign hashed_index_0 = bht_val_0 ^ pc_frag_0;
 assign hashed_index_1 = bht_val_1 ^ pc_frag_1;
@@ -107,13 +114,11 @@ reg     [1:0]   pht   [PHTNUM - 1:0];
 //search PHT
 logic   [1:0]   pht_res_0           ;
 logic   [1:0]   pht_res_1           ;
-logic           taken_0             ;
-logic           taken_1             ; 
 
 assign pht_res_0 = pht[hashed_index_0];
 assign pht_res_1 = pht[hashed_index_1];
 assign taken_0 = pht_res_0[1];
-assign taken_2 = pht_res_1[1];
+assign taken_1 = pht_res_1[1];
 //reset & update PHT
 integer j;
 always @(posedge clk) begin
@@ -137,11 +142,6 @@ always @(posedge clk) begin
 end
 
 
-logic   [2:0]   ins_type ;
-assign ins_type =   taken_0 ? ins_type_0 :
-                    taken_1 ? ins_type_1 :
-                    3'b000;
-
 
 //RAS
 reg     [31:0]              ras_pc      [RASNUM - 1:0];
@@ -153,14 +153,20 @@ logic   [31:0]              ras_top_val;
 logic   [31:0]              ras_ret_pc;
 logic   [31:0]              ras_ret_pc_0;
 logic   [31:0]              ras_ret_pc_1;
+logic                       ras_push;
+logic                       ras_pop;
+
 
 assign ras_top_val = ras_pc[ras_top];
-assign ras_ret_pc = taken_0 ? ras_ret_pc_0 :
-                    taken_1 ? ras_ret_pc_0 :
+assign ras_ret_pc = ({32{ins_type_0 == 3'b010}} & ras_ret_pc_0 )|
+                    ({32{ins_type_0 == 3'b010 && dual_issue}} & ras_ret_pc_1 )|
                     32'b0;
-assign ras_ret_pc_0 = {fetch_pc_0[31:2] + 1'b1,2'b0};
-assign ras_ret_pc_1 = {fetch_pc_1[31:2] + 1'b1,2'b0};
+assign ras_ret_pc_0 = {fetch_pc_0[31:2] + 1'b1,fetch_pc_0[1:0]};
+assign ras_ret_pc_1 = {fetch_pc_1[31:2] + 1'b1,fetch_pc_1[1:0]};
+assign ras_push = ins_type_0 == 3'b010 || (ins_type_1 == 3'b010 && dual_issue);
+assign ras_pop = ins_type_0 == 3'b011 || (ins_type_1 == 3'b011 && dual_issue);
 //reset & push & pop RAS
+
 integer k;
 always @(posedge clk) begin
     if(reset) begin
@@ -172,7 +178,7 @@ always @(posedge clk) begin
     end
     else begin
         //call->push
-        if(ins_type == 3'b010) begin
+        if(ras_push) begin
             //recursion counter increase
             if(ras_ret_pc == ras_top_val && ras_counter[ras_top] != RASCNTMAX) begin
                 ras_counter[ras_top] <= ras_counter[ras_top] + 1;
@@ -184,7 +190,7 @@ always @(posedge clk) begin
             end
         end
         //ret->pop
-        else if(ins_type == 3'b011) begin
+        else if(ras_pop) begin
             ras_res <= ras_top_val;
             if(ras_counter[ras_top] <= 1) begin
                 ras_counter[ras_top] <= 0;
@@ -200,13 +206,10 @@ end
 //Target Cache
 reg     [31:0]  tc    [TCNUM - 1:0];
 //search Target Cache
-logic           tc_res             ;
 logic           tc_res_0           ;
 logic           tc_res_1           ;
 
-assign tc_res = taken_0 ? tc_res_0 :
-                taken_1 ? tc_res_1 :
-                32'b0;
+
 assign tc_res_0 = tc[hashed_index_0];
 assign tc_res_1 = tc[hashed_index_1];
 //reset & update Target Cache
@@ -217,7 +220,7 @@ always @(posedge clk) begin
             tc[l] <= 0;
         end
     end
-    else if(branch_mistaken && ins_type_w == 100) begin
+    else if(branch_mistaken && ins_type_w == 3'b100) begin
         tc[hashed_index_w] <= right_target;
     end
 end
@@ -226,9 +229,8 @@ end
 //BTB
 logic   [31:0]  btb_res_0;
 logic   [31:0]  btb_res_1;
-logic   [31:0]  btb_res;
 btb btb(
-    .clk(clock),
+    .clk(clk),
     .reset(reset),
 
     .fetch_pc_0(fetch_pc_0),
@@ -243,22 +245,22 @@ btb btb(
     .wrong_pc(wrong_pc),
     .right_target(right_target)
 );
-assign btb_res = taken_0 ? btb_res_0:
-                 taken_1 ? btb_res_1:
-                 32'b0;
 
 //final select
-assign ret_pc = ({32{ins_type == 3'b000}} & {fetch_pc_0[31:2] + 1'b1,2'b0}) |
-                ({32{ins_type == 3'b001}} & btb_res)|
-                ({32{ins_type == 3'b010}} & btb_res)|
-                ({32{ins_type == 3'b011}} & ras_res)|
-                ({32{ins_type == 3'b100}} & tc_res)|
-                ({32{ins_type == 3'b101}} & btb_res)|
+assign ret_pc_0 = ({32{ins_type_0 == 3'b000}} & {fetch_pc_0[31:3] + 1'b1,3'b0}) |
+                ({32{ins_type_0 == 3'b001}} & btb_res_0)|
+                ({32{ins_type_0 == 3'b010}} & btb_res_0)|
+                ({32{ins_type_0 == 3'b011}} & ras_res)|
+                ({32{ins_type_0 == 3'b100}} & tc_res_0)|
+                ({32{ins_type_0 == 3'b101}} & btb_res_0)|
                 32'b0;
-assign hit_num = taken_0 ? 2'b01:
-                 taken_1 ? 2'b10:
-                 2'b00;
-
+assign ret_pc_1 = ({32{ins_type_1 == 3'b000}} & {fetch_pc_1[31:3] + 1'b1,3'b0}) |
+                ({32{ins_type_1 == 3'b001}} & btb_res_1)|
+                ({32{ins_type_1 == 3'b010}} & btb_res_1)|
+                ({32{ins_type_1 == 3'b011}} & ras_res)|
+                ({32{ins_type_1 == 3'b100}} & tc_res_1)|
+                ({32{ins_type_1 == 3'b101}} & btb_res_1)|
+                32'b0;
 
 
 

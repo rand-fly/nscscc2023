@@ -19,7 +19,7 @@ module btb
 
     //update btb
     input             branch_mistaken  ,
-    input			  ins_type_w	   ,
+    input	[2:0]		  ins_type_w	   ,
     input  	[31:0]    wrong_pc         ,
     input  	[31:0]    right_target     
 );
@@ -51,9 +51,9 @@ logic   [BTBGROUP-1:0]  btb_hit_0;
 logic   [BTBGROUP-1:0]  btb_hit_1;
 logic   [BTBGROUP-1:0]  btb_hit_w; 
 logic   [BTBGROUP-1:0]  btb_hit_inv;  
-logic   [BTBIDLEN-1:0]  btb_group_num_0;
-logic   [BTBIDLEN-1:0]  btb_group_num_1;
-logic   [BTBIDLEN-1:0]  btb_group_num_w;
+logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_0;
+logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_1;
+logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_w;
 logic   [BTBTAGLEN-1:0] btb_fetch_tag_0;
 logic   [BTBTAGLEN-1:0] btb_fetch_tag_1;
 logic   [BTBTAGLEN-1:0] btb_fetch_tag_w;
@@ -121,11 +121,11 @@ assign hit_inv = |btb_hit_inv;
 assign target_0 = btb_target[index_0];
 assign target_1 = btb_target[index_1];
 
-assign target_pc_0 = target_0;
-assign target_pc_1 = target_1;
+assign target_pc_0 = hit_0 ?target_0 : 32'b0;
+assign target_pc_1 = hit_1 ?target_1 : 32'b0;
 
-assign ins_type_0 = btb_ins_type[index_0];
-assign ins_type_1 = btb_ins_type[index_1];
+assign ins_type_0 = hit_0 ? btb_ins_type[index_0] : 3'b000;
+assign ins_type_1 = hit_1 ? btb_ins_type[index_1] : 3'b000;
 integer k;
 always @(posedge clk) begin
     if(reset) begin
