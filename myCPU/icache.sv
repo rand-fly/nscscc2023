@@ -7,6 +7,7 @@ module icache(
 
     // Pipe interface
     input wire valid,
+    input wire [2:0] op,
     input wire [`TAG_WIDTH-1:0] tag,
     input wire [`INDEX_WIDTH-1:0] index,
     input wire [`OFFSET_WIDTH-1:0] offset,
@@ -47,10 +48,12 @@ module icache(
 
 `endif
 
+reg [2:0] op_reg;
 reg [`INDEX_WIDTH-1:0] index_reg;
 reg [`INDEX_WIDTH-1:0] index_reg_miss;
 reg [`TAG_WIDTH-1:0] tag_reg;
 reg [`OFFSET_WIDTH-1:0] offset_reg;
+reg [`OFFSET_WIDTH-1:0] offset_reg_miss;
 // reg [1:0] offset_w_reg; // word offset
 wire [`OFFSET_WIDTH-3:0] offset_w_reg; // word offset
 reg uncached_reg;
@@ -151,14 +154,22 @@ reg [`LINE_WIDTH-1:0] data_way3 [0:`LINE_NUM-1];
 
 reg [2:0] main_state;
 
-`define RD_TYPE_WORD      3'b010
-`define RD_TYPE_CACHELINE 3'b100
+parameter OP_READ   =   3'b000;
+parameter OP_WRITE  =   3'b001;
+parameter OP_CACOP0 =   3'b100;
+parameter OP_CACOP1 =   3'b101;
+parameter OP_CACOP2 =   3'b110;
+parameter OP_CACOP3 =   3'b111;
 
+parameter RD_TYPE_WORD = 3'b010;
+parameter RD_TYPE_CACHELINE = 3'b100;
+parameter WR_TYPE_CACHELINE = 3'b100;
 
-`define MAIN_ST_IDLE 0
-`define MAIN_ST_LOOKUP 1
-`define MAIN_ST_MISS 2      // wait for memory finish writing previous data
-`define MAIN_ST_REFILL 4
+parameter MAIN_ST_IDLE      = 0;
+parameter MAIN_ST_LOOKUP    = 1;
+parameter MAIN_ST_MISS      = 2;      // wait for memory finish writing previous data
+parameter MAIN_ST_REPLACE   = 3;   // write data and wait for memory finish reading miss data
+parameter MAIN_ST_REFILL    = 4;
 
 wire [2:0]  rd_type_cache;
 wire [31:0] rd_addr_cache;
@@ -191,7 +202,7 @@ wire [`LINE_WIDTH-1:0] buffer_read_data_new;
 // wire [127+24:0] cache_rd_data_ext;
 wire [`LINE_WIDTH-1:0] cache_rd_data;
 reg [`LINE_WIDTH-1:0] buffer_read_data;
-reg [`OFFSET_WIDTH-3:0] buffer_read_data_count;
+reg [`OFFSET_WIDTH-3+1:0] buffer_read_data_count;
 
 reg [`CACHE_WAY_NUM_LOG2-1:0] refill_way_id;
 
@@ -224,10 +235,10 @@ wire fetch_ok;
 
 assign offset_w_reg = offset_reg[`OFFSET_WIDTH-1:2];
 
-assign idle = (main_state == `MAIN_ST_IDLE);
-assign lookup = (main_state == `MAIN_ST_LOOKUP);
-assign miss = (main_state == `MAIN_ST_MISS);
-assign refill = (main_state == `MAIN_ST_REFILL);
+assign idle = (main_state == MAIN_ST_IDLE);
+assign lookup = (main_state == MAIN_ST_LOOKUP);
+assign miss = (main_state == MAIN_ST_MISS);
+assign refill = (main_state == MAIN_ST_REFILL);
 
 assign ret_valid_last = (ret_valid & ret_last);
 
@@ -236,7 +247,7 @@ assign next_same_line = (index == index_reg) & (tag == tag_reg);
 assign pipe_interface_latch = valid & (
     (idle & !(prefetching & prefetch_next_same_line & ret_valid_last)) | 
     (lookup & cache_hit_and_cached) |
-    (miss & (prefetching & prefetch_next_same_line & !ret_valid_last)) |
+    (miss & ((!prefetching & next_same_line) | prefetch_next_same_line)) |
     (refill & !uncached_reg & (data_ok | finished) & next_same_line & !fetch_ok));
 
 always @(posedge clk) begin
@@ -265,6 +276,7 @@ always @(posedge clk) begin
         end
         if (lookup) begin
             index_reg_miss <= index_reg;
+            offset_reg_miss <= offset_reg;
         end
     end
 end
@@ -305,36 +317,36 @@ always @(posedge clk) begin
     end
     else begin
         case(main_state)
-            `MAIN_ST_IDLE: begin
+            MAIN_ST_IDLE: begin
                 if (pipe_interface_latch) begin
-                    main_state <= `MAIN_ST_LOOKUP;
+                    main_state <= MAIN_ST_LOOKUP;
                 end
             end
-            `MAIN_ST_LOOKUP: begin
+            MAIN_ST_LOOKUP: begin
                 if (cache_hit_and_cached) begin
                     if (!valid) begin
-                        main_state <= `MAIN_ST_IDLE;
+                        main_state <= MAIN_ST_IDLE;
                     end
                 end
                 else begin
-                    main_state <= `MAIN_ST_MISS;
+                    main_state <= MAIN_ST_MISS;
                 end
             end
-            `MAIN_ST_MISS: begin
+            MAIN_ST_MISS: begin
                 if (!prefetching) begin    
                     if (uncached_reg) begin
                         if (rd_rdy & !prefetching) begin
-                            main_state <= `MAIN_ST_REFILL;
+                            main_state <= MAIN_ST_REFILL;
                         end
                     end
                     else if (!prefetching) begin
-                        main_state <= `MAIN_ST_REFILL;
+                        main_state <= MAIN_ST_REFILL;
                     end
                 end
             end
-            `MAIN_ST_REFILL: begin
+            MAIN_ST_REFILL: begin
                 if (fetch_ok) begin
-                    main_state <= `MAIN_ST_IDLE;
+                    main_state <= MAIN_ST_IDLE;
                     refill_way_id <= refill_way_id + 1;
                 end
             end
@@ -369,7 +381,9 @@ assign cache_rd_data = cache_hit
                         ? `get_preload_data(cache_hit_way_id)
                         : (prefetch_hit)
                             ? prefetch_data_reg
-                            : buffer_read_data_new;
+                            : (buffer_read_data_count[`OFFSET_WIDTH-3+1] & (buffer_read_data_count[`OFFSET_WIDTH-3:0] == offset_reg_miss[`OFFSET_WIDTH-1:2]))
+                                ? buffer_read_data
+                                : buffer_read_data_new;
 
 assign rdata_l = uncached_reg ? ret_data : `get_word(cache_rd_data, offset_w_reg);
 assign rdata_h = `get_word(cache_rd_data, offset_w_reg+1);
@@ -395,18 +409,19 @@ assign wr_data = 0;
 assign wr_req = 0;
 assign wr_wstrb = 0;
 
-assign rd_type_cache = uncached_reg ? `RD_TYPE_WORD : `RD_TYPE_CACHELINE;
-assign rd_addr_cache = uncached_reg ? {tag_reg,index_reg,offset_reg} : {tag_reg, index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
+assign rd_type_cache = uncached_reg ? RD_TYPE_WORD : RD_TYPE_CACHELINE;
+// assign rd_addr_cache = uncached_reg ? {tag_reg,index_reg,offset_reg} : {tag_reg, index_reg_miss,{`OFFSET_WIDTH{1'b0}}};  //关闭关键字优先
+assign rd_addr_cache = uncached_reg ? {tag_reg,index_reg,offset_reg} : {tag_reg, index_reg_miss,offset_reg_miss[`OFFSET_WIDTH-1:2],2'b0}; // 关键字优先
 assign rd_req_cache = !prefetch_hit & refill & ~rd_addr_ok;
 
-assign rd_type = prefetching ? `RD_TYPE_CACHELINE : rd_type_cache;
+assign rd_type = prefetching ? RD_TYPE_CACHELINE : rd_type_cache;
 assign rd_addr = prefetching ? rd_addr_prefetch : rd_addr_cache;
 assign rd_req = prefetching ? rd_req_prefetch : rd_req_cache;
 
 // fetch data from memory
 
 // assign buffer_read_data_new = (buffer_read_data >> 32) | (ret_data << (32*3));
-assign buffer_read_data_new = buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*buffer_read_data_count));
+assign buffer_read_data_new = buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*buffer_read_data_count[`OFFSET_WIDTH-3:0]));
 
 always @(posedge clk) begin
     // TODO 优化，此处反复写?
@@ -415,13 +430,13 @@ always @(posedge clk) begin
         buffer_read_data_count <= 0;
     end
     else begin
-        if (ret_valid) begin
+        if (!uncached_reg & ret_valid) begin
             buffer_read_data <= buffer_read_data_new;
             buffer_read_data_count <= buffer_read_data_count + 1;
         end
-        if (ret_valid_last) begin
+        if (rd_req) begin
             buffer_read_data <= 0;
-            buffer_read_data_count <= 0;
+            buffer_read_data_count <= rd_addr[`OFFSET_WIDTH-1:2];
         end
     end
     
@@ -514,12 +529,12 @@ always @(posedge clk) begin
         prefetch_tag_reg <= 0;
         prefetch_index_reg <= 0;
     end
-    else if (!prefetching & (lookup & cache_hit_and_cached) & (prefetch_index!=0) & !prefetch_cached & !uncached_reg & ((prefetch_tag != prefetch_tag_reg) | (prefetch_index != prefetch_index_reg))) begin
-        prefetching <= 1;
-        prefetch_valid_reg <= 0;
-        prefetch_tag_reg <= prefetch_tag;
-        prefetch_index_reg <= prefetch_index;
-    end
+    // else if (!prefetching & (lookup & cache_hit_and_cached) & (prefetch_index!=0) & !prefetch_cached & !uncached_reg & ((prefetch_tag != prefetch_tag_reg) | (prefetch_index != prefetch_index_reg))) begin
+    //     prefetching <= 1;
+    //     prefetch_valid_reg <= 0;
+    //     prefetch_tag_reg <= prefetch_tag;
+    //     prefetch_index_reg <= prefetch_index;
+    // end
     if (prefetching & ret_valid_last) begin
         prefetching <= 0;
         prefetch_valid_reg <= 1;
