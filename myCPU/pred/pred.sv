@@ -6,7 +6,7 @@ module pred
     parameter RASCNTMAX = (2**RASCNTLEN)-1,
     parameter BHTNUM = 64,
     parameter BHTIDLEN = $clog2(BHTNUM),
-    parameter BHRLEN = 8,
+    parameter BHRLEN = 7,
     parameter PHTNUM = 2**BHRLEN,
     parameter TCNUM = 2**BHRLEN
 )
@@ -206,7 +206,7 @@ end
 reg     [31:0]  tc    [TCNUM - 1:0];
 //search Target Cache
 logic   [31:0]  tc_res_0           ;
-logic   [31:0]  tc_res_1           ;
+logic   [31:0]    tc_res_1           ;
 
 
 assign tc_res_0 = tc[hashed_index_0];

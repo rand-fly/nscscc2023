@@ -88,11 +88,11 @@ endgenerate
 //calc index
 integer j;
 always_comb begin
-//    btb_index_in_group_0 = 0;
-//	btb_index_in_group_1 = 0;
-//	btb_index_in_group_inv = 0;
-//	btb_index_in_group_w = 0;
-    for(j = 0; j < BTBNUM/BTBGROUP; j = j + 1) begin
+    btb_index_in_group_0 = 0;
+	btb_index_in_group_1 = 0;
+	btb_index_in_group_inv = 0;
+	btb_index_in_group_w = 0;
+    for(j = 0; j < BTBGROUP; j = j + 1) begin
         if(btb_hit_0[j]) begin
             btb_index_in_group_0 = j;
         end
