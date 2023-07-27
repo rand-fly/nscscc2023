@@ -22,7 +22,7 @@ module alu (
       ALU_SLL:  result = src1 << src2[4:0];
       ALU_SRL:  result = src1 >> src2[4:0];
       ALU_SRA:  result = $signed(src1) >>> src2[4:0];
-      default:  result = src1;
+      default:  result = src2;
     endcase
   end
 

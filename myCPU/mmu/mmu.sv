@@ -210,36 +210,36 @@ module mmu (
   assign tlbsrch_found = tlbsrch_valid && tlb_s1_result.found;
   assign tlbsrch_index = !d1_req ? tlb_s1_result.index : tlb_s2_result.index;
 
-  tlb tlb_0 (
-      .clk  (clk),
-      .reset(reset),
+//   tlb tlb_0 (
+//       .clk  (clk),
+//       .reset(reset),
 
-      .s0_vppn    (tlb_s0_vppn),
-      .s0_va_bit12(tlb_s0_va_bit12),
-      .s0_asid    (tlb_s0_asid),
-      .s0_result  (tlb_s0_result),
+//       .s0_vppn    (tlb_s0_vppn),
+//       .s0_va_bit12(tlb_s0_va_bit12),
+//       .s0_asid    (tlb_s0_asid),
+//       .s0_result  (tlb_s0_result),
 
-      .s1_vppn    (tlbsrch_valid ? tlbsrch_vppn : tlb_s1_vppn),
-      .s1_va_bit12(tlb_s1_va_bit12),
-      .s1_asid    (tlb_s1_asid),
-      .s1_result  (tlb_s1_result),
+//       .s1_vppn    (tlbsrch_valid ? tlbsrch_vppn : tlb_s1_vppn),
+//       .s1_va_bit12(tlb_s1_va_bit12),
+//       .s1_asid    (tlb_s1_asid),
+//       .s1_result  (tlb_s1_result),
 
-      .s2_vppn    (tlb_s2_vppn),
-      .s2_va_bit12(tlb_s2_va_bit12),
-      .s2_asid    (tlb_s2_asid),
-      .s2_result  (tlb_s2_result),
+//       .s2_vppn    (tlb_s2_vppn),
+//       .s2_va_bit12(tlb_s2_va_bit12),
+//       .s2_asid    (tlb_s2_asid),
+//       .s2_result  (tlb_s2_result),
 
-      .invtlb_valid(invtlb_valid),
-      .invtlb_op   (invtlb_op),
-      .invtlb_asid (invtlb_asid),
-      .invtlb_va   (invtlb_va),
+//       .invtlb_valid(invtlb_valid),
+//       .invtlb_op   (invtlb_op),
+//       .invtlb_asid (invtlb_asid),
+//       .invtlb_va   (invtlb_va),
 
-      .we     (tlb_we),
-      .w_index(tlb_w_index),
-      .w_entry(tlb_w_entry),
-      .r_index(tlb_r_index),
-      .r_entry(tlb_r_entry)
-  );
+//       .we     (tlb_we),
+//       .w_index(tlb_w_index),
+//       .w_entry(tlb_w_entry),
+//       .r_index(tlb_r_index),
+//       .r_entry(tlb_r_entry)
+//   );
 
   assign icache_req = i_req;
   assign icache_addr = i_pa;

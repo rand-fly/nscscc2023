@@ -1,74 +1,183 @@
 `include "definitions.svh"
 
+typedef struct packed {
+  logic [31:0] pc;
+  optype_t     optype;
+  opcode_t     opcode;
+  logic [4:0]  dest;
+  logic [31:0] imm;
+  logic        pred_br_taken;
+  logic [31:0] pred_br_target;
+  logic        is_br;
+  logic        br_condition;
+  logic [31:0] br_target;
+  logic        is_jirl;
+  logic        have_excp;
+  excp_t       excp_type;
+  csr_addr_t   csr_addr;
+  logic        csr_wr;
+  logic [4:0]  r1;
+  logic [4:0]  r2;
+  logic        src2_is_imm;
+} ibuf_entry_t;
+
 module ibuf (
-    input                clk,
-    input                reset,
-    input                flush,
-    input                interrupt,
+    input                    clk,
+    input                    reset,
+    input                    flush,
+    input                    interrupt,
     // input
-    input         [ 1:0] i_size,
-    output               i_ready,
+    input             [ 1:0] i_size,
+    output                   i_ready,
     // input port 0
-    input         [31:0] i0_pc,
-    input         [31:0] i0_inst,
-    input                i0_pred_br_taken,
-    input         [31:0] i0_pred_br_target,
-    input                i0_have_excp,
-    input  excp_t        i0_excp_type,
+    input             [31:0] i_a_pc,
+    input  optype_t          i_a_optype,
+    input  opcode_t          i_a_opcode,
+    input             [ 4:0] i_a_dest,
+    input             [31:0] i_a_imm,
+    input                    i_a_pred_br_taken,
+    input             [31:0] i_a_pred_br_target,
+    input                    i_a_is_br,
+    input                    i_a_br_condition,
+    input             [31:0] i_a_br_target,
+    input                    i_a_is_jirl,
+    input                    i_a_have_excp,
+    input  excp_t            i_a_excp_type,
+    input  csr_addr_t        i_a_csr_addr,
+    input                    i_a_csr_wr,
+    input             [ 4:0] i_a_r1,
+    input             [ 4:0] i_a_r2,
+    input                    i_a_src2_is_imm,
     // input port 1
-    input         [31:0] i1_pc,
-    input         [31:0] i1_inst,
-    input                i1_pred_br_taken,
-    input         [31:0] i1_pred_br_target,
+    input             [31:0] i_b_pc,
+    input  optype_t          i_b_optype,
+    input  opcode_t          i_b_opcode,
+    input             [ 4:0] i_b_dest,
+    input             [31:0] i_b_imm,
+    input                    i_b_pred_br_taken,
+    input             [31:0] i_b_pred_br_target,
+    input                    i_b_is_br,
+    input                    i_b_br_condition,
+    input             [31:0] i_b_br_target,
+    input                    i_b_is_jirl,
+    input                    i_b_have_excp,
+    input  excp_t            i_b_excp_type,
+    input  csr_addr_t        i_b_csr_addr,
+    input                    i_b_csr_wr,
+    input             [ 4:0] i_b_r1,
+    input             [ 4:0] i_b_r2,
+    input                    i_b_src2_is_imm,
+
+`ifdef DIFFTEST_EN
+    input  difftest_t i_a_difftest,
+    input  difftest_t i_b_difftest,
+    output difftest_t o_a_difftest,
+    output difftest_t o_b_difftest,
+`endif
 
     //output
-    input         [ 1:0] o_size,
-    //output port 0
-    output               o0_valid,
-    output        [31:0] o0_pc,
-    output        [31:0] o0_inst,
-    output               o0_pred_br_taken,
-    output        [31:0] o0_pred_br_target,
-    output               o0_have_excp,
-    output excp_t        o0_excp_type,
-    //output port 1
-    output               o1_valid,
-    output        [31:0] o1_pc,
-    output        [31:0] o1_inst,
-    output               o1_pred_br_taken,
-    output        [31:0] o1_pred_br_target,
-    output               o1_have_excp,
-    output excp_t        o1_excp_type
+    input             [ 1:0] o_size,
+    // output port 0
+    output            [31:0] o_a_pc,
+    output                   o_a_valid,
+    output optype_t          o_a_optype,
+    output opcode_t          o_a_opcode,
+    output            [ 4:0] o_a_dest,
+    output            [31:0] o_a_imm,
+    output                   o_a_pred_br_taken,
+    output            [31:0] o_a_pred_br_target,
+    output                   o_a_is_br,
+    output                   o_a_br_condition,
+    output            [31:0] o_a_br_target,
+    output                   o_a_is_jirl,
+    output                   o_a_have_excp,
+    output excp_t            o_a_excp_type,
+    output csr_addr_t        o_a_csr_addr,
+    output                   o_a_csr_wr,
+    output            [ 4:0] o_a_r1,
+    output            [ 4:0] o_a_r2,
+    output                   o_a_src2_is_imm,
+    // output port 1
+    output            [31:0] o_b_pc,
+    output                   o_b_valid,
+    output optype_t          o_b_optype,
+    output opcode_t          o_b_opcode,
+    output            [ 4:0] o_b_dest,
+    output            [31:0] o_b_imm,
+    output                   o_b_pred_br_taken,
+    output            [31:0] o_b_pred_br_target,
+    output                   o_b_is_br,
+    output                   o_b_br_condition,
+    output            [31:0] o_b_br_target,
+    output                   o_b_is_jirl,
+    output                   o_b_have_excp,
+    output excp_t            o_b_excp_type,
+    output csr_addr_t        o_b_csr_addr,
+    output                   o_b_csr_wr,
+    output            [ 4:0] o_b_r1,
+    output            [ 4:0] o_b_r2,
+    output                   o_b_src2_is_imm
 );
 
-  logic  [31:0] pc            [7:0];
-  logic  [31:0] inst          [7:0];
-  logic         pred_br_taken [7:0];
-  logic  [31:0] pred_br_target[7:0];
-  logic         have_excp     [7:0];
-  excp_t        excp_type     [7:0];
+  ibuf_entry_t data[8];
 
-  logic  [ 2:0] head;
-  logic  [ 2:0] tail;
-  logic  [ 3:0] length;
+`ifdef DIFFTEST_EN
+  difftest_t difftest[8];
+`endif
 
-  assign i_ready = length <= 4'd4; // 本周期最多可能进来两条，同时最多可能发起两条请求
+  logic [2:0] head;
+  logic [2:0] tail;
+  logic [3:0] length;
 
-  assign o0_valid = length >= 4'd1;
-  assign o0_pc = pc[head];
-  assign o0_inst = inst[head];
-  assign o0_pred_br_taken = pred_br_taken[head];
-  assign o0_pred_br_target = pred_br_target[head];
-  assign o0_have_excp = interrupt || have_excp[head];
-  assign o0_excp_type = interrupt ? INT : excp_type[head];
+  assign i_ready = length <= 4'd2; // 本周期最多可能进来两条，同时最多可能发起两条请求
 
-  assign o1_valid = length >= 4'd2;
-  assign o1_pc = pc[head+3'd1];
-  assign o1_inst = inst[head+3'd1];
-  assign o1_pred_br_taken = pred_br_taken[head+3'd1];
-  assign o1_pred_br_target = pred_br_target[head+3'd1];
-  assign o1_have_excp = have_excp[head+3'd1];
-  assign o1_excp_type = excp_type[head+3'd1];
+  assign o_a_valid = length >= 4'd1;
+  assign{o_a_pc,
+         o_a_optype,
+         o_a_opcode,
+         o_a_dest,
+         o_a_imm,
+         o_a_pred_br_taken,
+         o_a_pred_br_target,
+         o_a_is_br,
+         o_a_br_condition,
+         o_a_br_target,
+         o_a_is_jirl,
+         o_a_have_excp,
+         o_a_excp_type,
+         o_a_csr_addr,
+         o_a_csr_wr,
+         o_a_r1,
+         o_a_r2,
+         o_a_src2_is_imm
+        } = data[head];
+
+  assign o_b_valid = length >= 4'd2;
+  assign{o_b_pc,
+         o_b_optype,
+         o_b_opcode,
+         o_b_dest,
+         o_b_imm,
+         o_b_pred_br_taken,
+         o_b_pred_br_target,
+         o_b_is_br,
+         o_b_br_condition,
+         o_b_br_target,
+         o_b_is_jirl,
+         o_b_have_excp,
+         o_b_excp_type,
+         o_b_csr_addr,
+         o_b_csr_wr,
+         o_b_r1,
+         o_b_r2,
+         o_b_src2_is_imm
+        } = data[head + 1'b1];
+
+
+`ifdef DIFFTEST_EN
+  assign o_a_difftest = difftest[head];
+  assign o_b_difftest = difftest[head+1'b1];
+`endif
 
   always_ff @(posedge clk) begin
     if (reset || flush) begin
@@ -80,19 +189,54 @@ module ibuf (
       head   <= head + o_size;
       length <= length + {1'b0, i_size} - {1'b0, o_size};
       if (i_size == 2'd1 || i_size == 2'd2) begin
-        pc[tail] <= i0_pc;
-        inst[tail] <= i0_inst;
-        pred_br_taken[tail] <= i0_pred_br_taken;
-        pred_br_target[tail] <= i0_pred_br_target;
-        have_excp[tail] <= i0_have_excp;
-        excp_type[tail] <= i0_excp_type;
+        data[tail] <= {
+          i_a_pc,
+          i_a_optype,
+          i_a_opcode,
+          i_a_dest,
+          i_a_imm,
+          i_a_pred_br_taken,
+          i_a_pred_br_target,
+          i_a_is_br,
+          i_a_br_condition,
+          i_a_br_target,
+          i_a_is_jirl,
+          i_a_have_excp || interrupt,
+          interrupt ? INT : i_a_excp_type,
+          i_a_csr_addr,
+          i_a_csr_wr,
+          i_a_r1,
+          i_a_r2,
+          i_a_src2_is_imm
+        };
+`ifdef DIFFTEST_EN
+        difftest[tail] <= i_a_difftest;
+`endif
       end
       if (i_size == 2'd2) begin
-        pc[tail+3'd1] <= i1_pc;
-        inst[tail+3'd1] <= i1_inst;
-        pred_br_taken[tail+3'd1] <= i1_pred_br_taken;
-        pred_br_target[tail+3'd1] <= i1_pred_br_target;
-        have_excp[tail+3'd1] <= 1'b0;
+        data[tail+1'b1] <= {
+          i_b_pc,
+          i_b_optype,
+          i_b_opcode,
+          i_b_dest,
+          i_b_imm,
+          i_b_pred_br_taken,
+          i_b_pred_br_target,
+          i_b_is_br,
+          i_b_br_condition,
+          i_b_br_target,
+          i_b_is_jirl,
+          i_b_have_excp,
+          i_b_excp_type,
+          i_b_csr_addr,
+          i_b_csr_wr,
+          i_b_r1,
+          i_b_r2,
+          i_b_src2_is_imm
+        };
+`ifdef DIFFTEST_EN
+        difftest[tail+2'd1] <= i_b_difftest;
+`endif
       end
     end
   end

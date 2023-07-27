@@ -44,7 +44,7 @@ always_comb begin
     end
     else begin
         // only 4KB
-        pa[31:12] = tlb_s_result.ppn;
+        pa[31:12] = va[31:12]; //tlb_s_result.ppn;
         mat = tlb_s_result.mat;
         use_tlb = 1'b1;
     end
@@ -54,9 +54,9 @@ assign tlb_s_vppn = va[31:13];
 assign tlb_s_va_bit12 = va[12];
 assign tlb_s_asid = asid;
 
-assign page_fault = use_tlb && !tlb_s_result.found;
-assign page_invalid = use_tlb && !tlb_s_result.v;
-assign page_dirty = use_tlb && tlb_s_result.d == 1'b0;
-assign plv_fault = use_tlb && plv > tlb_s_result.plv;
+// assign page_fault = use_tlb && !tlb_s_result.found;
+// assign page_invalid = use_tlb && !tlb_s_result.v;
+// assign page_dirty = use_tlb && tlb_s_result.d == 1'b0;
+// assign plv_fault = use_tlb && plv > tlb_s_result.plv;
 
 endmodule

@@ -43,7 +43,6 @@ module ifu (
   logic        pending_data;
   logic        cancel;
   logic [31:0] pred_pc_start;
-
   assign pred_pc_start = mmu_i_double ? pc_start + 32'd8 : pc_start + 32'd4;
   assign pred_br_taken0 = 1'b0;
   assign pred_br_target0 = 32'd0;
