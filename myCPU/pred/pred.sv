@@ -4,7 +4,7 @@ module pred
     parameter RASIDLEN = $clog2(RASNUM),
     parameter RASCNTLEN = 8,
     parameter RASCNTMAX = (2**RASCNTLEN)-1,
-    parameter BHTNUM = 64,
+    parameter BHTNUM = 32,
     parameter BHTIDLEN = $clog2(BHTNUM),
     parameter BHRLEN = 7,
     parameter PHTNUM = 2**BHRLEN,
@@ -49,6 +49,7 @@ logic  [2:0]      ins_type_1    ;
   
 
 //BHT
+reg                 bht_v[BHTNUM - 1:0];//bhr_valid lazy_tag
 reg [BHRLEN - 1:0]  bht [BHTNUM - 1:0] ;//8bit bhr
 //search BHT
 logic   [BHTIDLEN - 1:0]    bht_index_0 ;
@@ -70,15 +71,15 @@ logic   [BHRLEN - 1:0]      hashed_index_w ;
 
 
 //adjust this hash while change BHTNUM/IDLEN
-assign bht_index_0 = fetch_pc_0[31:26]^fetch_pc_0[25:20]^fetch_pc_0[19:14]^fetch_pc_0[13:8]^fetch_pc_0[7:2];
-assign bht_index_1 = fetch_pc_1[31:26]^fetch_pc_1[25:20]^fetch_pc_1[19:14]^fetch_pc_1[13:8]^fetch_pc_1[7:2];
-assign bht_index_o = retire_pc[31:26]^retire_pc[25:20]^retire_pc[19:14]^retire_pc[13:8]^retire_pc[7:2];
-assign bht_index_w = wrong_pc[31:26]^wrong_pc[25:20]^wrong_pc[19:14]^wrong_pc[13:8]^wrong_pc[7:2];
+assign bht_index_0 = fetch_pc_0[31:27]^fetch_pc_0[26:22]^fetch_pc_0[21:17]^fetch_pc_0[16:12]^fetch_pc_0[11:7]^fetch_pc_0[6:2];
+assign bht_index_1 = fetch_pc_1[31:27]^fetch_pc_1[26:22]^fetch_pc_1[21:17]^fetch_pc_1[16:12]^fetch_pc_1[11:7]^fetch_pc_1[6:2];
+assign bht_index_o = retire_pc[31:27]^retire_pc[26:22]^retire_pc[21:17]^retire_pc[16:12]^retire_pc[11:7]^retire_pc[6:2];
+assign bht_index_w = wrong_pc[31:27]^wrong_pc[26:22]^wrong_pc[21:17]^wrong_pc[16:12]^wrong_pc[11:7]^wrong_pc[6:2];
 
-assign bht_val_0 = bht[bht_index_0];
-assign bht_val_1 = bht[bht_index_1];
-assign bht_val_o = bht[bht_index_o];
-assign bht_val_w = bht[bht_index_w];
+assign bht_val_0 = {7{bht_v[bht_index_0]}} & bht[bht_index_0];
+assign bht_val_1 = {7{bht_v[bht_index_1]}} & bht[bht_index_1];
+assign bht_val_o = {7{bht_v[bht_index_o]}} & bht[bht_index_o];
+assign bht_val_w = {7{bht_v[bht_index_w]}} & bht[bht_index_w];
 
 assign pc_frag_0 = fetch_pc_0[BHRLEN + 1 :2];
 assign pc_frag_1 = fetch_pc_1[BHRLEN + 1 :2];
@@ -94,13 +95,19 @@ integer i;
 always @(posedge clk) begin
     if(reset) begin
         for(i = 0; i < BHTNUM; i = i + 1) begin
-            bht[i] <= 0;
+            bht_v[i] <= 0;
         end
     end
     else if(update_orien_en) begin
-        for(i = BHRLEN - 1; i >= 0; i = i - 1) begin
-            bht[bht_index_o] <= bht[bht_index_o] << 1;
-            bht[bht_index_o][0] <= right_orien;
+        if(bht_v[bht_index_o]) begin
+            for(i = BHRLEN - 1; i >= 0; i = i - 1) begin
+                bht[bht_index_o] <= bht[bht_index_o] << 1;
+                bht[bht_index_o][0] <= right_orien;
+            end
+        end
+        else begin//need reset
+            bht[bht_index_o] <= right_orien;
+            bht_v[bht_index_o] <= 1;
         end
     end
 end
@@ -110,13 +117,14 @@ end
 //PHT
 // 00 01 10 11
 //untaken -> taken
+reg             pht_v [PHTNUM - 1:0];
 reg     [1:0]   pht   [PHTNUM - 1:0];
 //search PHT
 logic   [1:0]   pht_res_0           ;
 logic   [1:0]   pht_res_1           ;
 
-assign pht_res_0 = pht[hashed_index_0];
-assign pht_res_1 = pht[hashed_index_1];
+assign pht_res_0 = {2{pht_v[hashed_index_0]}} & pht[hashed_index_0];
+assign pht_res_1 = {2{pht_v[hashed_index_1]}} & pht[hashed_index_1];
 assign taken_0 = pht_res_0[1];
 assign taken_1 = pht_res_1[1];
 //reset & update PHT
@@ -124,19 +132,25 @@ integer j;
 always @(posedge clk) begin
     if(reset) begin
         for(j = 0; j < PHTNUM; j = j + 1) begin
-            pht[j] <= 0;
+            pht_v[j] <= 0;
         end
     end
     else if(update_orien_en) begin
-        if(right_orien) begin
-            if(pht[hashed_index_o] != 2'b11)begin    
-                pht[hashed_index_o] <= pht[hashed_index_o] + 1;
+        if(pht_v[hashed_index_o]) begin
+            if(right_orien) begin
+                if(pht[hashed_index_o] != 2'b11)begin    
+                    pht[hashed_index_o] <= pht[hashed_index_o] + 1;
+                end
+            end
+            else begin
+                if(pht[hashed_index_o] != 2'b00)begin    
+                    pht[hashed_index_o] <= pht[hashed_index_o] - 1;
+                end
             end
         end
-        else begin
-            if(pht[hashed_index_o] != 2'b00)begin    
-                pht[hashed_index_o] <= pht[hashed_index_o] - 1;
-            end
+        else begin//need reset, always 00 or 01
+            pht_v[hashed_index_o] <= 1;
+            pht[hashed_index_o] <= {1'b0, right_orien};
         end
     end
 end
@@ -203,24 +217,26 @@ end
 
 
 //Target Cache
+reg             tc_v  [TCNUM - 1:0];
 reg     [31:0]  tc    [TCNUM - 1:0];
 //search Target Cache
 logic   [31:0]  tc_res_0           ;
-logic   [31:0]    tc_res_1           ;
+logic   [31:0]  tc_res_1           ;
 
 
-assign tc_res_0 = tc[hashed_index_0];
-assign tc_res_1 = tc[hashed_index_1];
+assign tc_res_0 = {32{tc_v[hashed_index_0]}} & tc[hashed_index_0];
+assign tc_res_1 = {32{tc_v[hashed_index_1]}} & tc[hashed_index_1];
 //reset & update Target Cache
 integer l;
 always @(posedge clk) begin
     if(reset) begin
         for(l = 0; l < TCNUM; l = l + 1) begin
-            tc[l] <= 0;
+            tc_v[l] <= 0;
         end
     end
     else if(branch_mistaken && (ins_type_w == 3'b100||ins_type_w == 3'b011)) begin
         tc[hashed_index_w] <= right_target;
+        tc_v[hashed_index_w] <= 1;
     end
 end
 
