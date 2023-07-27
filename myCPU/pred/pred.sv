@@ -17,7 +17,7 @@ module pred
     input  [31:0]     fetch_pc_0    ,
     input  [31:0]     fetch_pc_1    ,
 
-    input             dual_issue    ,
+    //input             dual_issue    ,
     
 
     output [31:0]     ret_pc_0        ,
@@ -38,7 +38,7 @@ module pred
 
 );
 
-//not jump instruction  -> 000  while both not jmp, pc_1+0x4
+//not jump instruction  -> 000  while both not jmp, pc_0+0x8
 //direct jmp            -> 001, predicted in btb
 //call                  -> 010, predicted in btb, push pc+0x4 into RAS
 //ret:  jirl r0, r1, 0  -> 011, using RAS
@@ -143,71 +143,70 @@ end
 
 
 
-//RAS
-reg     [31:0]              ras_pc      [RASNUM - 1:0];
-reg     [RASCNTLEN - 1:0]   ras_counter [RASNUM - 1:0];
-reg     [$clog2(RASNUM)-1:0]ras_top                   ;
-//search RAS
-reg     [31:0]              ras_res;
-logic   [31:0]              ras_top_val;
-logic   [31:0]              ras_ret_pc;
-logic   [31:0]              ras_ret_pc_0;
-logic   [31:0]              ras_ret_pc_1;
-logic                       ras_push;
-logic                       ras_pop;
+// //RAS
+// reg     [31:0]              ras_pc      [RASNUM - 1:0];
+// reg     [RASCNTLEN - 1:0]   ras_counter [RASNUM - 1:0];
+// reg     [$clog2(RASNUM)-1:0]ras_top                   ;
+// //search RAS
+// reg     [31:0]              ras_res;
+// logic   [31:0]              ras_top_val;
+// logic   [31:0]              ras_ret_pc;
+// logic   [31:0]              ras_ret_pc_0;
+// logic   [31:0]              ras_ret_pc_1;
+// logic   [2:0]               ras_ins_type;
 
 
-assign ras_top_val = ras_pc[ras_top];
-assign ras_ret_pc = ({32{ins_type_0 == 3'b010}} & ras_ret_pc_0 )|
-                    ({32{ins_type_0 == 3'b010 && dual_issue}} & ras_ret_pc_1 )|
-                    32'b0;
-assign ras_ret_pc_0 = {fetch_pc_0[31:2] + 1'b1,fetch_pc_0[1:0]};
-assign ras_ret_pc_1 = {fetch_pc_1[31:2] + 1'b1,fetch_pc_1[1:0]};
-assign ras_push = ins_type_0 == 3'b010 || (ins_type_1 == 3'b010 && dual_issue);
-assign ras_pop = ins_type_0 == 3'b011 || (ins_type_1 == 3'b011 && dual_issue);
-//reset & push & pop RAS
+// assign ras_top_val = ras_pc[ras_top];
+// assign ras_ins_type = (ins_type_0 == 3'b010 || ins_type_0 == 3'b011) ? ins_type_0 : ins_type_1 & {32{dual_issue}}; 
+// assign ras_ret_pc = (ins_type_0 == 3'b010 || ins_type_0 == 3'b011) ? ras_ret_pc_0 : ras_ret_pc_1;
+// assign ras_ret_pc_0 = {fetch_pc_0[31:3] + 1'b1,fetch_pc_0[2:0]};
+// assign ras_ret_pc_1 = {fetch_pc_1[31:3] + 1'b1,fetch_pc_1[2:0]};
 
-integer k;
-always @(posedge clk) begin
-    if(reset) begin
-        for(k = 0; k < RASNUM; k = k + 1) begin
-            ras_pc[k] <= 0;
-            ras_counter[k] <=0;
-        end
-        ras_top <= 0;
-    end
-    else begin
-        //call->push
-        if(ras_push) begin
-            //recursion counter increase
-            if(ras_ret_pc == ras_top_val && ras_counter[ras_top] != RASCNTMAX) begin
-                ras_counter[ras_top] <= ras_counter[ras_top] + 1;
-            end
-            else begin
-                ras_top <= ras_top + 1;
-                ras_pc[ras_top] <= ras_ret_pc;
-                ras_counter[ras_top] <= 1;
-            end
-        end
-        //ret->pop
-        else if(ras_pop) begin
-            ras_res <= ras_top_val;
-            if(ras_counter[ras_top] <= 1) begin
-                ras_counter[ras_top] <= 0;
-                ras_top <= ras_top - 1;
-            end
-            else begin
-                ras_counter[ras_top] = ras_counter[ras_top] - 1;
-            end
-        end
-    end
-end
+// //reset & push & pop RAS
+
+// integer k;
+// always @(posedge clk) begin
+//     if(reset) begin
+//         for(k = 0; k < RASNUM; k = k + 1) begin
+//             ras_pc[k] <= 0;
+//             ras_counter[k] <=0;
+//         end
+//         ras_top <= 0;
+//     end
+//     else begin
+//         //call->push
+//         if(ras_ins_type == 3'b010) begin
+//             //recursion counter increase
+//             if(ras_ret_pc == ras_top_val && ras_counter[ras_top] != RASCNTMAX) begin
+//                 ras_counter[ras_top] <= ras_counter[ras_top] + 1;
+//             end
+//             else begin
+//                 ras_top <= ras_top + 1;
+//                 ras_pc[ras_top] <= ras_ret_pc;
+//                 ras_counter[ras_top] <= 1;
+//             end
+//         end
+//         //ret->pop
+//         else if(ras_ins_type == 3'b011) begin
+//             ras_res <= ras_top_val;
+//             if(ras_counter[ras_top] <= 1) begin
+//                 ras_counter[ras_top] <= 0;
+//                 ras_top <= ras_top - 1;
+//             end
+//             else begin
+//                 ras_counter[ras_top] = ras_counter[ras_top] - 1;
+//             end
+//         end
+//     end
+// end
+
+
 
 //Target Cache
 reg     [31:0]  tc    [TCNUM - 1:0];
 //search Target Cache
-logic           tc_res_0           ;
-logic           tc_res_1           ;
+logic   [31:0]  tc_res_0           ;
+logic   [31:0]  tc_res_1           ;
 
 
 assign tc_res_0 = tc[hashed_index_0];
@@ -220,7 +219,7 @@ always @(posedge clk) begin
             tc[l] <= 0;
         end
     end
-    else if(branch_mistaken && ins_type_w == 3'b100) begin
+    else if(branch_mistaken && (ins_type_w == 3'b100||ins_type_w == 3'b011)) begin
         tc[hashed_index_w] <= right_target;
     end
 end
@@ -250,16 +249,14 @@ btb btb(
 assign ret_pc_0 = ({32{ins_type_0 == 3'b000}} & {fetch_pc_0[31:3] + 1'b1,3'b0}) |
                 ({32{ins_type_0 == 3'b001}} & btb_res_0)|
                 ({32{ins_type_0 == 3'b010}} & btb_res_0)|
-                ({32{ins_type_0 == 3'b011}} & ras_res)|
+                ({32{ins_type_0 == 3'b011}} & tc_res_0)|
                 ({32{ins_type_0 == 3'b100}} & tc_res_0)|
-                ({32{ins_type_0 == 3'b101}} & btb_res_0)|
                 32'b0;
 assign ret_pc_1 = ({32{ins_type_1 == 3'b000}} & {fetch_pc_1[31:3] + 1'b1,3'b0}) |
                 ({32{ins_type_1 == 3'b001}} & btb_res_1)|
                 ({32{ins_type_1 == 3'b010}} & btb_res_1)|
-                ({32{ins_type_1 == 3'b011}} & ras_res)|
+                ({32{ins_type_1 == 3'b011}} & tc_res_1)|
                 ({32{ins_type_1 == 3'b100}} & tc_res_1)|
-                ({32{ins_type_1 == 3'b101}} & btb_res_1)|
                 32'b0;
 
 
