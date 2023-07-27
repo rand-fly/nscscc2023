@@ -872,7 +872,7 @@ module core (
   assign allow_issue_b = !ibuf_no_out && allow_issue_a
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
                       && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB
-                      && ro_b_optype != OP_TLB && ro_b_optype != OP_MEM;
+                      && ro_b_optype != OP_TLB && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
