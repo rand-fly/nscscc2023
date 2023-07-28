@@ -1096,7 +1096,7 @@ module core (
       .reset(reset),
       .ready(lsu_b_ready),
       .valid(EX1_b_valid && EX1_b_optype == OP_MEM),
-      .start(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling && !lsu_b_have_excp && !lsu_a_have_excp && !ex2_b_br_mistaken),
+      .start(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling && !lsu_b_have_excp && !lsu_a_have_excp && !ex1_a_br_mistaken && !ex2_b_br_mistaken),
       .base(ex1_b_src1),
       .offset(EX1_b_imm),
       .mem_type(mem_type_t'(EX1_b_opcode[3:2])),
