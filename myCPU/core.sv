@@ -87,10 +87,9 @@ module core (
   opcode_t          id_a_opcode;
   logic      [ 4:0] id_a_dest;
   logic      [31:0] id_a_imm;
-  logic             id_a_is_br;
+  br_type_t         id_a_br_type;
   logic             id_a_br_condition;
   logic      [31:0] id_a_br_target;
-  logic             id_a_is_jirl;
   logic             id_a_have_excp;
   excp_t            id_a_excp_type;
   csr_addr_t        id_a_csr_addr;
@@ -104,10 +103,9 @@ module core (
   opcode_t          id_b_opcode;
   logic      [ 4:0] id_b_dest;
   logic      [31:0] id_b_imm;
-  logic             id_b_is_br;
+  br_type_t         id_b_br_type;
   logic             id_b_br_condition;
   logic      [31:0] id_b_br_target;
-  logic             id_b_is_jirl;
   logic             id_b_have_excp;
   excp_t            id_b_excp_type;
   csr_addr_t        id_b_csr_addr;
@@ -136,10 +134,10 @@ module core (
   logic      [31:0] ro_a_imm;
   logic             ro_a_pred_br_taken;
   logic      [31:0] ro_a_pred_br_target;
-  logic             ro_a_is_br;
+  br_type_t         ro_a_br_type;
   logic             ro_a_br_condition;
   logic      [31:0] ro_a_br_target;
-  logic             ro_a_is_jirl;
+  logic             ro_a_br_taken;
   logic             ro_a_have_excp;
   excp_t            ro_a_excp_type;
   csr_addr_t        ro_a_csr_addr;
@@ -147,8 +145,7 @@ module core (
   logic      [ 4:0] ro_a_r1;
   logic      [ 4:0] ro_a_r2;
   logic             ro_a_src2_is_imm;
-  logic             ro_a_br_mistaken;
-  logic             ro_a_br_taken;
+
   logic             ro_b_valid;
   logic      [31:0] ro_b_pc;
   optype_t          ro_b_optype;
@@ -157,10 +154,10 @@ module core (
   logic      [31:0] ro_b_imm;
   logic             ro_b_pred_br_taken;
   logic      [31:0] ro_b_pred_br_target;
-  logic             ro_b_is_br;
+  br_type_t         ro_b_br_type;
   logic             ro_b_br_condition;
   logic      [31:0] ro_b_br_target;
-  logic             ro_b_is_jirl;
+  logic             ro_b_br_taken;
   logic             ro_b_have_excp;
   excp_t            ro_b_excp_type;
   csr_addr_t        ro_b_csr_addr;
@@ -168,8 +165,6 @@ module core (
   logic      [ 4:0] ro_b_r1;
   logic      [ 4:0] ro_b_r2;
   logic             ro_b_src2_is_imm;
-  logic             ro_b_br_mistaken;
-  logic             ro_b_br_taken;
 `ifdef DIFFTEST_EN
   difftest_t ro_a_difftest;
   difftest_t ro_b_difftest;
@@ -227,7 +222,12 @@ module core (
 
   //from branch ctrl
   logic                      br_mistaken;
-  logic       [        31:0] correct_target;
+  br_type_t                  br_type;
+  logic       [        31:0] wrong_pc;
+  logic       [        31:0] right_target;
+  logic                      update_orien_en;
+  logic       [        31:0] retire_pc;
+  logic                      right_orien;
 
   //between mmu and ifu/lsu
   logic                      mmu_i_req;
@@ -298,12 +298,12 @@ module core (
   logic       [        31:0] EX1_a_src2_passed;
   logic       [        31:0] EX1_a_src2_stalled;
   logic       [        31:0] EX1_a_imm;
-  logic                      EX1_a_is_br;
+  br_type_t                  EX1_a_br_type;
   logic                      EX1_a_br_condition;
   logic       [        31:0] EX1_a_br_target;
-  logic                      EX1_a_is_jirl;
   logic                      EX1_a_pred_br_taken;
   logic       [        31:0] EX1_a_pred_br_target;
+  logic                      EX1_a_br_taken;
   logic                      EX1_a_have_excp;
   excp_t                     EX1_a_excp_type;
   csr_addr_t                 EX1_a_csr_addr;
@@ -321,12 +321,12 @@ module core (
   logic       [        31:0] EX1_b_src2_passed;
   logic       [        31:0] EX1_b_src2_stalled;
   logic       [        31:0] EX1_b_imm;
-  logic                      EX1_b_is_br;
+  br_type_t                  EX1_b_br_type;
   logic                      EX1_b_br_condition;
   logic       [        31:0] EX1_b_br_target;
-  logic                      EX1_b_is_jirl;
   logic                      EX1_b_pred_br_taken;
   logic       [        31:0] EX1_b_pred_br_target;
+  logic                      EX1_b_br_taken;
   logic                      EX1_b_have_excp;
   excp_t                     EX1_b_excp_type;
   csr_addr_t                 EX1_b_csr_addr;
@@ -360,6 +360,8 @@ module core (
   logic      [31:0] EX2_a_src1;
   logic      [31:0] EX2_a_src2;
   logic      [31:0] EX2_a_alu_result;
+  br_type_t         EX2_a_br_type;
+  logic             EX2_a_br_taken;
   logic             EX2_a_have_excp;
   excp_t            EX2_a_excp_type;
   logic      [31:0] EX2_a_excp_addr;
@@ -377,12 +379,12 @@ module core (
   logic             EX2_b_src2_delayed;
   logic      [31:0] EX2_b_alu_result;
   logic      [31:0] EX2_b_imm;
-  logic             EX2_b_is_br;
+  br_type_t         EX2_b_br_type;
   logic             EX2_b_br_condition;
   logic      [31:0] EX2_b_br_target;
-  logic             EX2_b_is_jirl;
   logic             EX2_b_pred_br_taken;
   logic      [31:0] EX2_b_pred_br_target;
+  logic             EX2_b_br_taken;
   logic             EX2_b_have_excp;
   excp_t            EX2_b_excp_type;
   logic      [31:0] EX2_b_excp_addr;
@@ -393,36 +395,40 @@ module core (
   difftest_t EX2_b_difftest;
 `endif
   // ex2 stage signal
-  logic         ex2_a_ok;
-  logic         ex2_b_ok;
-  logic         ex2_stall;
-  logic  [31:0] ex2_b_src1;
-  logic  [31:0] ex2_b_src2;
-  logic         ex2_b_br_taken;
-  logic  [31:0] ex2_b_br_target;
-  logic         ex2_b_br_mistaken;
-  logic  [31:0] ex2_csr_mask;
-  logic  [31:0] ex2_csr_wdata;
-  logic         ex2_have_excp;
-  excp_t        ex2_excp_type;
-  logic  [31:0] ex2_excp_pc;
-  logic  [31:0] ex2_excp_addr;
+  logic            ex2_a_ok;
+  logic            ex2_b_ok;
+  logic            ex2_stall;
+  logic     [31:0] ex2_b_src1;
+  logic     [31:0] ex2_b_src2;
+  logic            ex2_b_br_taken;
+  logic     [31:0] ex2_b_br_target;
+  logic            ex2_b_br_mistaken;
+  logic     [31:0] ex2_csr_mask;
+  logic     [31:0] ex2_csr_wdata;
+  logic            ex2_have_excp;
+  excp_t           ex2_excp_type;
+  logic     [31:0] ex2_excp_pc;
+  logic     [31:0] ex2_excp_addr;
 
   // WB stage reg
-  logic         WB_a_valid;
-  logic         WB_a_ok;
-  logic  [31:0] WB_a_pc;
-  logic  [ 4:0] WB_a_dest;
-  logic  [31:0] WB_a_result;
-  logic         WB_a_have_excp;
-  excp_t        WB_a_excp_type;
-  logic         WB_b_valid;
-  logic         WB_b_ok;
-  logic  [31:0] WB_b_pc;
-  logic  [ 4:0] WB_b_dest;
-  logic  [31:0] WB_b_result;
-  logic         WB_b_have_excp;
-  excp_t        WB_b_excp_type;
+  logic            WB_a_valid;
+  logic            WB_a_ok;
+  logic     [31:0] WB_a_pc;
+  logic     [ 4:0] WB_a_dest;
+  logic     [31:0] WB_a_result;
+  br_type_t        WB_a_br_type;
+  logic            WB_a_br_taken;
+  logic            WB_a_have_excp;
+  excp_t           WB_a_excp_type;
+  logic            WB_b_valid;
+  logic            WB_b_ok;
+  logic     [31:0] WB_b_pc;
+  logic     [ 4:0] WB_b_dest;
+  logic     [31:0] WB_b_result;
+  br_type_t        WB_b_br_type;
+  logic            WB_b_br_taken;
+  logic            WB_b_have_excp;
+  excp_t           WB_b_excp_type;
 `ifdef DIFFTEST_EN
   difftest_t WB_a_difftest;
   difftest_t WB_b_difftest;
@@ -473,7 +479,12 @@ module core (
       .have_excp      (ifu_have_excp),
       .excp_type      (ifu_excp_type),
       .br_mistaken    (br_mistaken),
-      .correct_target (correct_target),
+      .br_type        (br_type),
+      .right_target   (right_target),
+      .wrong_pc       (wrong_pc),
+      .update_orien_en(update_orien_en),
+      .retire_pc      (retire_pc),
+      .right_orien    (right_orien),
       .raise_excp     (ex2_have_excp),
       .excp_target    (excp_target),
       .replay         (replay),
@@ -531,10 +542,9 @@ module core (
       .opcode        (id_a_opcode),
       .dest          (id_a_dest),
       .imm           (id_a_imm),
-      .is_br         (id_a_is_br),
+      .br_type       (id_a_br_type),
       .br_condition  (id_a_br_condition),
       .br_target     (id_a_br_target),
-      .is_jirl       (id_a_is_jirl),
       .have_excp     (id_a_have_excp),
       .excp_type     (id_a_excp_type),
       .csr_addr      (id_a_csr_addr),
@@ -556,10 +566,9 @@ module core (
       .opcode        (id_b_opcode),
       .dest          (id_b_dest),
       .imm           (id_b_imm),
-      .is_br         (id_b_is_br),
+      .br_type       (id_b_br_type),
       .br_condition  (id_b_br_condition),
       .br_target     (id_b_br_target),
-      .is_jirl       (id_b_is_jirl),
       .have_excp     (id_b_have_excp),
       .excp_type     (id_b_excp_type),
       .csr_addr      (id_b_csr_addr),
@@ -573,23 +582,35 @@ module core (
 
   always_comb begin
     if (ex2_b_br_mistaken) begin
-      br_mistaken = 1'b1;
-      correct_target = ex2_b_br_target;
+      br_mistaken  = 1'b1;
+      br_type      = EX2_b_br_type;
+      wrong_pc     = EX2_b_pc;
+      right_target = ex2_b_br_taken ? ex2_b_br_target : EX2_b_pc + 32'd4;
     end else if (ex1_a_br_mistaken) begin
-      br_mistaken = 1'b1;
-      correct_target = ex1_a_br_target;
+      br_mistaken  = 1'b1;
+      br_type      = EX1_a_br_type;
+      wrong_pc     = EX1_a_pc;
+      right_target = ex1_a_br_taken ? ex1_a_br_target : EX1_a_pc + 32'd4;
     end else if (ex1_b_br_mistaken) begin
-      br_mistaken = 1'b1;
-      correct_target = ex1_b_br_target;
+      br_mistaken  = 1'b1;
+      br_type      = EX1_b_br_type;
+      wrong_pc     = EX1_b_pc;
+      right_target = ex1_b_br_taken ? ex1_b_br_target : EX1_b_pc + 32'd4;
     end else if (ID_a_valid && id_a_br_mistaken) begin
       br_mistaken = 1'b1;
-      correct_target = id_a_br_target;
+      br_type = id_a_br_type;
+      wrong_pc = ID_a_pc;
+      right_target = (id_a_br_taken || id_a_br_type == BR_COND && ID_a_pred_br_taken) ? id_a_br_target : ID_a_pc + 32'd4;
     end else if (ID_b_valid && id_b_br_mistaken) begin
       br_mistaken = 1'b1;
-      correct_target = id_b_br_target;
+      br_type = id_b_br_type;
+      wrong_pc = ID_b_pc;
+      right_target = (id_b_br_taken || id_b_br_type == BR_COND && ID_b_pred_br_taken) ? id_b_br_target : ID_b_pc + 32'd4;
     end else begin
-      br_mistaken = 1'b0;
-      correct_target = 32'd0;
+      br_mistaken  = 1'b0;
+      br_type      = BR_NOP;
+      wrong_pc     = 32'd0;
+      right_target = 32'd0;
     end
   end
 
@@ -630,14 +651,14 @@ module core (
       .i_a_opcode        (id_a_opcode),
       .i_a_dest          (id_a_dest),
       .i_a_imm           (id_a_imm),
-      .i_a_pred_br_taken (ifu_pred_br_taken0),
-      .i_a_pred_br_target(ifu_pred_br_target0),
-      .i_a_is_br         (id_a_is_br),
+      .i_a_pred_br_taken (ID_a_pred_br_taken),
+      .i_a_pred_br_target(ID_a_pred_br_target),
+      .i_a_br_type       (id_a_br_type),
       .i_a_br_condition  (id_a_br_condition),
       .i_a_br_target     (id_a_br_target),
-      .i_a_is_jirl       (id_a_is_jirl),
-      .i_a_have_excp     (ifu_have_excp || id_a_have_excp),
-      .i_a_excp_type     (ifu_have_excp ? ifu_excp_type : id_a_excp_type),
+      .i_a_br_taken      (id_a_br_taken),
+      .i_a_have_excp     (ID_a_have_excp || id_a_have_excp),
+      .i_a_excp_type     (ID_a_have_excp ? ID_a_excp_type : id_a_excp_type),
       .i_a_csr_addr      (id_a_csr_addr),
       .i_a_csr_wr        (id_a_csr_wr),
       .i_a_r1            (id_a_r1),
@@ -648,12 +669,12 @@ module core (
       .i_b_opcode        (id_b_opcode),
       .i_b_dest          (id_b_dest),
       .i_b_imm           (id_b_imm),
-      .i_b_pred_br_taken (ifu_pred_br_taken1),
-      .i_b_pred_br_target(ifu_pred_br_target1),
-      .i_b_is_br         (id_b_is_br),
+      .i_b_pred_br_taken (ID_b_pred_br_taken),
+      .i_b_pred_br_target(ID_b_pred_br_target),
+      .i_b_br_type       (id_b_br_type),
       .i_b_br_condition  (id_b_br_condition),
       .i_b_br_target     (id_b_br_target),
-      .i_b_is_jirl       (id_b_is_jirl),
+      .i_b_br_taken      (id_b_br_taken),
       .i_b_have_excp     (id_b_have_excp),
       .i_b_excp_type     (id_b_excp_type),
       .i_b_csr_addr      (id_b_csr_addr),
@@ -678,10 +699,10 @@ module core (
       .o_a_imm           (ro_a_imm),
       .o_a_pred_br_taken (ro_a_pred_br_taken),
       .o_a_pred_br_target(ro_a_pred_br_target),
-      .o_a_is_br         (ro_a_is_br),
+      .o_a_br_type       (ro_a_br_type),
       .o_a_br_condition  (ro_a_br_condition),
       .o_a_br_target     (ro_a_br_target),
-      .o_a_is_jirl       (ro_a_is_jirl),
+      .o_a_br_taken      (ro_a_br_taken),
       .o_a_have_excp     (ro_a_have_excp),
       .o_a_excp_type     (ro_a_excp_type),
       .o_a_csr_addr      (ro_a_csr_addr),
@@ -697,10 +718,10 @@ module core (
       .o_b_imm           (ro_b_imm),
       .o_b_pred_br_taken (ro_b_pred_br_taken),
       .o_b_pred_br_target(ro_b_pred_br_target),
-      .o_b_is_br         (ro_b_is_br),
+      .o_b_br_type       (ro_b_br_type),
       .o_b_br_condition  (ro_b_br_condition),
       .o_b_br_target     (ro_b_br_target),
-      .o_b_is_jirl       (ro_b_is_jirl),
+      .o_b_br_taken      (ro_b_br_taken),
       .o_b_have_excp     (ro_b_have_excp),
       .o_b_excp_type     (ro_b_excp_type),
       .o_b_csr_addr      (ro_b_csr_addr),
@@ -872,7 +893,7 @@ module core (
   assign allow_issue_b = !ibuf_no_out && allow_issue_a
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
                       && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB
-                      && ro_b_optype != OP_TLB && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
+                      && ro_b_optype != OP_TLB && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM/* && (ro_a_opcode[3]^ro_b_opcode[3])*/);
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
@@ -895,12 +916,12 @@ module core (
       EX1_a_src2_source    <= ro_a_src2_source;
       EX1_a_src2_passed    <= ro_a_src2_passed;
       EX1_a_imm            <= ro_a_imm;
-      EX1_a_is_br          <= ro_a_is_br;
+      EX1_a_br_type        <= ro_a_br_type;
       EX1_a_br_condition   <= ro_a_br_condition;
       EX1_a_br_target      <= ro_a_br_target;
-      EX1_a_is_jirl        <= ro_a_is_jirl;
       EX1_a_pred_br_taken  <= ro_a_pred_br_taken;
       EX1_a_pred_br_target <= ro_a_pred_br_target;
+      EX1_a_br_taken       <= ro_a_br_taken;
       EX1_a_have_excp      <= ro_a_have_excp;
       EX1_a_excp_type      <= ro_a_excp_type;
       EX1_a_csr_addr       <= ro_a_csr_addr;
@@ -923,12 +944,12 @@ module core (
       EX1_b_src2_source    <= ro_b_src2_source;
       EX1_b_src2_passed    <= ro_b_src2_passed;
       EX1_b_imm            <= ro_b_imm;
-      EX1_b_is_br          <= ro_b_is_br;
+      EX1_b_br_type        <= ro_b_br_type;
       EX1_b_br_condition   <= ro_b_br_condition;
       EX1_b_br_target      <= ro_b_br_target;
-      EX1_b_is_jirl        <= ro_b_is_jirl;
       EX1_b_pred_br_taken  <= ro_b_pred_br_taken;
       EX1_b_pred_br_target <= ro_b_pred_br_target;
+      EX1_b_br_taken       <= ro_b_br_taken;
       EX1_b_have_excp      <= ro_b_have_excp;
       EX1_b_excp_type      <= ro_b_excp_type;
       EX1_b_csr_addr       <= id_b_csr_addr;
@@ -1005,9 +1026,21 @@ module core (
       .result(alu_a_result)
   );
 
-  assign ex1_a_br_taken = EX1_a_is_br && (EX1_a_is_jirl || EX1_a_br_condition == alu_a_result[0]);
-  assign ex1_a_br_target = EX1_a_is_jirl ? ex1_a_src1 + EX1_a_br_target : EX1_a_br_target;
-  assign ex1_a_br_mistaken_long = EX1_a_valid && ex1_a_br_taken != EX1_a_pred_br_taken;
+  always_comb begin
+    if (EX1_a_br_type == BR_COND) begin
+      ex1_a_br_taken = EX1_a_br_condition == alu_a_result[0];
+      ex1_a_br_target = EX1_a_br_target;
+      ex1_a_br_mistaken_long = EX1_a_valid && ex1_a_br_taken != EX1_a_pred_br_taken;
+    end else if (EX1_a_br_type == BR_INDIR || EX1_a_br_type == BR_RET) begin
+      ex1_a_br_taken = 1'b1;
+      ex1_a_br_target = ex1_a_src1 + EX1_a_br_target;
+      ex1_a_br_mistaken_long = EX1_a_valid && (!EX1_a_pred_br_taken || ex1_a_br_target != EX1_a_pred_br_target);
+    end else begin
+      ex1_a_br_taken = 1'b0;
+      ex1_a_br_target = 32'd0;
+      ex1_a_br_mistaken_long = 1'b0;
+    end
+  end
   assign ex1_a_br_mistaken = ex1_a_br_mistaken_long && !EX1_stalling;
 
   alu u_alu_b1 (
@@ -1017,9 +1050,21 @@ module core (
       .result(alu_b1_result)
   );
 
-  assign ex1_b_br_taken = EX1_b_is_br && (EX1_b_is_jirl || EX1_b_br_condition == alu_b1_result[0]);
-  assign ex1_b_br_target = EX1_b_is_jirl ? ex1_b_src1 + EX1_b_br_target : EX1_b_br_target;
-  assign ex1_b_br_mistaken = EX1_b_valid && !EX1_stalling && !EX1_b_delayed && ex1_b_br_taken != EX1_b_pred_br_taken;
+  always_comb begin
+    if (!EX1_b_delayed && EX1_b_br_type == BR_COND) begin
+      ex1_b_br_taken = EX1_b_br_condition == alu_b1_result[0];
+      ex1_b_br_target = EX1_b_br_target;
+      ex1_b_br_mistaken = EX1_b_valid && !EX1_stalling && ex1_b_br_taken != EX1_b_pred_br_taken;
+    end else if (!EX1_b_delayed && (EX1_b_br_type == BR_INDIR || EX1_b_br_type == BR_RET)) begin
+      ex1_b_br_taken = 1'b1;
+      ex1_b_br_target = ex1_b_src1 + EX1_b_br_target;
+      ex1_b_br_mistaken = EX1_b_valid && !EX1_stalling && (!EX1_b_pred_br_taken || ex1_b_br_target != EX1_b_pred_br_target);
+    end else begin
+      ex1_b_br_taken = 1'b0;
+      ex1_b_br_target = 32'd0;
+      ex1_b_br_mistaken = 1'b0;
+    end
+  end
 
   mul u_mul_a (
       .clk   (clk),
@@ -1156,6 +1201,8 @@ module core (
       EX2_a_src1       <= ex1_a_src1;
       EX2_a_src2       <= ex1_a_src2;
       EX2_a_alu_result <= alu_a_result;
+      EX2_a_br_type    <= EX1_a_br_type;
+      EX2_a_br_taken   <= ex1_a_br_taken || EX1_a_br_taken;
       EX2_a_have_excp  <= EX1_a_have_excp || lsu_a_have_excp;
       EX2_a_excp_type  <= lsu_a_have_excp ? lsu_a_excp_type : EX1_a_excp_type;
       EX2_a_excp_addr  <= u_lsu_a.addr;
@@ -1203,12 +1250,12 @@ module core (
       EX2_b_src2_delayed   <= EX1_b_src2_source == SRC_DELAYED;
       EX2_b_alu_result     <= alu_b1_result;
       EX2_b_imm            <= EX1_b_imm;
-      EX2_b_is_br          <= EX1_b_is_br;
+      EX2_b_br_type        <= EX1_b_br_type;
       EX2_b_br_condition   <= EX1_b_br_condition;
       EX2_b_br_target      <= EX1_b_br_target;
-      EX2_b_is_jirl        <= EX1_b_is_jirl;
       EX2_b_pred_br_taken  <= EX1_b_pred_br_taken;
       EX2_b_pred_br_target <= EX1_b_pred_br_target;
+      EX2_b_br_taken       <= ex1_b_br_taken || EX1_b_br_taken;
       EX2_b_have_excp      <= EX1_b_have_excp || lsu_b_have_excp;
       EX2_b_excp_type      <= lsu_b_have_excp ? lsu_b_excp_type : EX1_b_excp_type;
       EX2_b_excp_addr      <= u_lsu_b.addr;
@@ -1289,9 +1336,22 @@ module core (
       .result(alu_b2_result)
   );
 
-  assign ex2_b_br_taken = EX2_b_is_br && (EX2_b_is_jirl || EX2_b_br_condition == alu_b2_result[0]);
-  assign ex2_b_br_target = EX2_b_is_jirl ? ex2_b_src1 + EX2_b_br_target : EX2_b_br_target;
-  assign ex2_b_br_mistaken = EX2_b_valid && !EX2_stalling && ex2_b_br_taken != EX2_b_pred_br_taken;
+  always_comb begin
+    if (EX2_b_delayed && EX2_b_br_type == BR_COND) begin
+      ex2_b_br_taken = EX2_b_br_condition == alu_b2_result[0];
+      ex2_b_br_target = EX2_b_br_target;
+      ex2_b_br_mistaken = EX2_b_valid && !EX2_stalling && ex2_b_br_taken != EX2_b_pred_br_taken;
+    end else if (EX2_b_delayed && (EX2_b_br_type == BR_INDIR || EX2_b_br_type == BR_RET)) begin
+      ex2_b_br_taken = 1'b1;
+      ex2_b_br_target = ex2_b_src1 + EX2_b_br_target;
+      ex2_b_br_mistaken = EX2_b_valid && !EX2_stalling && (!EX2_b_pred_br_taken || ex2_b_br_target != EX2_b_pred_br_target);
+    end else begin
+      ex2_b_br_taken = 1'b0;
+      ex2_b_br_target = 32'd0;
+      ex2_b_br_mistaken = 1'b0;
+    end
+  end
+
   assign ex2_csr_mask = EX2_a_optype == OP_CSR ? (EX2_a_csr_wr ? 32'hffffffff :EX2_a_src1): (EX2_b_csr_wr ? 32'hffffffff :ex2_b_src1);
   assign ex2_csr_wdata = EX2_a_optype == OP_CSR ? EX2_a_src2 : ex2_b_src2;
 
@@ -1310,6 +1370,8 @@ module core (
     if (!ex2_stall && EX2_a_valid) begin
       WB_a_pc <= EX2_a_pc;
       WB_a_dest <= EX2_a_dest;
+      WB_a_br_type <= EX2_a_br_type;
+      WB_a_br_taken <= EX2_a_br_taken;
       WB_a_have_excp <= EX2_a_have_excp;
       WB_a_excp_type <= EX2_a_excp_type;
 `ifdef DIFFTEST_EN
@@ -1319,6 +1381,8 @@ module core (
     if (!ex2_stall && EX2_b_valid) begin
       WB_b_pc <= EX2_b_pc;
       WB_b_dest <= EX2_b_dest;
+      WB_b_br_type <= EX2_b_br_type;
+      WB_b_br_taken <= ex2_b_br_taken || EX2_b_br_taken;
       WB_b_have_excp <= EX2_b_have_excp;
       WB_b_excp_type <= EX2_b_excp_type;
 `ifdef DIFFTEST_EN
@@ -1326,6 +1390,11 @@ module core (
 `endif
     end
   end
+
+  assign update_orien_en = WB_a_valid && WB_a_br_type == BR_COND || WB_b_valid && WB_b_br_type == BR_COND;
+  assign retire_pc = (WB_a_valid && WB_a_br_type == BR_COND) ? WB_a_pc : WB_b_pc;
+  assign right_orien = (WB_a_valid && WB_a_br_type == BR_COND) ? WB_a_br_taken : WB_b_br_taken;
+
 
   always_ff @(posedge clk) begin
     if (reset) begin
@@ -1543,5 +1612,24 @@ module core (
       .dcache1_data_ok (dcache1_data_ok),
       .dcache1_rdata   (dcache1_rdata)
   );
+
+ int br_cnt = 0;
+ int ret_cnt = 0;
+ int br_mis_cnt = 0;
+ always_ff @(posedge clk) begin
+   if (ID_a_valid && id_a_br_type != BR_NOP) br_cnt = br_cnt + 1;
+   if (ID_b_valid && id_a_br_type != BR_NOP) br_cnt = br_cnt + 1;
+   if (ID_a_valid && id_a_br_type == BR_RET) ret_cnt = ret_cnt + 1;
+   if (ID_b_valid && id_a_br_type == BR_RET) ret_cnt = ret_cnt + 1;
+   if (br_mistaken) br_mis_cnt = br_mis_cnt + 1;
+   if (br_cnt > 0 && br_cnt % 10000 == 0)
+     $display(
+         "br_cnt=%d, br_mis_cnt=%d, ret_cnt=%d, rate=%lf%%",
+         br_cnt,
+         br_mis_cnt,
+         ret_cnt,
+         100.0 * br_mis_cnt / br_cnt
+     );
+ end
 
 endmodule

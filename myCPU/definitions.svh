@@ -10,7 +10,7 @@ parameter TLBNUM = 16;
 parameter TLBIDLEN = $clog2(TLBNUM);
 parameter PALEN = 32;
 
-`define CACHE_LINE_32B 
+`define CACHE_LINE_32B
 
 `ifdef CACHE_LINE_16B
 `define LINE_SIZE 16
@@ -90,6 +90,15 @@ typedef enum opcode_t {
   TLB_TLBFILL,
   TLB_INVTLB
 } tlb_opcode_t;
+
+typedef enum logic [2:0] {
+  BR_NOP   = 3'b000,
+  BR_IMM   = 3'b001,
+  BR_COND  = 3'b010,
+  BR_CALL  = 3'b011,
+  BR_RET   = 3'b100,
+  BR_INDIR = 3'b101
+} br_type_t;
 
 typedef logic [9:0] asid_t;
 typedef logic [13:0] csr_addr_t;
