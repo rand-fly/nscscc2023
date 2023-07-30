@@ -225,6 +225,7 @@ module core (
   br_type_t                  br_type;
   logic       [        31:0] wrong_pc;
   logic       [        31:0] right_target;
+  logic       [        31:0] btb_target;
   logic                      update_orien_en;
   logic       [        31:0] retire_pc;
   logic                      right_orien;
@@ -481,6 +482,7 @@ module core (
       .br_mistaken    (br_mistaken),
       .br_type        (br_type),
       .right_target   (right_target),
+      .btb_target     (btb_target),
       .wrong_pc       (wrong_pc),
       .update_orien_en(update_orien_en),
       .retire_pc      (retire_pc),
@@ -586,26 +588,31 @@ module core (
       br_type      = EX2_b_br_type;
       wrong_pc     = EX2_b_pc;
       right_target = ex2_b_br_taken ? ex2_b_br_target : EX2_b_pc + 32'd4;
+      btb_target   = ex2_b_br_target;
     end else if (ex1_a_br_mistaken) begin
       br_mistaken  = 1'b1;
       br_type      = EX1_a_br_type;
       wrong_pc     = EX1_a_pc;
       right_target = ex1_a_br_taken ? ex1_a_br_target : EX1_a_pc + 32'd4;
+      btb_target   = ex1_a_br_target;
     end else if (ex1_b_br_mistaken) begin
       br_mistaken  = 1'b1;
       br_type      = EX1_b_br_type;
       wrong_pc     = EX1_b_pc;
       right_target = ex1_b_br_taken ? ex1_b_br_target : EX1_b_pc + 32'd4;
+      btb_target   = ex1_b_br_target;
     end else if (ID_a_valid && id_a_br_mistaken) begin
       br_mistaken = 1'b1;
       br_type = id_a_br_type;
       wrong_pc = ID_a_pc;
       right_target = (id_a_br_taken || id_a_br_type == BR_COND && ID_a_pred_br_taken) ? id_a_br_target : ID_a_pc + 32'd4;
+      btb_target = id_a_br_target;
     end else if (ID_b_valid && id_b_br_mistaken) begin
       br_mistaken = 1'b1;
       br_type = id_b_br_type;
       wrong_pc = ID_b_pc;
       right_target = (id_b_br_taken || id_b_br_type == BR_COND && ID_b_pred_br_taken) ? id_b_br_target : ID_b_pc + 32'd4;
+      btb_target = id_b_br_target;
     end else begin
       br_mistaken  = 1'b0;
       br_type      = BR_NOP;
@@ -1613,23 +1620,23 @@ module core (
       .dcache1_rdata   (dcache1_rdata)
   );
 
- int br_cnt = 0;
- int ret_cnt = 0;
- int br_mis_cnt = 0;
- always_ff @(posedge clk) begin
-   if (ID_a_valid && id_a_br_type != BR_NOP) br_cnt = br_cnt + 1;
-   if (ID_b_valid && id_a_br_type != BR_NOP) br_cnt = br_cnt + 1;
-   if (ID_a_valid && id_a_br_type == BR_RET) ret_cnt = ret_cnt + 1;
-   if (ID_b_valid && id_a_br_type == BR_RET) ret_cnt = ret_cnt + 1;
-   if (br_mistaken) br_mis_cnt = br_mis_cnt + 1;
-   if (br_cnt > 0 && br_cnt % 10000 == 0)
-     $display(
-         "br_cnt=%d, br_mis_cnt=%d, ret_cnt=%d, rate=%lf%%",
-         br_cnt,
-         br_mis_cnt,
-         ret_cnt,
-         100.0 * br_mis_cnt / br_cnt
-     );
- end
+  //  int br_cnt = 0;
+  //  int ret_cnt = 0;
+  //  int br_mis_cnt = 0;
+  //  always_ff @(posedge clk) begin
+  //    if (ID_a_valid && id_a_br_type != BR_NOP) br_cnt = br_cnt + 1;
+  //    if (ID_b_valid && id_a_br_type != BR_NOP) br_cnt = br_cnt + 1;
+  //    if (ID_a_valid && id_a_br_type == BR_RET) ret_cnt = ret_cnt + 1;
+  //    if (ID_b_valid && id_a_br_type == BR_RET) ret_cnt = ret_cnt + 1;
+  //    if (br_mistaken) br_mis_cnt = br_mis_cnt + 1;
+  //    if (br_cnt > 0 && br_cnt % 10000 == 0)
+  //      $display(
+  //          "br_cnt=%d, br_mis_cnt=%d, ret_cnt=%d, rate=%lf%%",
+  //          br_cnt,
+  //          br_mis_cnt,
+  //          ret_cnt,
+  //          100.0 * br_mis_cnt / br_cnt
+  //      );
+  //  end
 
 endmodule

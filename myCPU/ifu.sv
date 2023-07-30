@@ -21,6 +21,7 @@ module ifu (
     input                   br_mistaken,
     input  br_type_t        br_type,
     input            [31:0] right_target,
+    input            [31:0] btb_target,
     input            [31:0] wrong_pc,
     input                   update_orien_en,
     input            [31:0] retire_pc,
@@ -42,19 +43,31 @@ module ifu (
     input                   mmu_i_ppi
 );
 
-  logic [31:0] pc_start;
-  logic [31:0] pc_start_sent;
+  logic     [31:0] pc_start;
+  logic     [31:0] pc_start_sent;
 
-  logic        pred_br_taken0_inner;
-  logic [31:0] pred_br_target0_inner;
-  logic        pred_br_taken1_inner;
-  logic [31:0] pred_br_target1_inner;
+  logic            pred_br_taken0_inner;
+  logic     [31:0] pred_br_target0_inner;
+  logic            pred_br_taken1_inner;
+  logic     [31:0] pred_br_target1_inner;
 
 
-  logic        is_sent_double;
-  logic        pending_data;
-  logic        cancel;
-  logic [31:0] pred_pc_start;
+  logic            is_sent_double;
+  logic            pending_data;
+  logic            cancel;
+  logic     [31:0] pred_pc_start;
+
+  logic            br_mistaken_buf;
+  br_type_t        br_type_buf;
+  logic     [31:0] btb_target_buf;
+  logic     [31:0] wrong_pc_buf;
+
+  always_ff @(posedge clk) begin
+    br_mistaken_buf <= br_mistaken;
+    br_type_buf <= br_type;
+    btb_target_buf <= btb_target;
+    wrong_pc_buf <= wrong_pc;
+  end
 
   always_comb begin
     if (pred_br_taken0_inner) pred_pc_start = pred_br_target0_inner;
@@ -149,10 +162,10 @@ module ifu (
       .ret_pc_1       (pred_br_target1_inner),
       .taken_0        (pred_br_taken0_inner),
       .taken_1        (pred_br_taken1_inner),
-      .branch_mistaken(br_mistaken),
-      .wrong_pc       (wrong_pc),
-      .right_target   (right_target),
-      .ins_type_w     (br_type),
+      .branch_mistaken(br_mistaken_buf),
+      .wrong_pc       (wrong_pc_buf),
+      .right_target   (btb_target_buf),
+      .ins_type_w     (br_type_buf),
       .update_orien_en(update_orien_en),
       .retire_pc      (retire_pc),
       .right_orien    (right_orien)

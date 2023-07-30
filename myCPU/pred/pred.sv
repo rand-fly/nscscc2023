@@ -220,7 +220,7 @@ module pred #(
       .ins_type_0 (ins_type_0),
       .ins_type_1 (ins_type_1),
 
-      .branch_mistaken(branch_mistaken && ins_type_w != BR_INDIR),
+      .branch_mistaken(branch_mistaken),
       .ins_type_w(ins_type_w),
       .wrong_pc(wrong_pc),
       .right_target(right_target)
