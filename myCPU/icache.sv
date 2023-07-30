@@ -53,7 +53,6 @@ reg [`INDEX_WIDTH-1:0] index_reg;
 reg [`INDEX_WIDTH-1:0] index_reg_miss;
 reg [`TAG_WIDTH-1:0] tag_reg;
 reg [`OFFSET_WIDTH-1:0] offset_reg;
-reg [`OFFSET_WIDTH-1:0] offset_reg_miss;
 // reg [1:0] offset_w_reg; // word offset
 wire [`OFFSET_WIDTH-3:0] offset_w_reg; // word offset
 reg uncached_reg;
@@ -248,7 +247,7 @@ assign next_same_line = (index == index_reg) & (tag == tag_reg);
 assign pipe_interface_latch = valid & (
     (idle & !(prefetching & prefetch_next_same_line & ret_valid_last)) | 
     (lookup & cache_hit_and_cached) |
-    (miss & ((!prefetching & next_same_line) | prefetch_next_same_line)) |
+    (miss & (prefetching & prefetch_next_same_line & !ret_valid_last)) |
     (refill & !uncached_reg & (data_ok | finished) & next_same_line & !fetch_ok));
 
 always @(posedge clk) begin
@@ -277,7 +276,6 @@ always @(posedge clk) begin
         end
         if (lookup) begin
             index_reg_miss <= index_reg;
-            offset_reg_miss <= offset_reg;
         end
     end
 end
@@ -382,9 +380,7 @@ assign cache_rd_data = cache_hit
                         ? `get_preload_data(cache_hit_way_id)
                         : (prefetch_hit)
                             ? prefetch_data_reg
-                            : (buffer_read_data_count[`OFFSET_WIDTH-3+1] & (buffer_read_data_count[`OFFSET_WIDTH-3:0] == offset_reg_miss[`OFFSET_WIDTH-1:2]))
-                                ? buffer_read_data
-                                : buffer_read_data_new;
+                            : buffer_read_data_new;
 
 assign rdata_l = uncached_reg ? ret_data : `get_word(cache_rd_data, offset_w_reg);
 assign rdata_h = `get_word(cache_rd_data, offset_w_reg+1);
@@ -422,7 +418,7 @@ assign rd_req = prefetching ? rd_req_prefetch : rd_req_cache;
 // fetch data from memory
 
 // assign buffer_read_data_new = (buffer_read_data >> 32) | (ret_data << (32*3));
-assign buffer_read_data_new = buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*buffer_read_data_count[`OFFSET_WIDTH-3:0]));
+assign buffer_read_data_new = buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*buffer_read_data_count));
 
 always @(posedge clk) begin
     // TODO 优化，此处反复写?
@@ -431,11 +427,11 @@ always @(posedge clk) begin
         buffer_read_data_count <= 0;
     end
     else begin
-        if (!uncached_reg & ret_valid) begin
+        if (ret_valid) begin
             buffer_read_data <= buffer_read_data_new;
             buffer_read_data_count <= buffer_read_data_count + 1;
         end
-        if (rd_req) begin
+        if (ret_valid_last) begin
             buffer_read_data <= 0;
             buffer_read_data_count <= rd_addr[`OFFSET_WIDTH-1:2];
             buffer_read_data_count_start <= rd_addr[`OFFSET_WIDTH-1:2];
@@ -531,12 +527,12 @@ always @(posedge clk) begin
         prefetch_tag_reg <= 0;
         prefetch_index_reg <= 0;
     end
-    // else if (!prefetching & (lookup & cache_hit_and_cached) & (prefetch_index!=0) & !prefetch_cached & !uncached_reg & ((prefetch_tag != prefetch_tag_reg) | (prefetch_index != prefetch_index_reg))) begin
-    //     prefetching <= 1;
-    //     prefetch_valid_reg <= 0;
-    //     prefetch_tag_reg <= prefetch_tag;
-    //     prefetch_index_reg <= prefetch_index;
-    // end
+    else if (!prefetching & (lookup & cache_hit_and_cached) & (prefetch_index!=0) & !prefetch_cached & !uncached_reg & ((prefetch_tag != prefetch_tag_reg) | (prefetch_index != prefetch_index_reg))) begin
+        prefetching <= 1;
+        prefetch_valid_reg <= 0;
+        prefetch_tag_reg <= prefetch_tag;
+        prefetch_index_reg <= prefetch_index;
+    end
     if (prefetching & ret_valid_last) begin
         prefetching <= 0;
         prefetch_valid_reg <= 1;
