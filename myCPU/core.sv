@@ -507,10 +507,10 @@ module core (
       ID_a_valid <= 1'b0;
       ID_b_valid <= 1'b0;
     end else begin
-      ID_a_valid <= ifu_output_size >= 2'd1 && !ifu_have_excp;
+      ID_a_valid <= ifu_output_size >= 2'd1;
       ID_b_valid <= ifu_output_size >= 2'd2 && !ifu_have_excp;
     end
-    if (ifu_output_size >= 2'd1 && !ifu_have_excp) begin
+    if (ifu_output_size >= 2'd1) begin
       ID_a_pc <= ifu_pc0;
       ID_a_inst <= ifu_inst0;
       ID_a_pred_br_taken <= ifu_pred_br_taken0;
@@ -893,14 +893,15 @@ module core (
     end
   end
 
-  assign ro_b_delayed  = ro_a_optype == OP_ALU && ro_b_optype == OP_ALU && ro_a_dest != 5'd0
-                      && (ro_a_dest == ro_b_r1 || ro_a_dest == ro_b_r2);
+  wire related = (ro_a_dest == ro_b_r1 || ro_a_dest == ro_b_r2);
+
+  assign ro_b_delayed  = ro_a_optype == OP_ALU && ro_b_optype == OP_ALU && ro_a_dest != 5'd0 && related;
 
   assign allow_issue_a = !ibuf_no_out && ro_a_valid && ro_a_src1_ok && ro_a_src2_ok;
   assign allow_issue_b = !ibuf_no_out && allow_issue_a
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
-                      && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB
-                      && ro_b_optype != OP_TLB && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM/* && (ro_a_opcode[3]^ro_b_opcode[3])*/);
+                      && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB && !(related && ro_a_optype != OP_ALU)
+                      && ro_b_optype != OP_TLB && ro_b_optype != OP_MEM; //!(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM/* && (ro_a_opcode[3]^ro_b_opcode[3])*/);
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
@@ -959,8 +960,8 @@ module core (
       EX1_b_br_taken       <= ro_b_br_taken;
       EX1_b_have_excp      <= ro_b_have_excp;
       EX1_b_excp_type      <= ro_b_excp_type;
-      EX1_b_csr_addr       <= id_b_csr_addr;
-      EX1_b_csr_wr         <= id_b_csr_wr;
+      EX1_b_csr_addr       <= ro_b_csr_addr;
+      EX1_b_csr_wr         <= ro_b_csr_wr;
 `ifdef DIFFTEST_EN
       EX1_b_difftest <= ro_b_difftest;
       EX1_b_difftest.is_TLBFILL <= id_b_optype == OP_TLB || id_b_opcode == TLB_TLBFILL;
