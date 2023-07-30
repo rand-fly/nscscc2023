@@ -1,14 +1,12 @@
 `include "../definitions.svh"
 
 module pred #(
-    parameter RASNUM = 16,
+    parameter RASNUM   = 16,
     parameter RASIDLEN = $clog2(RASNUM),
-    parameter RASCNTLEN = 8,
-    parameter RASCNTMAX = (2 ** RASCNTLEN) - 1,
-    parameter BHTNUM = 32,
+    parameter BHTNUM   = 32,
     parameter BHTIDLEN = $clog2(BHTNUM),
-    parameter BHRLEN = 7,
-    parameter PHTNUM = 2 ** BHRLEN
+    parameter BHRLEN   = 7,
+    parameter PHTNUM   = 2 ** BHRLEN
 ) (
     input        clk,
     input        reset,
@@ -152,7 +150,6 @@ module pred #(
 
   //RAS
   reg   [              31:0] ras_pc       [RASNUM - 1:0];
-  reg   [   RASCNTLEN - 1:0] ras_counter  [RASNUM - 1:0];
   reg   [$clog2(RASNUM)-1:0] ras_top;
   //search RAS
   reg   [              31:0] ras_res;
@@ -164,41 +161,27 @@ module pred #(
 
 
   assign ras_top_val = ras_pc[ras_top];
-  assign ras_ins_type = (ins_type_0 == BR_CALL || ins_type_0 == BR_RET) ? ins_type_0 : ins_type_1 & {32{dual_issue}};
+  assign ras_ins_type = (ins_type_0 == BR_CALL || ins_type_0 == BR_RET) ? ins_type_0 : ins_type_1 & {3{dual_issue}};
   assign ras_ret_pc = (ins_type_0 == BR_CALL || ins_type_0 == BR_RET) ? ras_ret_pc_0 : ras_ret_pc_1;
   assign ras_ret_pc_0 = {fetch_pc_0[31:2] + 1'b1, fetch_pc_0[1:0]};
   assign ras_ret_pc_1 = {fetch_pc_1[31:2] + 1'b1, fetch_pc_1[1:0]};
 
   //reset & push & pop RAS
-
   integer k;
   always @(posedge clk) begin
     if (reset) begin
       for (k = 0; k < RASNUM; k = k + 1) begin
         ras_pc[k] <= 0;
-        ras_counter[k] <= 0;
       end
       ras_top <= 0;
     end else begin
       //call->push
       if (ras_ins_type == BR_CALL) begin
-        //recursion counter increase
-        if (ras_ret_pc == ras_top_val && ras_counter[ras_top] != RASCNTMAX) begin
-          ras_counter[ras_top] <= ras_counter[ras_top] + 1;
-        end else begin
-          ras_top <= ras_top + 1;
-          ras_pc[ras_top+1] <= ras_ret_pc;
-          ras_counter[ras_top+1] <= 1;
-        end
+        ras_top <= ras_top + 1;
+        ras_pc[ras_top+1] <= ras_ret_pc;
       end  //ret->pop
       else if (ras_ins_type == BR_RET) begin
-        // ras_res <= ras_top_val;
-        if (ras_counter[ras_top] <= 1) begin
-          ras_counter[ras_top] <= 0;
-          ras_top <= ras_top - 1;
-        end else begin
-          ras_counter[ras_top] <= ras_counter[ras_top] - 1;
-        end
+        ras_top <= ras_top - 1;
       end
     end
   end
