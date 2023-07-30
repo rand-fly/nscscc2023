@@ -1127,7 +1127,7 @@ module core (
       .have_excp(lsu_a_have_excp),
       .excp_type(lsu_a_excp_type),
       .ok(lsu_a_ok),
-      .accept_ok(EX2_a_valid && EX2_a_optype == OP_MEM && lsu_a_ok),
+      .accept_ok(EX2_a_valid && EX2_a_optype == OP_MEM && !WB_a_ok && lsu_a_ok),
       .ld_data(lsu_a_result),
       .mmu_req(mmu_d1_req),
       .mmu_addr(mmu_d1_va),
@@ -1159,7 +1159,7 @@ module core (
       .have_excp(lsu_b_have_excp),
       .excp_type(lsu_b_excp_type),
       .ok(lsu_b_ok),
-      .accept_ok(EX2_b_valid && EX2_b_optype == OP_MEM && lsu_b_ok),
+      .accept_ok(EX2_b_valid && EX2_b_optype == OP_MEM && !WB_b_ok && lsu_b_ok),
       .ld_data(lsu_b_result),
       .mmu_req(mmu_d2_req),
       .mmu_addr(mmu_d2_va),
@@ -1332,8 +1332,8 @@ module core (
     );
   assign csr_vppn_wdata = ex2_excp_type == PIF ? ex2_excp_pc[31:13] : ex2_excp_addr[31:13];
 
-  assign ex2_a_ok = !(EX2_a_optype == OP_DIV && !div_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
-  assign ex2_b_ok = !(EX2_b_optype == OP_DIV && !div_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);
+  assign ex2_a_ok = EX2_a_valid && !(EX2_a_optype == OP_DIV && !div_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
+  assign ex2_b_ok = EX2_b_valid && !(EX2_b_optype == OP_DIV && !div_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);
   assign ex2_stall  = (EX2_a_valid || EX2_b_valid) && (EX2_a_valid && !ex2_a_ok && !WB_a_ok || EX2_b_valid && !ex2_b_ok && !WB_b_ok);
   assign ex2_b_src1 = EX2_b_src1_delayed ? EX2_a_alu_result : EX2_b_src1;
   assign ex2_b_src2 = EX2_b_src2_delayed ? EX2_a_alu_result : EX2_b_src2;
@@ -1409,7 +1409,7 @@ module core (
     if (reset) begin
       WB_a_ok <= 1'b0;
     end else begin
-      if (ex2_a_ok) begin
+      if (ex2_a_ok && !WB_a_ok) begin
         if (ex2_stall) WB_a_ok <= 1'b1;
         unique case (EX2_a_optype)
           OP_ALU:  WB_a_result <= EX2_a_alu_result;
@@ -1430,7 +1430,7 @@ module core (
     if (reset) begin
       WB_b_ok <= 1'b0;
     end else begin
-      if (ex2_b_ok) begin
+      if (ex2_b_ok && !WB_b_ok) begin
         if (ex2_stall) WB_b_ok <= 1'b1;
         unique case (EX2_b_optype)
           OP_ALU:  WB_b_result <= EX2_b_delayed ? alu_b2_result : EX2_b_alu_result;
