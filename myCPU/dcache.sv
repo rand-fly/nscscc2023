@@ -496,7 +496,7 @@ assign next_p1_next_p0_same_line = (p1_tag == p0_tag)
 assign next_all_same_line = next_p0_p0_same_line | next_p0_p1_same_line
                             | next_p1_p0_same_line | next_p1_p1_same_line;
 assign merge_next_p0_next_p1 = next_p1_next_p0_same_line
-                                & (p0_valid & p1_valid) & (p0_op == OP_WRITE) & (p1_op == OP_WRITE)
+                                & (p0_valid & p1_valid) & (p0_op == p1_op)
                                 & (p0_uncached == p1_uncached);
 
 assign pipe_interface_latch = p0_valid & (
@@ -565,6 +565,10 @@ always @(posedge clk) begin
         else if (p0_refill_write | p0_hit_write) begin
             p0_cache_wstrb_reg <= 0;
             p0_cache_write_data_reg <= 0;
+            if (merge_p0_p1_reg) begin
+                p1_cache_wstrb_reg <= 0;
+                p1_cache_write_data_reg <= 0;
+            end
         end
         if (p0_lookup) begin
             p0_index_reg_miss <= p0_index_reg;
@@ -581,7 +585,7 @@ always @(posedge clk) begin
             p1_size_reg        <= p1_size;
             p1_wstrb_reg       <= p1_wstrb;
             p1_wdata_reg       <= p1_wdata;
-            if (!p1_uncached & (p1_op == OP_WRITE) & !merge_next_p0_next_p1) begin
+            if (!p1_uncached & (p1_op == OP_WRITE)) begin
                 p1_cache_wstrb_reg      <= p1_cache_wstrb_new;
                 p1_cache_write_data_reg <= (p1_cache_write_data_reg & ~p1_cache_write_data_strobe)
                                             | p1_cache_write_data_append;
@@ -607,7 +611,7 @@ always @(posedge clk) begin
 end
 
 assign p0_hit_write = p0_lookup & p0_cache_hit_and_cached & (p0_op_reg == OP_WRITE);
-assign p1_hit_write = p1_lookup & p1_cache_hit_and_cached & (p1_op_reg == OP_WRITE);
+assign p1_hit_write = !merge_p0_p1_reg && p1_lookup & p1_cache_hit_and_cached & (p1_op_reg == OP_WRITE);
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -706,7 +710,7 @@ always @(posedge clk) begin
         // p1 state
         case(p1_main_state)
             MAIN_ST_IDLE: begin
-                if (pipe_interface_latch & p1_valid & !merge_next_p0_next_p1) begin
+                if (pipe_interface_latch & p1_valid) begin
                     p1_main_state <= MAIN_ST_LOOKUP;
                 end
             end
@@ -715,12 +719,14 @@ always @(posedge clk) begin
                     if (!p1_addr_ok) begin
                         p1_main_state <= MAIN_ST_IDLE;
                     end
-                    else begin
-                        replace_way_id <= replace_way_id + 1;
-                    end
                 end
                 else begin
-                    p1_main_state <= MAIN_ST_MISS;
+                    if (merge_p0_p1_reg) begin
+                        p1_main_state <= MAIN_ST_IDLE;
+                    end
+                    else begin
+                        p1_main_state <= MAIN_ST_MISS;
+                    end
                 end
             end
             MAIN_ST_MISS: begin
@@ -813,17 +819,11 @@ assign p0_data_ok = !p0_finished & ((p0_op_reg == OP_READ)
                                                     ? (p0_refill & ret_valid_last)
                                                     : (p0_refill & ret_valid & (p0_buffer_read_data_count >= {(p0_offset_w_reg < p0_buffer_read_data_count_start),p0_offset_w_reg}))))
                     : p0_wdata_ok_reg);
-assign p1_data_ok = merge_p0_p1_reg
-                        ? (!p0_finished & ((p0_op_reg == OP_READ)
-                                            ? ((p0_lookup & p0_cache_hit_and_cached) | (p0_uncached_reg
-                                                                            ? (p0_refill & ret_valid_last)
-                                                                            : (p0_refill & ret_valid & (p0_buffer_read_data_count >= {(p1_offset_w_reg < p0_buffer_read_data_count_start),p1_offset_w_reg}))))
-                                            : p0_wdata_ok_reg))
-                        : (!p1_finished & ((p1_op_reg == OP_READ)
-                                            ? ((p1_lookup & p1_cache_hit_and_cached) | (p1_uncached_reg
-                                                                            ? (p1_refill & ret_valid_last)
-                                                                            : (p1_refill & ret_valid & (p1_buffer_read_data_count >= {(p1_offset_w_reg < p1_buffer_read_data_count_start),p1_offset_w_reg}))))
-                                            : p1_wdata_ok_reg));
+assign p1_data_ok = !p1_finished & ((p1_op_reg == OP_READ)
+                    ? ((p1_lookup & p1_cache_hit_and_cached) | (p1_uncached_reg
+                                                    ? (p1_refill & ret_valid_last)
+                                                    : ((p1_refill | (merge_p0_p1_reg & p0_refill)) & ret_valid & (p1_buffer_read_data_count >= {(p1_offset_w_reg < p1_buffer_read_data_count_start),p1_offset_w_reg}))))
+                    : p1_wdata_ok_reg);
 
 always @(posedge clk) begin
     if (p0_miss) begin
@@ -888,11 +888,20 @@ always @(posedge clk) begin
         if (!p0_uncached_reg & p0_refill & ret_valid) begin
             p0_buffer_read_data         <= p0_buffer_read_data_new;
             p0_buffer_read_data_count   <= p0_buffer_read_data_count + 1;
+            if (merge_p0_p1_reg) begin
+                p1_buffer_read_data         <= p1_buffer_read_data_new;
+                p1_buffer_read_data_count   <= p1_buffer_read_data_count + 1;
+            end
         end
         if (p0_rd_req) begin
             p0_buffer_read_data <= 0;
             p0_buffer_read_data_count <= p0_rd_addr[`OFFSET_WIDTH-1:2];
             p0_buffer_read_data_count_start <= p0_rd_addr[`OFFSET_WIDTH-1:2];
+            if (merge_p0_p1_reg) begin
+                p1_buffer_read_data <= 0;
+                p1_buffer_read_data_count <= p0_rd_addr[`OFFSET_WIDTH-1:2];
+                p1_buffer_read_data_count_start <= p0_rd_addr[`OFFSET_WIDTH-1:2];
+            end
         end
 
         if (!p1_uncached_reg & p1_refill & ret_valid) begin
@@ -1047,8 +1056,8 @@ always @(posedge clk) begin
     end
 end
 
-`define DBG_TAG 20'h205
-`define DBG_INDEX 7'h6f
+`define DBG_TAG 20'h203
+`define DBG_INDEX 7'h16
 // `define DCACHE_DBG
 
 `ifdef DCACHE_DBG

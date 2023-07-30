@@ -531,12 +531,12 @@ always @(posedge clk) begin
         prefetch_tag_reg <= 0;
         prefetch_index_reg <= 0;
     end
-    // else if (!prefetching & (lookup & cache_hit_and_cached) & (prefetch_index!=0) & !prefetch_cached & !uncached_reg & ((prefetch_tag != prefetch_tag_reg) | (prefetch_index != prefetch_index_reg))) begin
-    //     prefetching <= 1;
-    //     prefetch_valid_reg <= 0;
-    //     prefetch_tag_reg <= prefetch_tag;
-    //     prefetch_index_reg <= prefetch_index;
-    // end
+    else if (!prefetching & (lookup & cache_hit_and_cached) & (prefetch_index!=0) & !prefetch_cached & !uncached_reg & ((prefetch_tag != prefetch_tag_reg) | (prefetch_index != prefetch_index_reg))) begin
+        prefetching <= 1;
+        prefetch_valid_reg <= 0;
+        prefetch_tag_reg <= prefetch_tag;
+        prefetch_index_reg <= prefetch_index;
+    end
     if (prefetching & ret_valid_last) begin
         prefetching <= 0;
         prefetch_valid_reg <= 1;
