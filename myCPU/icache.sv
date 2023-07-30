@@ -203,6 +203,7 @@ wire [`LINE_WIDTH-1:0] buffer_read_data_new;
 wire [`LINE_WIDTH-1:0] cache_rd_data;
 reg [`LINE_WIDTH-1:0] buffer_read_data;
 reg [`OFFSET_WIDTH-3+1:0] buffer_read_data_count;
+reg [`OFFSET_WIDTH-3+1:0] buffer_read_data_count_start; 
 
 reg [`CACHE_WAY_NUM_LOG2-1:0] refill_way_id;
 
@@ -387,7 +388,7 @@ assign cache_rd_data = cache_hit
 
 assign rdata_l = uncached_reg ? ret_data : `get_word(cache_rd_data, offset_w_reg);
 assign rdata_h = `get_word(cache_rd_data, offset_w_reg+1);
-assign rdata_h_valid = offset_reg[`OFFSET_WIDTH-1:2] != {(`OFFSET_WIDTH-2){1'b1}};
+assign rdata_h_valid = offset_w_reg != {(`OFFSET_WIDTH-2){1'b1}};
 
 // assign data_ok = (op_reg == OP_READ) ? ((lookup & cache_hit) | ret_valid_last) : wdata_ok_reg;
 assign data_ok = !finished & ((lookup & cache_hit_and_cached) 
@@ -395,8 +396,8 @@ assign data_ok = !finished & ((lookup & cache_hit_and_cached)
                                 | (uncached_reg
                                     ?   (refill & ret_valid_last)
                                     :   ((refill | (prefetching & prefetch_same_line)) & ret_valid & (rdata_h_valid
-                                                                                                                ? (buffer_read_data_count > offset_reg[`OFFSET_WIDTH-1:2])
-                                                                                                                : (buffer_read_data_count >= offset_reg[`OFFSET_WIDTH-1:2]))
+                                                                                                                ? (buffer_read_data_count > {(offset_w_reg < buffer_read_data_count_start),offset_w_reg})
+                                                                                                                : (buffer_read_data_count >= {(offset_w_reg < buffer_read_data_count_start),offset_w_reg}))
                                         )
                                 )
                             );
@@ -410,8 +411,8 @@ assign wr_req = 0;
 assign wr_wstrb = 0;
 
 assign rd_type_cache = uncached_reg ? RD_TYPE_WORD : RD_TYPE_CACHELINE;
-// assign rd_addr_cache = uncached_reg ? {tag_reg,index_reg,offset_reg} : {tag_reg, index_reg_miss,{`OFFSET_WIDTH{1'b0}}};  //关闭关键字优先
-assign rd_addr_cache = uncached_reg ? {tag_reg,index_reg,offset_reg} : {tag_reg, index_reg_miss,offset_reg_miss[`OFFSET_WIDTH-1:2],2'b0}; // 关键字优先
+assign rd_addr_cache = uncached_reg ? {tag_reg,index_reg,offset_reg} : {tag_reg, index_reg_miss,{`OFFSET_WIDTH{1'b0}}};  //关闭关键字优先
+// assign rd_addr_cache = uncached_reg ? {tag_reg,index_reg,offset_reg} : {tag_reg, index_reg_miss,offset_reg_miss[`OFFSET_WIDTH-1:2],2'b0}; // 关键字优先
 assign rd_req_cache = !prefetch_hit & refill & ~rd_addr_ok;
 
 assign rd_type = prefetching ? RD_TYPE_CACHELINE : rd_type_cache;
@@ -437,6 +438,7 @@ always @(posedge clk) begin
         if (rd_req) begin
             buffer_read_data <= 0;
             buffer_read_data_count <= rd_addr[`OFFSET_WIDTH-1:2];
+            buffer_read_data_count_start <= rd_addr[`OFFSET_WIDTH-1:2];
         end
     end
     

@@ -404,11 +404,13 @@ wire [`LINE_WIDTH-1:0]  p0_buffer_read_data_new;
 wire [`LINE_WIDTH-1:0]  p0_cache_rd_data;
 reg [`LINE_WIDTH-1:0]   p0_buffer_read_data;
 reg [`OFFSET_WIDTH-3+1:0] p0_buffer_read_data_count;
+reg [`OFFSET_WIDTH-3+1:0] p0_buffer_read_data_count_start;
 
 wire [`LINE_WIDTH-1:0]  p1_buffer_read_data_new;
 wire [`LINE_WIDTH-1:0]  p1_cache_rd_data;
 reg [`LINE_WIDTH-1:0]   p1_buffer_read_data;
 reg [`OFFSET_WIDTH-3+1:0] p1_buffer_read_data_count;
+reg [`OFFSET_WIDTH-3+1:0] p1_buffer_read_data_count_start;
 
 reg [`CACHE_WAY_NUM_LOG2-1:0]   replace_way_id;
 
@@ -809,18 +811,18 @@ assign p1_rdata = p1_uncached_reg ? ret_data : `get_word(p1_cache_rd_data, p1_of
 assign p0_data_ok = !p0_finished & ((p0_op_reg == OP_READ)
                     ? ((p0_lookup & p0_cache_hit_and_cached) | (p0_uncached_reg
                                                     ? (p0_refill & ret_valid_last)
-                                                    : (p0_refill & ret_valid & (p0_buffer_read_data_count >= p0_offset_reg[`OFFSET_WIDTH-1:2]))))
+                                                    : (p0_refill & ret_valid & (p0_buffer_read_data_count >= {(p0_offset_w_reg < p0_buffer_read_data_count_start),p0_offset_w_reg}))))
                     : p0_wdata_ok_reg);
 assign p1_data_ok = merge_p0_p1_reg
                         ? (!p0_finished & ((p0_op_reg == OP_READ)
                                             ? ((p0_lookup & p0_cache_hit_and_cached) | (p0_uncached_reg
                                                                             ? (p0_refill & ret_valid_last)
-                                                                            : (p0_refill & ret_valid & (p0_buffer_read_data_count >= p1_offset_reg[`OFFSET_WIDTH-1:2]))))
+                                                                            : (p0_refill & ret_valid & (p0_buffer_read_data_count >= {(p1_offset_w_reg < p0_buffer_read_data_count_start),p1_offset_w_reg}))))
                                             : p0_wdata_ok_reg))
                         : (!p1_finished & ((p1_op_reg == OP_READ)
                                             ? ((p1_lookup & p1_cache_hit_and_cached) | (p1_uncached_reg
                                                                             ? (p1_refill & ret_valid_last)
-                                                                            : (p1_refill & ret_valid & (p1_buffer_read_data_count >= p1_offset_reg[`OFFSET_WIDTH-1:2]))))
+                                                                            : (p1_refill & ret_valid & (p1_buffer_read_data_count >= {(p1_offset_w_reg < p1_buffer_read_data_count_start),p1_offset_w_reg}))))
                                             : p1_wdata_ok_reg));
 
 always @(posedge clk) begin
@@ -890,6 +892,7 @@ always @(posedge clk) begin
         if (p0_rd_req) begin
             p0_buffer_read_data <= 0;
             p0_buffer_read_data_count <= p0_rd_addr[`OFFSET_WIDTH-1:2];
+            p0_buffer_read_data_count_start <= p0_rd_addr[`OFFSET_WIDTH-1:2];
         end
 
         if (!p1_uncached_reg & p1_refill & ret_valid) begin
@@ -899,6 +902,7 @@ always @(posedge clk) begin
         if (p1_rd_req) begin
             p1_buffer_read_data <= 0;
             p1_buffer_read_data_count <= p1_rd_addr[`OFFSET_WIDTH-1:2];
+            p1_buffer_read_data_count_start <= p1_rd_addr[`OFFSET_WIDTH-1:2];
         end
     end
     
@@ -1043,8 +1047,8 @@ always @(posedge clk) begin
     end
 end
 
-`define DBG_TAG 20'h202
-`define DBG_INDEX 7'h5d
+`define DBG_TAG 20'h205
+`define DBG_INDEX 7'h6f
 // `define DCACHE_DBG
 
 `ifdef DCACHE_DBG
