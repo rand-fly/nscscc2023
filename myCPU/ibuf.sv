@@ -119,19 +119,19 @@ module ibuf (
     output                   o_b_src2_is_imm
 );
 
-  ibuf_entry_t data[8];
+  ibuf_entry_t data[16];
 
 `ifdef DIFFTEST_EN
-  difftest_t difftest[8];
+  difftest_t difftest[16];
 `endif
 
-  logic [2:0] head;
-  logic [2:0] tail;
-  logic [3:0] length;
+  logic [3:0] head;
+  logic [3:0] tail;
+  logic [4:0] length;
 
-  assign i_ready = length <= 4'd2; // 本周期最多可能进来两条，同时最多可能发起两条请求
+  assign i_ready = length <= 5'd10; // 本周期最多可能进来两条，ID阶段可能有两条，同时最多可能发起两条请求，16-6=10
 
-  assign o_a_valid = length >= 4'd1;
+  assign o_a_valid = length >= 5'd1;
   assign{o_a_pc,
          o_a_optype,
          o_a_opcode,
@@ -152,7 +152,7 @@ module ibuf (
          o_a_src2_is_imm
         } = data[head];
 
-  assign o_b_valid = length >= 4'd2;
+  assign o_b_valid = length >= 5'd2;
   assign{o_b_pc,
          o_b_optype,
          o_b_opcode,
@@ -181,9 +181,9 @@ module ibuf (
 
   always_ff @(posedge clk) begin
     if (reset || flush) begin
-      head   <= 3'd0;
-      tail   <= 3'd0;
-      length <= 4'd0;
+      head   <= 4'd0;
+      tail   <= 4'd0;
+      length <= 5'd0;
     end else begin
       tail   <= tail + i_size;
       head   <= head + o_size;
