@@ -15,7 +15,7 @@ module pred #(
     input [31:0] fetch_pc_1,
 
     input dual_issue,
-
+    input ras_en,
 
     output logic [31:0] ret_pc_0,
     output logic [31:0] ret_pc_1,
@@ -174,11 +174,11 @@ module pred #(
         ras_pc[k] <= 0;
       end
       ras_top <= 0;
-    end else begin
+    end else if (ras_en) begin
       //call->push
       if (ras_ins_type == BR_CALL) begin
-        ras_top <= ras_top + 1;
         ras_pc[ras_top+1] <= ras_ret_pc;
+        ras_top <= ras_top + 1;
       end  //ret->pop
       else if (ras_ins_type == BR_RET) begin
         ras_top <= ras_top - 1;

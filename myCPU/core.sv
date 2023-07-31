@@ -1621,24 +1621,60 @@ module core (
       .dcache1_data_ok (dcache1_data_ok),
       .dcache1_rdata   (dcache1_rdata)
   );
+  // int br_cnt = 0;
+  // int imm_cnt = 0;
+  // int con_cnt = 0;
+  // int call_cnt = 0;
+  // int ret_cnt = 0;
+  // int indir_cnt = 0;
+  // int imm_mis_cnt = 0;
+  // int con_mis_cnt = 0;
+  // int call_mis_cnt = 0;
+  // int ret_mis_cnt = 0;
+  // int indir_mis_cnt = 0;
 
-  //  int br_cnt = 0;
-  //  int ret_cnt = 0;
-  //  int br_mis_cnt = 0;
-  //  always_ff @(posedge clk) begin
-  //    if (ID_a_valid && id_a_br_type != BR_NOP) br_cnt = br_cnt + 1;
-  //    if (ID_b_valid && id_a_br_type != BR_NOP) br_cnt = br_cnt + 1;
-  //    if (ID_a_valid && id_a_br_type == BR_RET) ret_cnt = ret_cnt + 1;
-  //    if (ID_b_valid && id_a_br_type == BR_RET) ret_cnt = ret_cnt + 1;
-  //    if (br_mistaken) br_mis_cnt = br_mis_cnt + 1;
-  //    if (br_cnt > 0 && br_cnt % 10000 == 0)
-  //      $display(
-  //          "br_cnt=%d, br_mis_cnt=%d, ret_cnt=%d, rate=%lf%%",
-  //          br_cnt,
-  //          br_mis_cnt,
-  //          ret_cnt,
-  //          100.0 * br_mis_cnt / br_cnt
-  //      );
-  //  end
+  // always_ff @(posedge clk) begin
+  //   if (ID_a_valid) begin
+  //     br_cnt = br_cnt + 1;
+  //     case (id_a_br_type)
+  //       BR_IMM:   imm_cnt = imm_cnt + 1;
+  //       BR_COND:  con_cnt = con_cnt + 1;
+  //       BR_CALL:  call_cnt = call_cnt + 1;
+  //       BR_RET:   ret_cnt = ret_cnt + 1;
+  //       BR_INDIR: indir_cnt = indir_cnt + 1;
+  //     endcase
+  //   end
+  //   if (ID_b_valid) begin
+  //     br_cnt = br_cnt + 1;
+  //     case (id_b_br_type)
+  //       BR_IMM:   imm_cnt = imm_cnt + 1;
+  //       BR_COND:  con_cnt = con_cnt + 1;
+  //       BR_CALL:  call_cnt = call_cnt + 1;
+  //       BR_RET:   ret_cnt = ret_cnt + 1;
+  //       BR_INDIR: indir_cnt = indir_cnt + 1;
+  //     endcase
+  //   end
+  //   if (br_mistaken) begin
+  //     case (br_type)
+  //       BR_IMM:   imm_mis_cnt = imm_mis_cnt + 1;
+  //       BR_COND:  con_mis_cnt = con_mis_cnt + 1;
+  //       BR_CALL:  call_mis_cnt = call_mis_cnt + 1;
+  //       BR_RET:   ret_mis_cnt = ret_mis_cnt + 1;
+  //       BR_INDIR: indir_mis_cnt = indir_mis_cnt + 1;
+  //     endcase
+  //   end
+  //   if (br_cnt > 0 && br_cnt % 10000 == 0) begin
+  //     $display("imm_cnt=%d, imm_mis_cnt=%d, rate=%f%%", imm_cnt, imm_mis_cnt,
+  //              100.0 * imm_mis_cnt / imm_cnt);
+  //     $display("con_cnt=%d, con_mis_cnt=%d, rate=%f%%", con_cnt, con_mis_cnt,
+  //              100.0 * con_mis_cnt / con_cnt);
+  //     $display("call_cnt=%d, call_mis_cnt=%d, rate=%f%%", call_cnt, call_mis_cnt,
+  //              100.0 * call_mis_cnt / call_cnt);
+  //     $display("ret_cnt=%d, ret_mis_cnt=%d, rate=%f%%", ret_cnt, ret_mis_cnt,
+  //              100.0 * ret_mis_cnt / ret_cnt);
+  //     $display("indir_cnt=%d, indir_mis_cnt=%d, rate=%f%%\n", indir_cnt, indir_mis_cnt,
+  //              100.0 * indir_mis_cnt / indir_cnt);
+  //   end
+  // end
 
 endmodule

@@ -62,11 +62,17 @@ module ifu (
   logic     [31:0] btb_target_buf;
   logic     [31:0] wrong_pc_buf;
 
+  logic            ras_en;
+
   always_ff @(posedge clk) begin
     br_mistaken_buf <= br_mistaken;
     br_type_buf <= br_type;
     btb_target_buf <= btb_target;
     wrong_pc_buf <= wrong_pc;
+  end
+
+  always_ff @(posedge clk) begin
+    ras_en <= mmu_i_req && mmu_i_addr_ok;
   end
 
   always_comb begin
@@ -158,6 +164,7 @@ module ifu (
       .fetch_pc_0     (pc_start),
       .fetch_pc_1     (pc_start + 32'd4),
       .dual_issue     (mmu_i_double),
+      .ras_en         (ras_en),
       .ret_pc_0       (pred_br_target0_inner),
       .ret_pc_1       (pred_br_target1_inner),
       .taken_0        (pred_br_taken0_inner),
