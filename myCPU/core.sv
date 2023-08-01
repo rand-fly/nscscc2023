@@ -1,37 +1,34 @@
 `include "definitions.svh"
 
 module core (
-    input wire clk,
-    input wire resetn,
+    input clk,
+    input resetn,
 
-    output logic        icache_req,
-    output logic [31:0] icache_addr,
-    output logic        icache_uncached,
-    input  wire         icache_addr_ok,
-    input  wire         icache_data_ok,
-    input  wire  [63:0] icache_rdata,
+    output        icache_req,
+    output [31:0] icache_addr,
+    output        icache_uncached,
+    input         icache_addr_ok,
+    input         icache_data_ok,
+    input  [63:0] icache_rdata,
 
-    output logic        dcache0_req,
-    output logic        dcache0_wr,
-    output logic [ 1:0] dcache0_size,
-    output logic [ 3:0] dcache0_wstrb,
-    output logic [31:0] dcache0_addr,
-    output logic [31:0] dcache0_wdata,
-    output logic        dcache0_uncached,
-    input  wire         dcache0_addr_ok,
-    input  wire         dcache0_data_ok,
-    input  wire  [31:0] dcache0_rdata,
-
-    output logic        dcache1_req,
-    output logic        dcache1_wr,
-    output logic [ 1:0] dcache1_size,
-    output logic [ 3:0] dcache1_wstrb,
-    output logic [31:0] dcache1_addr,
-    output logic [31:0] dcache1_wdata,
-    output logic        dcache1_uncached,
-    input  wire         dcache1_addr_ok,
-    input  wire         dcache1_data_ok,
-    input  wire  [31:0] dcache1_rdata,
+    output                     dcache_p0_valid,
+    output                     dcache_p1_valid,
+    output [              2:0] dcache_op,
+    output [   `TAG_WIDTH-1:0] dcache_tag,
+    output [ `INDEX_WIDTH-1:0] dcache_index,
+    output [`OFFSET_WIDTH-1:0] dcache_p0_offset,
+    output [`OFFSET_WIDTH-1:0] dcache_p1_offset,
+    output [              3:0] dcache_p0_wstrb,
+    output [              3:0] dcache_p1_wstrb,
+    output [             31:0] dcache_p0_wdata,
+    output [             31:0] dcache_p1_wdata,
+    output                     dcache_uncached,
+    output [              1:0] dcache_p0_size,
+    output [              1:0] dcache_p1_size,
+    input                      dcache_addr_ok,
+    input                      dcache_data_ok,
+    input  [             31:0] dcache_p0_rdata,
+    input  [             31:0] dcache_p1_rdata,
 
 `ifdef DIFFTEST_EN
     output difftest_t a_difftest,
@@ -901,8 +898,9 @@ module core (
   assign allow_issue_a = !ibuf_no_out && ro_a_valid && ro_a_src1_ok && ro_a_src2_ok;
   assign allow_issue_b = !ibuf_no_out && allow_issue_a
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
-                      && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU))
-                      && ro_b_optype != OP_TLB && ro_b_optype != OP_MEM; //!(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
+                      && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB
+                      && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU))
+                      && ro_b_optype != OP_TLB && ro_b_optype != OP_MEM;//&& !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
@@ -1600,26 +1598,24 @@ module core (
       .icache_addr_ok  (icache_addr_ok),
       .icache_data_ok  (icache_data_ok),
       .icache_rdata    (icache_rdata),
-      .dcache0_req     (dcache0_req),
-      .dcache0_wr      (dcache0_wr),
-      .dcache0_size    (dcache0_size),
-      .dcache0_wstrb   (dcache0_wstrb),
-      .dcache0_addr    (dcache0_addr),
-      .dcache0_wdata   (dcache0_wdata),
-      .dcache0_uncached(dcache0_uncached),
-      .dcache0_addr_ok (dcache0_addr_ok),
-      .dcache0_data_ok (dcache0_data_ok),
-      .dcache0_rdata   (dcache0_rdata),
-      .dcache1_req     (dcache1_req),
-      .dcache1_wr      (dcache1_wr),
-      .dcache1_size    (dcache1_size),
-      .dcache1_wstrb   (dcache1_wstrb),
-      .dcache1_addr    (dcache1_addr),
-      .dcache1_wdata   (dcache1_wdata),
-      .dcache1_uncached(dcache1_uncached),
-      .dcache1_addr_ok (dcache1_addr_ok),
-      .dcache1_data_ok (dcache1_data_ok),
-      .dcache1_rdata   (dcache1_rdata)
+      .dcache_p0_valid (dcache_p0_valid),
+      .dcache_p1_valid (dcache_p1_valid),
+      .dcache_op       (dcache_op),
+      .dcache_tag      (dcache_tag),
+      .dcache_index    (dcache_index),
+      .dcache_p0_offset(dcache_p0_offset),
+      .dcache_p1_offset(dcache_p1_offset),
+      .dcache_p0_wstrb (dcache_p0_wstrb),
+      .dcache_p1_wstrb (dcache_p1_wstrb),
+      .dcache_p0_wdata (dcache_p0_wdata),
+      .dcache_p1_wdata (dcache_p1_wdata),
+      .dcache_uncached (dcache_uncached),
+      .dcache_p0_size  (dcache_p0_size),
+      .dcache_p1_size  (dcache_p1_size),
+      .dcache_addr_ok  (dcache_addr_ok),
+      .dcache_data_ok  (dcache_data_ok),
+      .dcache_p0_rdata (dcache_p0_rdata),
+      .dcache_p1_rdata (dcache_p1_rdata)
   );
   // int br_cnt = 0;
   // int imm_cnt = 0;

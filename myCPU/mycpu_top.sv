@@ -83,26 +83,25 @@ logic        icache_addr_ok;
 logic        icache_data_ok;
 logic [63:0] icache_rdata;
 
-logic        dcache0_req;
-logic        dcache0_wr;
-logic [ 1:0] dcache0_size;
-logic [ 3:0] dcache0_wstrb;
-logic [31:0] dcache0_addr;
-logic [31:0] dcache0_wdata;
-logic        dcache0_uncached;
-logic        dcache0_addr_ok;
-logic        dcache0_data_ok;
-logic [31:0] dcache0_rdata;
-logic        dcache1_req;
-logic        dcache1_wr;
-logic [ 1:0] dcache1_size;
-logic [ 3:0] dcache1_wstrb;
-logic [31:0] dcache1_addr;
-logic [31:0] dcache1_wdata;
-logic        dcache1_uncached;
-logic        dcache1_addr_ok;
-logic        dcache1_data_ok;
-logic [31:0] dcache1_rdata;
+
+logic                      dcache_p0_valid;
+logic                      dcache_p1_valid;
+logic [2:0]                dcache_op;
+logic [`TAG_WIDTH-1:0]     dcache_tag;
+logic [`INDEX_WIDTH-1:0]   dcache_index;
+logic [`OFFSET_WIDTH-1:0]  dcache_p0_offset;
+logic [`OFFSET_WIDTH-1:0]  dcache_p1_offset;
+logic [3:0]                dcache_p0_wstrb;
+logic [3:0]                dcache_p1_wstrb;
+logic [31:0]               dcache_p0_wdata;
+logic [31:0]               dcache_p1_wdata;
+logic                      dcache_uncached;
+logic [1:0]                dcache_p0_size;
+logic [1:0]                dcache_p1_size;
+logic                      dcache_addr_ok;
+logic                      dcache_data_ok;
+logic [31:0]               dcache_p0_rdata;
+logic [31:0]               dcache_p1_rdata;
 
 
 logic                      inst_rd_req;
@@ -151,26 +150,24 @@ core core_0(
     .icache_data_ok(icache_data_ok),
     .icache_rdata(icache_rdata),
 
-    .dcache0_req(dcache0_req),
-    .dcache0_wr(dcache0_wr),
-    .dcache0_size(dcache0_size),
-    .dcache0_wstrb(dcache0_wstrb),
-    .dcache0_addr(dcache0_addr),
-    .dcache0_wdata(dcache0_wdata),
-    .dcache0_uncached(dcache0_uncached),
-    .dcache0_addr_ok(dcache0_addr_ok),
-    .dcache0_data_ok(dcache0_data_ok),
-    .dcache0_rdata(dcache0_rdata),
-    .dcache1_req(dcache1_req),
-    .dcache1_wr(dcache1_wr),
-    .dcache1_size(dcache1_size),
-    .dcache1_wstrb(dcache1_wstrb),
-    .dcache1_addr(dcache1_addr),
-    .dcache1_wdata(dcache1_wdata),
-    .dcache1_uncached(dcache1_uncached),
-    .dcache1_addr_ok(dcache1_addr_ok),
-    .dcache1_data_ok(dcache1_data_ok),
-    .dcache1_rdata(dcache1_rdata),
+    .dcache_p0_valid(dcache_p0_valid),
+    .dcache_p1_valid(dcache_p1_valid),
+    .dcache_op(dcache_op),
+    .dcache_tag(dcache_tag),
+    .dcache_index(dcache_index),
+    .dcache_p0_offset(dcache_p0_offset),
+    .dcache_p1_offset(dcache_p1_offset),
+    .dcache_p0_wstrb(dcache_p0_wstrb),
+    .dcache_p1_wstrb(dcache_p1_wstrb),
+    .dcache_p0_wdata(dcache_p0_wdata),
+    .dcache_p1_wdata(dcache_p1_wdata),
+    .dcache_uncached(dcache_uncached),
+    .dcache_p0_size(dcache_p0_size),
+    .dcache_p1_size(dcache_p1_size),
+    .dcache_addr_ok(dcache_addr_ok),
+    .dcache_data_ok(dcache_data_ok),
+    .dcache_p0_rdata(dcache_p0_rdata),
+    .dcache_p1_rdata(dcache_p1_rdata),
 
     .debug0_wb_pc(debug0_wb_pc),
     .debug0_wb_rf_wen(debug0_wb_rf_wen),
@@ -257,63 +254,35 @@ icache icache(
 //     .wr_rdy(data_wr_rdy)
 // );
 
-wire dcache_p1_only = !dcache0_req && dcache1_req;
-reg dcache_p1_only_reg;
 
-wire dcache0_addr_ok_ori;
-wire dcache0_data_ok_ori;
-wire dcache1_addr_ok_ori;
-wire dcache1_data_ok_ori;
-wire [31:0] dcache1_rdata_ori;
-
-always @(posedge aclk) begin
-    if (dcache0_addr_ok | dcache1_addr_ok) begin
-        dcache_p1_only_reg <= dcache_p1_only;
-    end
-end
-
-assign dcache0_addr_ok = !dcache_p1_only ? dcache0_addr_ok_ori : 1'b0;
-assign dcache0_data_ok = !dcache_p1_only_reg ? dcache0_data_ok_ori : 1'b0;
-
-assign dcache1_addr_ok = !dcache_p1_only ? dcache1_addr_ok_ori : dcache0_addr_ok_ori;
-assign dcache1_data_ok = !dcache_p1_only_reg ? dcache1_data_ok_ori : dcache0_data_ok_ori;
-assign dcache1_rdata = !dcache_p1_only_reg ? dcache1_rdata_ori : dcache0_rdata;
-
-dcache dcache_0(
+dcache1_2 dcache(
     .clk(aclk),
     .resetn(aresetn),
 
-    .p0_valid       (!dcache_p1_only ? dcache0_req : dcache1_req),
-    .p0_op          (!dcache_p1_only ? dcache0_wr : dcache1_wr),
-    .p0_tag         (!dcache_p1_only ? dcache0_addr[31:12] : dcache1_addr[31:12]),
-    .p0_index       (!dcache_p1_only
-                        ? dcache0_addr[11:`OFFSET_WIDTH]
-                        : dcache1_addr[11:`OFFSET_WIDTH]),
-    .p0_offset      (!dcache_p1_only
-                        ? dcache0_addr[`OFFSET_WIDTH-1:0]
-                        : dcache1_addr[`OFFSET_WIDTH-1:0]),
-    .p0_wstrb       (!dcache_p1_only ? dcache0_wstrb : dcache1_wstrb),
-    .p0_wdata       (!dcache_p1_only ? dcache0_wdata : dcache1_wdata),
-    .p0_uncached    (!dcache_p1_only ? dcache0_uncached : dcache1_uncached),
-    .p0_size        (!dcache_p1_only ? dcache0_size : dcache1_size),
+    .p0_valid       (dcache_p0_valid),
+    .p1_valid       (dcache_p1_valid),
 
-    .p0_addr_ok     (dcache0_addr_ok_ori),
-    .p0_data_ok     (dcache0_data_ok_ori),
-    .p0_rdata       (dcache0_rdata),
+    .op             (dcache_op),
+    .tag            (dcache_tag),
+    .index          (dcache_index),
+    .p0_offset      (dcache_p0_offset),
+    .p1_offset      (dcache_p1_offset),
+
+    .p0_wstrb       (dcache_p0_wstrb),
+    .p1_wstrb       (dcache_p1_wstrb),
 
 
-    .p1_valid       (dcache1_req & !dcache_p1_only),
-    .p1_op          (dcache1_wr),
-    .p1_tag         (dcache1_addr[31:12]),
-    .p1_index       (dcache1_addr[11:`OFFSET_WIDTH]),
-    .p1_offset      (dcache1_addr[`OFFSET_WIDTH-1:0]),
-    .p1_wstrb       (dcache1_wstrb),
-    .p1_wdata       (dcache1_wdata),
-    .p1_uncached    (dcache1_uncached),
-    .p1_size        (dcache1_size),
-    .p1_addr_ok     (dcache1_addr_ok_ori),
-    .p1_data_ok     (dcache1_data_ok_ori),
-    .p1_rdata       (dcache1_rdata_ori),
+    .p0_wdata       (dcache_p0_wdata),
+    .p1_wdata       (dcache_p1_wdata),
+
+    .uncached       (dcache_uncached),
+    .p0_size        (dcache_p0_size),
+    .p1_size        (dcache_p1_size),
+
+    .addr_ok        (dcache_addr_ok),
+    .data_ok        (dcache_data_ok),
+    .p0_rdata       (dcache_p0_rdata),
+    .p1_rdata       (dcache_p1_rdata),
 
     .rd_req(data_rd_req),
     .rd_type(data_rd_type),

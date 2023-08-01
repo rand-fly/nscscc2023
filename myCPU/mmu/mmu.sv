@@ -1,4 +1,4 @@
-`include "definitions.svh"
+`include "../definitions.svh"
 
 module mmu (
     input               clk,
@@ -73,33 +73,31 @@ module mmu (
     output [TLBIDLEN-1:0] tlbsrch_index,
 
     // to and from icache
-    output              icache_req,
-    output       [31:0] icache_addr,
-    output              icache_uncached,
-    input               icache_addr_ok,
-    input               icache_data_ok,
-    input        [63:0] icache_rdata,
+    output                     icache_req,
+    output [             31:0] icache_addr,
+    output                     icache_uncached,
+    input                      icache_addr_ok,
+    input                      icache_data_ok,
+    input  [             63:0] icache_rdata,
     // to and from dcache
-    output logic        dcache0_req,
-    output logic        dcache0_wr,
-    output logic [ 1:0] dcache0_size,
-    output logic [ 3:0] dcache0_wstrb,
-    output logic [31:0] dcache0_addr,
-    output logic [31:0] dcache0_wdata,
-    output logic        dcache0_uncached,
-    input  wire         dcache0_addr_ok,
-    input  wire         dcache0_data_ok,
-    input  wire  [31:0] dcache0_rdata,
-    output logic        dcache1_req,
-    output logic        dcache1_wr,
-    output logic [ 1:0] dcache1_size,
-    output logic [ 3:0] dcache1_wstrb,
-    output logic [31:0] dcache1_addr,
-    output logic [31:0] dcache1_wdata,
-    output logic        dcache1_uncached,
-    input  wire         dcache1_addr_ok,
-    input  wire         dcache1_data_ok,
-    input  wire  [31:0] dcache1_rdata
+    output                     dcache_p0_valid,
+    output                     dcache_p1_valid,
+    output [              2:0] dcache_op,
+    output [   `TAG_WIDTH-1:0] dcache_tag,
+    output [ `INDEX_WIDTH-1:0] dcache_index,
+    output [`OFFSET_WIDTH-1:0] dcache_p0_offset,
+    output [`OFFSET_WIDTH-1:0] dcache_p1_offset,
+    output [              3:0] dcache_p0_wstrb,
+    output [              3:0] dcache_p1_wstrb,
+    output [             31:0] dcache_p0_wdata,
+    output [             31:0] dcache_p1_wdata,
+    output                     dcache_uncached,
+    output [              1:0] dcache_p0_size,
+    output [              1:0] dcache_p1_size,
+    input                      dcache_addr_ok,
+    input                      dcache_data_ok,
+    input  [             31:0] dcache_p0_rdata,
+    input  [             31:0] dcache_p1_rdata
 );
 
   logic        [31:0] i_pa;
@@ -259,26 +257,46 @@ module mmu (
   assign i_data_ok = icache_data_ok;
   assign i_rdata = icache_rdata;
 
-  assign dcache0_req = d1_req;
-  assign dcache0_wr = d1_we;
-  assign dcache0_size = d1_size;
-  assign dcache0_wstrb = d1_wstrb;
-  assign dcache0_addr = d1_pa;
-  assign dcache0_wdata = d1_wdata;
-  assign dcache0_uncached = d1_mat == 2'd0;
-  assign d1_addr_ok = dcache0_addr_ok;
-  assign d1_data_ok = dcache0_data_ok;
-  assign d1_rdata = dcache0_rdata;
+  wire d2_only = !d1_req && d2_req;
+  reg d2_only_reg;
+  reg d1_req_reg;
+  reg d2_req_reg;
+  wire conflict = d1_req && (dcache_uncached || d1_pa[31:`OFFSET_WIDTH] != d2_pa[31:`OFFSET_WIDTH]);
 
-  assign dcache1_req = d2_req;
-  assign dcache1_wr = d2_we;
-  assign dcache1_size = d2_size;
-  assign dcache1_wstrb = d2_wstrb;
-  assign dcache1_addr = d2_pa;
-  assign dcache1_wdata = d2_wdata;
-  assign dcache1_uncached = d2_mat == 2'd0;
-  assign d2_addr_ok = dcache1_addr_ok;
-  assign d2_data_ok = dcache1_data_ok;
-  assign d2_rdata = dcache1_rdata;
+  always @(posedge clk) begin
+    if (reset) begin
+      d2_only_reg  <= 1'b0;
+      d1_req_reg <= 1'b0;
+      d2_req_reg <= 1'b0;
+    end else if (dcache_addr_ok) begin
+      d2_only_reg  <= d2_only;
+      d1_req_reg <= d1_req;
+      d2_req_reg <= d2_req;
+    end
+  end
+
+  assign dcache_p0_valid = d2_only ? d2_req : d1_req;
+  assign dcache_p1_valid = d2_req && !conflict;
+  assign dcache_op = d1_req ? d1_we : d2_we;
+  assign dcache_tag = d1_pa[31:31-`TAG_WIDTH+1];
+  assign dcache_index = d1_pa[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1];
+  assign dcache_p0_offset = d2_only ? d2_pa[`OFFSET_WIDTH-1:0] : d1_pa[`OFFSET_WIDTH-1:0];
+  assign dcache_p1_offset = d2_pa[`OFFSET_WIDTH-1:0];
+  assign dcache_p0_wstrb = d2_only ? d2_wstrb : d1_wstrb;
+  assign dcache_p1_wstrb = d2_wstrb;
+  assign dcache_p0_wdata = d2_only ? d2_wdata : d1_wdata;
+  assign dcache_p1_wdata = d2_wdata;
+  assign dcache_uncached = d1_mat == 2'd0;
+  assign dcache_p0_size = d2_only ? d2_size : d1_size;
+  assign dcache_p1_size = d2_size;
+
+  assign d1_addr_ok = d1_req && dcache_addr_ok;
+  assign d1_data_ok = d1_req_reg && dcache_data_ok;
+  assign d1_rdata = d2_only_reg ? dcache_p1_rdata : dcache_p0_rdata;
+
+  assign d2_addr_ok = d2_req && dcache_addr_ok;
+  assign d2_data_ok = d2_req_reg && dcache_data_ok;
+  assign d2_rdata = dcache_p1_rdata;
+
 
 endmodule
