@@ -817,12 +817,12 @@ assign p1_rdata = p1_uncached_reg ? ret_data : `get_word(p1_cache_rd_data, p1_of
 assign p0_data_ok = !p0_finished & ((p0_op_reg == OP_READ)
                     ? ((p0_lookup & p0_cache_hit_and_cached) | (p0_uncached_reg
                                                     ? (p0_refill & ret_valid_last)
-                                                    : (p0_refill & ret_valid & (p0_buffer_read_data_count >= {(p0_offset_w_reg < p0_buffer_read_data_count_start),p0_offset_w_reg}))))
+                                                    : (p0_refill & ret_valid & (p0_buffer_read_data_count >= {(p0_offset_w_reg < p0_buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),p0_offset_w_reg}))))
                     : p0_wdata_ok_reg);
 assign p1_data_ok = !p1_finished & ((p1_op_reg == OP_READ)
                     ? ((p1_lookup & p1_cache_hit_and_cached) | (p1_uncached_reg
                                                     ? (p1_refill & ret_valid_last)
-                                                    : ((p1_refill | (merge_p0_p1_reg & p0_refill)) & ret_valid & (p1_buffer_read_data_count >= {(p1_offset_w_reg < p1_buffer_read_data_count_start),p1_offset_w_reg}))))
+                                                    : ((p1_refill | (merge_p0_p1_reg & p0_refill)) & ret_valid & (p1_buffer_read_data_count >= {(p1_offset_w_reg < p1_buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),p1_offset_w_reg}))))
                     : p1_wdata_ok_reg);
 
 always @(posedge clk) begin
