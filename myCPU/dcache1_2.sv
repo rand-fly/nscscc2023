@@ -79,7 +79,7 @@ reg [3:0] p0_wstrb_reg;
 reg [3:0] p1_wstrb_reg;
 reg [31:0] p0_wdata_reg;
 reg [31:0] p1_wdata_reg;
-wire [31:0] p1_wdata_valid;
+// wire [31:0] p1_wdata_valid;
 // wire [7:0] wdata_reg_bytes [0:3];
 // wire [31:0] wdata_actually;
 // reg [31:0] wdata_actually_reg;
@@ -300,7 +300,7 @@ wire [`LINE_WIDTH-1:0] p1_cache_write_data_strobe;
 wire next_same_line;
 wire [3:0] p1_wstrb_valid;
 
-assign p1_wdata_valid = p1_valid ? p1_wdata : 0;
+// assign p1_wdata_valid = p1_valid ? p1_wdata : 0;
 assign p1_wstrb_valid = p1_valid ? p1_wstrb : 0;
 
 assign p0_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{p0_wstrb[3]}},{8{p0_wstrb[2]}},{8{p0_wstrb[1]}},{8{p0_wstrb[0]}}} << (p0_offset_cell_w*8);
@@ -363,12 +363,15 @@ always @(posedge clk) begin
             p0_wstrb_reg <= p0_wstrb;
             p1_wstrb_reg <= p1_wstrb_valid;
             p0_wdata_reg <= p0_wdata;
+            p1_wdata_reg <= p1_wdata;
             p1_valid_reg <= p1_valid;
             if (!uncached & (op == OP_WRITE)) begin
                 cache_wstrb_reg <= cache_wstrb_reg | ({{(`LINE_SIZE-4){1'b0}},p0_wstrb} << p0_offset_cell_w) | ({{(`LINE_SIZE-4){1'b0}},p1_wstrb_valid} << p1_offset_cell_w);
                 cache_write_data_reg <= (cache_write_data_reg & ~cache_write_data_strobe) 
-                                        | ((({{(`LINE_WIDTH-32){1'b0}},p0_wdata} << (p0_offset_cell_w*8)) 
-                                            | ({{(`LINE_WIDTH-32){1'b0}},p1_wdata_valid} << (p1_offset_cell_w*8))) & cache_write_data_strobe);
+                                        | ((
+                                            ({{(`LINE_WIDTH-32){1'b0}},p0_wdata} << (p0_offset_cell_w*8) & p0_cache_write_data_strobe) 
+                                            | ({{(`LINE_WIDTH-32){1'b0}},p1_wdata} << (p1_offset_cell_w*8) & p1_cache_write_data_strobe)
+                                            ));
             end
         end
         else if (refill_write | hit_write) begin
@@ -688,9 +691,9 @@ always @(posedge clk) begin
 end
 
 
-`define DBG_TAG 20'h203
-`define DBG_INDEX 7'h16
-// `define DCACHE_DBG
+`define DBG_TAG 20'h1d0
+`define DBG_INDEX 7'h00
+`define DCACHE_DBG
 
 `ifdef DCACHE_DBG
 always @(posedge clk) begin
