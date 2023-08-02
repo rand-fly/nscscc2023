@@ -3,6 +3,7 @@
 module lsu (
     input clk,
     input reset,
+    input cancel,
     // to ex1
     output ready,
     // from ex1
@@ -60,7 +61,7 @@ module lsu (
     if (reset) begin
       wait_for_addr_ok <= 1'b0;
     end else begin
-      if (start_req && !mmu_addr_ok) begin
+      if (start_req && !mmu_addr_ok && !cancel) begin
         wait_for_addr_ok <= 1'b1;
       end
       if (mmu_addr_ok) begin

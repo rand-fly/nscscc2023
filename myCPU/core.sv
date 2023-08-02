@@ -1023,7 +1023,7 @@ module core (
     end
   end
 
-  assign ex1_ready = lsu_a_ready && lsu_b_ready;
+  assign ex1_ready = lsu_a_ready && lsu_b_ready || mem_cancel;
   assign ex1_stall = (EX1_a_valid || EX1_b_valid) && (!ex1_ready || ex2_stall);
 
   alu u_alu_a (
@@ -1111,12 +1111,15 @@ module core (
       .result(div_b_result)
   );
 
+  wire mem_cancel = raise_excp || lsu_a_have_excp || ex2_b_br_mistaken || lsu_a_have_excp || lsu_b_have_excp || ex1_a_br_mistaken || EX1_a_have_excp;
+
   lsu u_lsu_a (
       .clk(clk),
       .reset(reset),
+      .cancel(mem_cancel),
       .ready(lsu_a_ready),
       .valid(EX1_a_valid && EX1_a_optype == OP_MEM),
-      .start(EX1_a_valid && EX1_a_optype == OP_MEM && !EX1_stalling && !raise_excp && !lsu_a_have_excp && !ex2_b_br_mistaken),
+      .start(EX1_a_valid && EX1_a_optype == OP_MEM && !EX1_stalling),
       .base(ex1_a_src1),
       .offset(EX1_a_imm),
       .mem_type(mem_type_t'(EX1_a_opcode[3:2])),
@@ -1146,9 +1149,10 @@ module core (
   lsu u_lsu_b (
       .clk(clk),
       .reset(reset),
+      .cancel(mem_cancel),
       .ready(lsu_b_ready),
       .valid(EX1_b_valid && EX1_b_optype == OP_MEM),
-      .start(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling && !lsu_b_have_excp && !EX1_a_have_excp && !raise_excp && !lsu_a_have_excp && !ex1_a_br_mistaken && !ex2_b_br_mistaken),
+      .start(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling),
       .base(ex1_b_src1),
       .offset(EX1_b_imm),
       .mem_type(mem_type_t'(EX1_b_opcode[3:2])),
@@ -1551,6 +1555,7 @@ module core (
       .i_tlbr          (mmu_i_tlbr),
       .i_pif           (mmu_i_pif),
       .i_ppi           (mmu_i_ppi),
+      .d_cancel        (mem_cancel),
       .d1_req          (mmu_d1_req),
       .d1_va           (mmu_d1_va),
       .d1_we           (mmu_d1_we),

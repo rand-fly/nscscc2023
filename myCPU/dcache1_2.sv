@@ -272,6 +272,7 @@ wire cache_hit_and_cached;
 wire [`CACHE_WAY_NUM-1:0] cache_hit_way;
 wire [`CACHE_WAY_NUM_LOG2-1:0] cache_hit_way_id;
 
+wire pipe_interface_latch_without_valid;
 wire pipe_interface_latch;
 
 wire [`LINE_WIDTH-1:0] buffer_read_data_new;
@@ -324,7 +325,8 @@ assign ret_valid_last = (ret_valid & ret_last);
 
 assign next_same_line = (index == index_reg) & (tag == tag_reg);
 
-assign pipe_interface_latch = p0_valid & (
+assign pipe_interface_latch = p0_valid & pipe_interface_latch_without_valid;
+assign pipe_interface_latch_without_valid = (
     idle | 
     (lookup & (op_reg == OP_READ) & cache_hit_and_cached) //|
     // (refill & !uncached_reg & (op_reg == OP_READ) & (data_ok | finished) & next_same_line & !fetch_ok) |
@@ -384,7 +386,7 @@ always @(posedge clk) begin
     end
 end
 
-assign addr_ok = pipe_interface_latch;
+assign addr_ok = pipe_interface_latch_without_valid;
 
 always @(posedge clk) begin
     wdata_ok_reg <= (op == OP_WRITE) & pipe_interface_latch;
