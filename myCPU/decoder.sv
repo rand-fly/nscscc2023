@@ -191,7 +191,9 @@ assign           {valid_inst, optype, opcode,                r1,    r2, src2_is_
 {56{inst_ertn     }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } ;
 
 
-br_type_t jirl_type = (rd == `R0 && rj == `R1 && i16 == 0) ? BR_RET : BR_INDIR;
+br_type_t jirl_type;
+
+assign jirl_type = (rd == `R0 && rj == `R1 && i16 == 0) ? BR_RET : BR_INDIR;
 
 // br table
 assign                 {br_type,   br_target, br_condition    } =
