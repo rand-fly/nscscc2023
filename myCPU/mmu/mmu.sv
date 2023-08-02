@@ -264,9 +264,6 @@ module mmu (
   wire conflict = d1_req && (dcache_uncached || d1_pa[31:`OFFSET_WIDTH] != d2_pa[31:`OFFSET_WIDTH]);
 
   always @(posedge clk) begin
-    if (d1_pa == 32'h00202bca || d2_pa == 32'h00202bca)begin
-      $display("time: %t",$time);
-    end
     if (reset) begin
       d2_only_reg  <= 1'b0;
       d1_req_reg <= 1'b0;
