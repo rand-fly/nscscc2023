@@ -15,10 +15,9 @@ module decoder (
     output opcode_t          opcode,
     output            [ 4:0] dest,
     output            [31:0] imm,
-    output                   is_br,
+    output br_type_t         br_type,
     output                   br_condition,
     output            [31:0] br_target,
-    output                   is_jirl,
     output                   have_excp,
     output excp_t            excp_type,
     output csr_addr_t        csr_addr,
@@ -192,22 +191,23 @@ assign           {valid_inst, optype, opcode,                r1,    r2, src2_is_
 {56{inst_ertn     }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } ;
 
 
-// br table
-assign                 {is_br, br_target, br_condition    } =
-{34{inst_beq      }} & {1'b1,  pc+si16,   1'b1 /* EQU  */ } |
-{34{inst_bne      }} & {1'b1,  pc+si16,   1'b0 /* EQU  */ } |
-{34{inst_blt      }} & {1'b1,  pc+si16,   1'b1 /* SLT  */ } |
-{34{inst_bltu     }} & {1'b1,  pc+si16,   1'b1 /* SLTU */ } |
-{34{inst_bge      }} & {1'b1,  pc+si16,   1'b0 /* SLT  */ } |
-{34{inst_bgeu     }} & {1'b1,  pc+si16,   1'b0 /* SLTU */ } |
-{34{inst_b        }} & {1'b0,  pc+si26,   1'b0            } |
-{34{inst_bl       }} & {1'b0,  pc+si26,   1'b0            } |
-{34{inst_jirl     }} & {1'b1,  si16,      1'b0            } ;
+br_type_t jirl_type = (rd == `R0 && rj == `R1 && i16 == 0) ? BR_RET : BR_INDIR;
 
-assign br_taken = inst_b || inst_bl;
-assign is_jirl = inst_jirl;
-assign br_mistaken = pred_br_taken && (!is_br || !br_taken || pred_br_target != br_target)
-                  || !pred_br_taken && br_taken;
+// br table
+assign                 {br_type,   br_target, br_condition    } =
+{36{inst_beq      }} & {BR_COND,   pc+si16,   1'b1 /* EQU  */ } |
+{36{inst_bne      }} & {BR_COND,   pc+si16,   1'b0 /* EQU  */ } |
+{36{inst_blt      }} & {BR_COND,   pc+si16,   1'b1 /* SLT  */ } |
+{36{inst_bltu     }} & {BR_COND,   pc+si16,   1'b1 /* SLTU */ } |
+{36{inst_bge      }} & {BR_COND,   pc+si16,   1'b0 /* SLT  */ } |
+{36{inst_bgeu     }} & {BR_COND,   pc+si16,   1'b0 /* SLTU */ } |
+{36{inst_b        }} & {BR_IMM,    pc+si26,   1'b0            } |
+{36{inst_bl       }} & {BR_CALL,   pc+si26,   1'b0            } |
+{36{inst_jirl     }} & {jirl_type, si16,      1'b0            } ;
+
+assign br_taken = inst_b | inst_bl;
+assign br_mistaken = pred_br_taken && (br_type == BR_NOP || (!inst_jirl && pred_br_target != br_target))
+                     || !pred_br_taken && br_taken;
 
 assign ine = !valid_inst || inst_invtlb && rd > 5'd6;
 

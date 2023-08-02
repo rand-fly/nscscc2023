@@ -1,21 +1,19 @@
-module btb
-#(
-	parameter BTBNUM = 32,
-	parameter BTBIDLEN = $clog2(BTBNUM),
-	parameter BTBTAGLEN = 6,
-	parameter BTBGROUP = 2
-)
-(
-	input             clk           ,
-    input             reset         ,
+module btb #(
+    parameter BTBNUM = 128,
+    parameter BTBIDLEN = $clog2(BTBNUM),
+    parameter BTBTAGLEN = 8,
+    parameter BTBGROUP = 2
+) (
+    input clk,
+    input reset,
 
     //from/to if
-    input  	[31:0]    fetch_pc_0     	,
-    input  	[31:0]    fetch_pc_1    	,
-    output	[31:0]	  target_pc_0		,
-    output	[31:0]	  target_pc_1		,
-    output 	[2:0]	  ins_type_0		,
-    output 	[2:0]	  ins_type_1		,
+    input  [31:0] fetch_pc_0,
+    input  [31:0] fetch_pc_1,
+    output [31:0] target_pc_0,
+    output [31:0] target_pc_1,
+    output [ 2:0] ins_type_0,
+    output [ 2:0] ins_type_1,
 
     //update btb
     input             branch_mistaken  ,
@@ -24,77 +22,82 @@ module btb
     input  	[31:0]    right_target     
 );
 
-logic            		hit_0    ;
-logic            	 	hit_1    ;
-logic             		hit_w    ;
-logic             		hit_inv  ;
+  logic            		              hit_0    ;
+  logic            	 	              hit_1    ;
+  logic             		          hit_w    ;
+  logic             		          hit_inv  ;
 
 //storage
-reg     [BTBNUM/BTBGROUP -1:0]    btb_valid_way0;
-reg     [BTBNUM/BTBGROUP -1:0]    btb_valid_way1;
+  reg   [       BTBNUM/BTBGROUP -1:0] btb_valid_way0;
+  reg   [       BTBNUM/BTBGROUP -1:0] btb_valid_way1;
 
 `define get_valid(way_id_,index_) (\
         {1{way_id_==0}} & btb_valid_way0[index_]\
     |   {1{way_id_==1}} & btb_valid_way1[index_]\
 )
 
-reg     [BTBTAGLEN-1:0] btb_tag_way0     [BTBNUM/BTBGROUP -1:0];
-reg     [BTBTAGLEN-1:0] btb_tag_way1     [BTBNUM/BTBGROUP -1:0];
+  reg   [              BTBTAGLEN-1:0] btb_tag_way0     [BTBNUM/BTBGROUP -1:0];
+  reg   [              BTBTAGLEN-1:0] btb_tag_way1     [BTBNUM/BTBGROUP -1:0];
 
 `define get_tag(way_id_,index_) (\
         {BTBTAGLEN{way_id_==0}} & btb_tag_way0[index_]\
     |   {BTBTAGLEN{way_id_==1}} & btb_tag_way1[index_]\
 )
 
-reg     [31:0]          btb_target_way0  [BTBNUM/BTBGROUP -1:0];
-reg     [31:0]          btb_target_way1  [BTBNUM/BTBGROUP -1:0];
+  reg   [                       31:0] btb_target_way0  [BTBNUM/BTBGROUP -1:0];
+  reg   [                       31:0] btb_target_way1  [BTBNUM/BTBGROUP -1:0];
 
 `define get_target(way_id_,index_) (\
         {32{way_id_==0}} & btb_target_way0[index_]\
     |   {32{way_id_==1}} & btb_target_way1[index_]\
 )
 
-reg     [2:0]			btb_ins_type_way0[BTBNUM/BTBGROUP -1:0];
-reg     [2:0]           btb_ins_type_way1[BTBNUM/BTBGROUP -1:0];
+  reg   [                        2:0] btb_ins_type_way0[BTBNUM/BTBGROUP -1:0];
+  reg   [                        2:0] btb_ins_type_way1[BTBNUM/BTBGROUP -1:0];
 
 `define get_ins_type(way_id_,index_) (\
         {3{way_id_==0}} & btb_ins_type_way0[index_]\
     |   {3{way_id_==1}} & btb_ins_type_way1[index_]\
 )
 
-reg   	[$clog2(BTBGROUP)-1:0]	btb_replace_counter	[BTBNUM/BTBGROUP -1:0] ;
+  reg   [       $clog2(BTBGROUP)-1:0] btb_replace_counter[BTBNUM/BTBGROUP -1:0];
 
 //search
-logic   [29:0]          pc_0_32to2;
-logic   [29:0]          pc_1_32to2;
-logic   [29:0]          pc_w_32to2;
-logic   [BTBGROUP-1:0]  btb_hit_way_0;
-logic   [BTBGROUP-1:0]  btb_hit_way_1;
-logic   [BTBGROUP-1:0]  btb_hit_way_w; 
-logic   [BTBGROUP-1:0]  btb_hit_way_inv;  
-logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_0;
-logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_1;
-logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_w;
-logic   [BTBTAGLEN-1:0] btb_fetch_tag_0;
-logic   [BTBTAGLEN-1:0] btb_fetch_tag_1;
-logic   [BTBTAGLEN-1:0] btb_fetch_tag_w;
-logic   [$clog2(BTBGROUP)-1:0]  btb_hit_way_id_0;
-logic   [$clog2(BTBGROUP)-1:0]  btb_hit_way_id_1;
-logic   [$clog2(BTBGROUP)-1:0]  btb_hit_way_id_w;
-logic   [$clog2(BTBGROUP)-1:0]  btb_hit_way_id_inv;
+  logic [                       29:0] pc_0_32to2;
+  logic [                       29:0] pc_1_32to2;
+  logic [                       29:0] pc_w_32to2;
+  logic [               BTBGROUP-1:0] btb_hit_way_0;
+  logic [               BTBGROUP-1:0] btb_hit_way_1;
+  logic [               BTBGROUP-1:0] btb_hit_way_w; 
+  logic [               BTBGROUP-1:0] btb_hit_way_inv;  
+  logic [$clog2(BTBNUM/BTBGROUP)-1:0] btb_group_num_0;
+  logic [$clog2(BTBNUM/BTBGROUP)-1:0] btb_group_num_1;
+  logic [$clog2(BTBNUM/BTBGROUP)-1:0] btb_group_num_w;
+  logic [              BTBTAGLEN-1:0] btb_fetch_tag_0;
+  logic [              BTBTAGLEN-1:0] btb_fetch_tag_1;
+  logic [              BTBTAGLEN-1:0] btb_fetch_tag_w;
+  logic [       $clog2(BTBGROUP)-1:0] btb_hit_way_id_0;
+  logic [       $clog2(BTBGROUP)-1:0] btb_hit_way_id_1;
+  logic [       $clog2(BTBGROUP)-1:0] btb_hit_way_id_w;
+  logic [       $clog2(BTBGROUP)-1:0] btb_hit_way_id_inv;
 
 
-assign pc_0_32to2 = fetch_pc_0[31:2];
-assign pc_1_32to2 = fetch_pc_1[31:2];
-assign pc_w_32to2 = wrong_pc[31:2];
 
-assign btb_group_num_0 = pc_0_32to2[$clog2(BTBNUM/BTBGROUP)-1:0];
-assign btb_group_num_1 = pc_1_32to2[$clog2(BTBNUM/BTBGROUP)-1:0];
-assign btb_group_num_w = pc_w_32to2[$clog2(BTBNUM/BTBGROUP)-1:0];
+  assign pc_0_32to2 = fetch_pc_0[31:2];
+  assign pc_1_32to2 = fetch_pc_1[31:2];
+  assign pc_w_32to2 = wrong_pc[31:2];
 
-assign btb_fetch_tag_0 = pc_0_32to2[29:24]^pc_0_32to2[23:18]^pc_0_32to2[17:12]^pc_0_32to2[11:6]^pc_0_32to2[5:0];
-assign btb_fetch_tag_1 = pc_1_32to2[29:24]^pc_1_32to2[23:18]^pc_1_32to2[17:12]^pc_1_32to2[11:6]^pc_1_32to2[5:0];
-assign btb_fetch_tag_w = pc_w_32to2[29:24]^pc_w_32to2[23:18]^pc_w_32to2[17:12]^pc_w_32to2[11:6]^pc_w_32to2[5:0];
+  assign btb_group_num_0 = pc_0_32to2[$clog2(BTBNUM/BTBGROUP)-1:0];
+  assign btb_group_num_1 = pc_1_32to2[$clog2(BTBNUM/BTBGROUP)-1:0];
+  assign btb_group_num_w = pc_w_32to2[$clog2(BTBNUM/BTBGROUP)-1:0];
+
+  // assign btb_fetch_tag_0 = pc_0_32to2[29:24]^pc_0_32to2[23:18]^pc_0_32to2[17:12]^pc_0_32to2[11:6]^pc_0_32to2[5:0];
+  // assign btb_fetch_tag_1 = pc_1_32to2[29:24]^pc_1_32to2[23:18]^pc_1_32to2[17:12]^pc_1_32to2[11:6]^pc_1_32to2[5:0];
+  // assign btb_fetch_tag_w = pc_w_32to2[29:24]^pc_w_32to2[23:18]^pc_w_32to2[17:12]^pc_w_32to2[11:6]^pc_w_32to2[5:0];
+
+  assign btb_fetch_tag_0 = pc_0_32to2[29:22]^pc_0_32to2[21:14]^pc_0_32to2[13:6];
+  assign btb_fetch_tag_1 = pc_1_32to2[29:22]^pc_1_32to2[21:14]^pc_1_32to2[13:6];
+  assign btb_fetch_tag_w = pc_w_32to2[29:22]^pc_w_32to2[21:14]^pc_w_32to2[13:6];
 
 genvar i;
 generate

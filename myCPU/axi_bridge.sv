@@ -78,8 +78,6 @@ module axi_bridge(
 );
 
 //fixed signal
-// assign  arburst = 2'b1;
-assign  arburst = (inst_rd_cache_line | data_rd_cache_line) ? 2'b10 : 2'b1;
 assign  arlock  = 2'b0;
 assign  arcache = 4'b0;
 assign  arprot  = 3'b0;
@@ -92,28 +90,31 @@ assign  wid     = 4'b1;
 
 assign  inst_wr_rdy = 1'b1;
 
-localparam read_requst_empty = 1'b0;
-localparam read_requst_ready = 1'b1;
-localparam read_respond_empty = 1'b0;
-localparam read_respond_transfer = 1'b1;
-localparam write_request_empty = 3'b000;
-localparam write_addr_ready = 3'b001;
-localparam write_data_ready = 3'b010;
-localparam write_all_ready = 3'b011;
-localparam write_data_transform = 3'b100;
-localparam write_data_wait = 3'b101;
-localparam write_wait_b = 3'b110;
+parameter RD_REQ_ST_IDLE = 1'b0;
+parameter RD_REQ_ST_RDY = 1'b1;
+
+parameter RD_RES_ST_IDLE = 1'b0;
+parameter RD_RES_ST_RX = 1'b1;
+
+parameter WR_ST_REQ_IDLE = 3'b000;
+parameter WR_ST_ADDR_RDY = 3'b001;
+parameter WR_ST_DATA_RDY = 3'b010;
+parameter WR_ST_RDY = 3'b011;
+parameter WR_ST_TX = 3'b100;
+parameter WR_ST_TX_WAIT = 3'b101;
+parameter WR_ST_WAIT_B = 3'b110;
 
 reg       read_requst_state;
 reg       read_respond_state;
-reg [2:0] write_requst_state;
+reg [2:0] write_state;
 
 wire      write_wait_enable;
 
 wire         rd_requst_state_is_empty;
 wire         rd_requst_can_receive;
 
-assign rd_requst_state_is_empty = read_requst_state == read_requst_empty;
+assign arburst = (inst_rd_cache_line | data_rd_cache_line) ? 2'b10 : 2'b1;
+assign rd_requst_state_is_empty = read_requst_state == RD_REQ_ST_IDLE;
 
 wire        data_rd_cache_line;
 wire        inst_rd_cache_line;
@@ -126,18 +127,17 @@ wire [ 2:0] data_real_wr_size;
 wire [ 7:0] data_real_wr_len ;
 
 reg [`LINE_WIDTH-1:0]                write_buffer_data;
-reg [`OFFSET_WIDTH-3:0]              write_buffer_num;
+reg [`OFFSET_WIDTH-3:0]              write_countdown_reg;
 
 wire                    write_buffer_last;
 
-assign write_buffer_empty = (write_buffer_num == {(`OFFSET_WIDTH-2){1'b0}}) && !write_wait_enable;
+assign write_buffer_empty = (write_countdown_reg == {(`OFFSET_WIDTH-2){1'b0}}) & !write_wait_enable;
 
-assign rd_requst_can_receive = rd_requst_state_is_empty && !(write_wait_enable && !(bvalid && bready));
+assign rd_requst_can_receive = rd_requst_state_is_empty & !(write_wait_enable & !(bvalid & bready));
 
 assign data_rd_rdy = rd_requst_can_receive;
-assign inst_rd_rdy = !data_rd_req && rd_requst_can_receive;
+assign inst_rd_rdy = !data_rd_req & rd_requst_can_receive;
 
-//read type must be cache line
 assign data_rd_cache_line = data_rd_type == 3'b100;
 assign data_real_rd_size  = data_rd_cache_line ? 3'b10 : data_rd_type;
 assign data_real_rd_len   = data_rd_cache_line ? (`LINE_WORD_NUM-1) : 8'b0;
@@ -146,33 +146,32 @@ assign inst_rd_cache_line = inst_rd_type == 3'b100;
 assign inst_real_rd_size  = inst_rd_cache_line ? 3'b10 : inst_rd_type;
 assign inst_real_rd_len   = inst_rd_cache_line ? (`LINE_WORD_NUM-1) : 8'b0;
 
-//write size can be special
 assign data_wr_cache_line = data_wr_type == 3'b100;
 assign data_real_wr_size  = data_wr_cache_line ? 3'b10 : data_wr_type;
 assign data_real_wr_len   = data_wr_cache_line ? (`LINE_WORD_NUM-1) : 8'b0;
 
-assign inst_ret_valid = !rid[0] && rvalid;
-assign inst_ret_last  = !rid[0] && rlast;
-assign inst_ret_data  = rdata;    //this signal needed buffer???
-assign data_ret_valid =  rid[0] && rvalid;
-assign data_ret_last  =  rid[0] && rlast;
+assign inst_ret_valid = !rid[0] & rvalid;
+assign inst_ret_last  = !rid[0] & rlast;
+assign inst_ret_data  = rdata;
+assign data_ret_valid =  rid[0] & rvalid;
+assign data_ret_last  =  rid[0] & rlast;
 assign data_ret_data  = rdata;
 
-assign data_wr_rdy = (write_requst_state == write_request_empty);
+assign data_wr_rdy = (write_state == WR_ST_REQ_IDLE);
 
-assign write_buffer_last = write_buffer_num == 1;//{{(`OFFSET_WIDTH-3){1'b0}},1'b1};
+assign write_buffer_last = write_countdown_reg == 1;
 
 always @(posedge clk) begin
     if (reset) begin
-        read_requst_state <= read_requst_empty;
+        read_requst_state <= RD_REQ_ST_IDLE;
         arvalid <= 1'b0;
     end
     else case (read_requst_state)
-        read_requst_empty: begin
+        RD_REQ_ST_IDLE: begin
             if (data_rd_req) begin
                 if (write_wait_enable) begin
-                    if (bvalid && bready) begin   //when wait write back, stop send read request. easiest way.
-                        read_requst_state <= read_requst_ready;
+                    if (bvalid & bready) begin // TODO faster
+                        read_requst_state <= RD_REQ_ST_RDY;
                         arid <= 4'b1;
                         araddr <= data_rd_addr;
                         arsize <= data_real_rd_size;
@@ -181,7 +180,7 @@ always @(posedge clk) begin
                     end
                 end
                 else begin
-                    read_requst_state <= read_requst_ready;
+                    read_requst_state <= RD_REQ_ST_RDY;
                     arid <= 4'b1;
                     araddr <= data_rd_addr;
                     arsize <= data_real_rd_size;
@@ -191,8 +190,8 @@ always @(posedge clk) begin
             end
             else if (inst_rd_req) begin
                 if (write_wait_enable) begin
-                    if (bvalid && bready) begin
-                        read_requst_state <= read_requst_ready;
+                    if (bvalid & bready) begin
+                        read_requst_state <= RD_REQ_ST_RDY;
                         arid <= 4'b0;
                         araddr <= inst_rd_addr;
                         arsize <= inst_real_rd_size;
@@ -201,7 +200,7 @@ always @(posedge clk) begin
                     end
                 end
                 else begin
-                    read_requst_state <= read_requst_ready;
+                    read_requst_state <= RD_REQ_ST_RDY;
                     arid <= 4'b0;
                     araddr <= inst_rd_addr;
                     arsize <= inst_real_rd_size;
@@ -210,13 +209,13 @@ always @(posedge clk) begin
                 end
             end
         end
-        read_requst_ready: begin
-            if (arready && arid[0]) begin
-                read_requst_state <= read_requst_empty;
+        RD_REQ_ST_RDY: begin
+            if (arready & arid[0]) begin
+                read_requst_state <= RD_REQ_ST_IDLE;
                 arvalid <= 1'b0;
             end
-            else if (arready && !arid[0]) begin 
-                read_requst_state <= read_requst_empty;
+            else if (arready & !arid[0]) begin 
+                read_requst_state <= RD_REQ_ST_IDLE;
                 arvalid <= 1'b0;
             end
         end
@@ -225,18 +224,18 @@ end
 
 always @(posedge clk) begin
     if (reset) begin
-        read_respond_state <= read_respond_empty;
+        read_respond_state <= RD_RES_ST_IDLE;
         rready <= 1'b1;
     end
     else case (read_respond_state)
-        read_respond_empty: begin
-            if (rvalid && rready) begin 
-                read_respond_state <= read_respond_transfer;
+        RD_RES_ST_IDLE: begin
+            if (rvalid & rready) begin 
+                read_respond_state <= RD_RES_ST_RX;
             end
         end
-        read_respond_transfer: begin
-            if (rlast && rvalid) begin
-                read_respond_state <= read_respond_empty;
+        RD_RES_ST_RX: begin
+            if (rlast & rvalid) begin
+                read_respond_state <= RD_RES_ST_IDLE;
             end
         end
     endcase
@@ -244,49 +243,49 @@ end
 
 always @(posedge clk) begin
     if (reset) begin
-        write_requst_state <= write_request_empty;
+        write_state <= WR_ST_REQ_IDLE;
         awvalid <= 1'b0;
         wvalid  <= 1'b0;
         wlast   <= 1'b0;
         bready  <= 1'b0;
         
-        write_buffer_num   <= 0;
-        write_buffer_data  <= 0;
+        write_countdown_reg <= 0;
+        write_buffer_data   <= 0;
     end
-    else case (write_requst_state)
-        write_request_empty: begin
+    else case (write_state)
+        WR_ST_REQ_IDLE: begin
             if (data_wr_req) begin
-                write_requst_state <= write_data_wait;
+                write_state <= WR_ST_TX_WAIT;
                 //end
                 awaddr  <= data_wr_addr;
                 awsize  <= data_real_wr_size;
                 awlen   <= data_real_wr_len;
                 awvalid <= 1'b1;
-                wdata   <= data_wr_data[31:0];  //from write (128/256) bit buffer
+                wdata   <= data_wr_data[31:0];
                 wstrb   <= data_wr_wstrb;
 
                 write_buffer_data <= {32'b0, data_wr_data[`LINE_WIDTH-1:32]};
 
                 if (data_wr_type == 3'b100) begin
-                    write_buffer_num <= {(`OFFSET_WIDTH-2){1'b1}};
+                    write_countdown_reg <= {(`OFFSET_WIDTH-2){1'b1}};
                 end
                 else begin
-                    write_buffer_num <= 0;
+                    write_countdown_reg <= 0;
                     wlast <= 1'b1;
                 end
             end
         end
-        write_data_wait: begin
+        WR_ST_TX_WAIT: begin
             if (awready) begin
-                write_requst_state <= write_data_transform;
+                write_state <= WR_ST_TX;
                 awvalid <= 1'b0;
 		wvalid  <= 1'b1;
             end
         end 
-        write_data_transform: begin
+        WR_ST_TX: begin
             if (wready) begin
                 if (wlast) begin
-                    write_requst_state <= write_wait_b;
+                    write_state <= WR_ST_WAIT_B;
                     wvalid <= 1'b0;
                     wlast <= 1'b0;
         	    bready <= 1'b1;
@@ -296,27 +295,27 @@ always @(posedge clk) begin
                         wlast <= 1'b1;
                     end
                 
-                    write_requst_state <= write_data_transform;
+                    write_state <= WR_ST_TX;
     
                     wdata   <= write_buffer_data[31:0];
                     wvalid  <= 1'b1;
                     write_buffer_data <= {32'b0, write_buffer_data[`LINE_WIDTH-1:32]};
-                    write_buffer_num  <= write_buffer_num - 1;
+                    write_countdown_reg  <= write_countdown_reg - 1;
                 end
             end
         end
-	write_wait_b: begin
-		if (bvalid && bready) begin
-                    write_requst_state <= write_request_empty;
-		    bready <= 1'b0;
-		end
-	end
+        WR_ST_WAIT_B: begin
+            if (bvalid & bready) begin
+                write_state <= WR_ST_REQ_IDLE;
+                bready <= 1'b0;
+            end
+        end
         default: begin
-            write_requst_state <= write_request_empty;
+            write_state <= WR_ST_REQ_IDLE;
         end
     endcase
 end
 
-assign write_wait_enable = ~(write_requst_state == write_request_empty);
+assign write_wait_enable = !(write_state == WR_ST_REQ_IDLE);
 
 endmodule
