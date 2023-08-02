@@ -70,13 +70,14 @@ reg [`INDEX_WIDTH-1:0] index_reg;
 reg [`INDEX_WIDTH-1:0] index_reg_miss;
 reg [`TAG_WIDTH-1:0] tag_reg;
 reg [`OFFSET_WIDTH-1:0] p0_offset_reg;
+reg [`OFFSET_WIDTH-1:0] p0_offset_reg_miss;
 reg [`OFFSET_WIDTH-1:0] p1_offset_reg;
 wire [`OFFSET_WIDTH-1:0] p0_offset_cell_w;
 wire [`OFFSET_WIDTH-1:0] p1_offset_cell_w;
 // reg [1:0] offset_w_reg; // word offset
 wire [`OFFSET_WIDTH-3:0] p0_offset_w_reg; // word offset
 wire [`OFFSET_WIDTH-3:0] p1_offset_w_reg; // word offset
-reg [`OFFSET_WIDTH-3:0] p_offset_w_max_reg;
+reg [`OFFSET_WIDTH-3:0] p_offset_w_last_reg;
 reg uncached_reg;
 reg p1_valid_reg;
 reg [1:0] p0_size_reg;
@@ -333,7 +334,7 @@ assign ret_valid_last = (ret_valid & ret_last);
 
 assign next_same_line = (index == index_reg) & (tag == tag_reg);
 
-assign addr_ok = pipe_interface_latch;
+assign addr_ok = cache_rdy;
 assign pipe_interface_latch = p0_valid & cache_rdy;
 assign cache_rdy = idle
     | (lookup & (op_reg == OP_READ) & cache_hit_and_cached) //|
@@ -367,7 +368,7 @@ always @(posedge clk) begin
             tag_reg <= tag;
             p0_offset_reg <= p0_offset;
             p1_offset_reg <= p1_offset;
-            p_offset_w_max_reg <= p0_offset > p1_offset ? p0_offset[`OFFSET_WIDTH-1:2] : p1_offset[`OFFSET_WIDTH-1:2];
+            p_offset_w_last_reg <= p1_valid ? p1_offset[`OFFSET_WIDTH-1:2] : p0_offset[`OFFSET_WIDTH-1:2];
             uncached_reg <= uncached;
             p0_size_reg <= p0_size;
             p0_wstrb_reg <= p0_wstrb;
@@ -390,6 +391,7 @@ always @(posedge clk) begin
         end
         if (lookup) begin
             index_reg_miss <= index_reg;
+            p0_offset_reg_miss <= p0_offset_reg;
         end
     end
 end
@@ -444,9 +446,6 @@ always @(posedge clk) begin
                 if ((!cacop_reg & cache_hit_and_cached) | (op_reg == OP_CACOP0) | ((op_reg == OP_CACOP2) & !cache_hit_and_cached)) begin
                     if (!p0_valid | hit_write) begin
                         main_state <= MAIN_ST_IDLE;
-                    end
-                    else begin
-                        replace_way_id_counter <= replace_way_id_counter + 1;
                     end
                 end
                 else begin
@@ -533,7 +532,7 @@ assign p1_rdata = `get_word(cache_rd_data, p1_offset_w_reg);
 assign data_ok = !finished & ((op_reg == OP_READ)
                     ? ((lookup & cache_hit_and_cached) | (uncached_reg
                                                     ? (refill & ret_valid_last)
-                                                    : (refill & ret_valid & (buffer_read_data_count >= {(p_offset_w_max_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),p_offset_w_max_reg}))))
+                                                    : (refill & ret_valid & (buffer_read_data_count >= {(p_offset_w_last_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),p_offset_w_last_reg}))))
                     : wdata_ok_reg);
 
 always @(posedge clk) begin
@@ -552,13 +551,13 @@ assign wr_req = replace;
 assign wr_wstrb = uncached_reg ? p0_wstrb_reg : 4'b1111;
 
 assign rd_type = uncached_reg ? {1'b0,p0_size_reg} : RD_TYPE_CACHELINE;
-assign rd_addr = uncached_reg ? {tag_reg,index_reg, p0_offset_reg} : {tag_reg, index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
+assign rd_addr = uncached_reg ? {tag_reg,index_reg, p0_offset_reg} : {tag_reg, index_reg_miss,p0_offset_reg_miss[`OFFSET_WIDTH-1:2],2'b0};
 assign rd_req = refill & ~rd_addr_ok;
 
 // fetch data from memory
 
 // assign buffer_read_data_new = (buffer_read_data >> 32) | (ret_data << (32*3));
-assign buffer_read_data_new = buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*buffer_read_data_count));
+assign buffer_read_data_new = buffer_read_data | ({{(`LINE_WIDTH-32){1'b0}},ret_data} << (32*buffer_read_data_count[`OFFSET_WIDTH-3:0]));
 
 always @(posedge clk) begin
     // TODO 优化，此处反复写?
@@ -622,7 +621,7 @@ always @(posedge clk) begin
 `endif
         end
     end
-    else if (refill_write) begin
+    else if (cache_write) begin
         case (cache_write_way_id)
             0 : begin
                 tag_way0[index_reg] <= tag_reg;
@@ -685,8 +684,8 @@ blk_mem_gen_cache_32 data_way1_ram(
 );
 
 
-`define DBG_TAG 20'h1d0
-`define DBG_INDEX 7'h00
+`define DBG_TAG 20'h0205
+`define DBG_INDEX 7'h6e
 // `define DCACHE_DBG
 
 `ifdef DCACHE_DBG
