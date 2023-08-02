@@ -264,6 +264,9 @@ module mmu (
   wire conflict = d1_req && (dcache_uncached || d1_pa[31:`OFFSET_WIDTH] != d2_pa[31:`OFFSET_WIDTH]);
 
   always @(posedge clk) begin
+    if (d1_pa == 32'h00202bca || d2_pa == 32'h00202bca)begin
+      $display("time: %t",$time);
+    end
     if (reset) begin
       d2_only_reg  <= 1'b0;
       d1_req_reg <= 1'b0;
@@ -271,22 +274,22 @@ module mmu (
     end else if (dcache_addr_ok) begin
       d2_only_reg  <= d2_only;
       d1_req_reg <= d1_req;
-      d2_req_reg <= d2_req;
+      d2_req_reg <= d2_req && !conflict;
     end
   end
 
   assign dcache_p0_valid = d2_only ? d2_req : d1_req;
-  assign dcache_p1_valid = d2_req && !conflict;
+  assign dcache_p1_valid = d2_req && !d2_only && !conflict;
   assign dcache_op = d1_req ? d1_we : d2_we;
-  assign dcache_tag = d1_pa[31:31-`TAG_WIDTH+1];
-  assign dcache_index = d1_pa[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1];
+  assign dcache_tag = d2_only ? d2_pa[31:31-`TAG_WIDTH+1] : d1_pa[31:31-`TAG_WIDTH+1];
+  assign dcache_index = d2_only ? d2_pa[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1] : d1_pa[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1];
   assign dcache_p0_offset = d2_only ? d2_pa[`OFFSET_WIDTH-1:0] : d1_pa[`OFFSET_WIDTH-1:0];
   assign dcache_p1_offset = d2_pa[`OFFSET_WIDTH-1:0];
   assign dcache_p0_wstrb = d2_only ? d2_wstrb : d1_wstrb;
   assign dcache_p1_wstrb = d2_wstrb;
   assign dcache_p0_wdata = d2_only ? d2_wdata : d1_wdata;
   assign dcache_p1_wdata = d2_wdata;
-  assign dcache_uncached = d1_mat == 2'd0;
+  assign dcache_uncached = d2_only ? d2_mat == 2'd0 : d1_mat == 2'd0;
   assign dcache_p0_size = d2_only ? d2_size : d1_size;
   assign dcache_p1_size = d2_size;
 
@@ -294,7 +297,7 @@ module mmu (
   assign d1_data_ok = d1_req_reg && dcache_data_ok;
   assign d1_rdata = d2_only_reg ? dcache_p1_rdata : dcache_p0_rdata;
 
-  assign d2_addr_ok = d2_req && dcache_addr_ok;
+  assign d2_addr_ok = d2_req && !conflict && dcache_addr_ok;
   assign d2_data_ok = d2_req_reg && dcache_data_ok;
   assign d2_rdata = dcache_p1_rdata;
 
