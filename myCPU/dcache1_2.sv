@@ -693,7 +693,7 @@ end
 
 `define DBG_TAG 20'h1d0
 `define DBG_INDEX 7'h00
-`define DCACHE_DBG
+// `define DCACHE_DBG
 
 `ifdef DCACHE_DBG
 always @(posedge clk) begin
