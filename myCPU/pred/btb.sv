@@ -19,48 +19,69 @@ module btb
 
     //update btb
     input             branch_mistaken  ,
-    input	[2:0]		  ins_type_w	   ,
+    input	[2:0]	  ins_type_w	   ,
     input  	[31:0]    wrong_pc         ,
     input  	[31:0]    right_target     
 );
 
-logic 	[BTBIDLEN-1:0]	index_0  ;	
-logic 	[BTBIDLEN-1:0]	index_1  ;
-logic  	[BTBIDLEN-1:0]  index_w  ;
-logic  	[BTBIDLEN-1:0]  index_inv;
-logic  	[BTBIDLEN-1:0]  index_replace;
 logic            		hit_0    ;
 logic            	 	hit_1    ;
 logic             		hit_w    ;
 logic             		hit_inv  ;
-logic 	[31:0]     		target_0 ;
-logic 	[31:0]     		target_1 ;
 
 //storage
-reg     [BTBNUM-1:0]    btb_valid;
-reg     [BTBTAGLEN-1:0] btb_tag     [BTBNUM-1:0];
-reg     [31:0]          btb_target  [BTBNUM-1:0];
-reg     [2:0]			btb_ins_type[BTBNUM-1:0];
-reg   	[$clog2(BTBGROUP)-1:0]	btb_replace_counter	[BTBNUM/BTBGROUP -1:0] ;   
+reg     [BTBNUM/BTBGROUP -1:0]    btb_valid_way0;
+reg     [BTBNUM/BTBGROUP -1:0]    btb_valid_way1;
+
+`define get_valid(way_id_,index_) (\
+        {1{way_id_==0}} & btb_valid_way0[index_]\
+    |   {1{way_id_==1}} & btb_valid_way1[index_]\
+)
+
+reg     [BTBTAGLEN-1:0] btb_tag_way0     [BTBNUM/BTBGROUP -1:0];
+reg     [BTBTAGLEN-1:0] btb_tag_way1     [BTBNUM/BTBGROUP -1:0];
+
+`define get_tag(way_id_,index_) (\
+        {BTBTAGLEN{way_id_==0}} & btb_tag_way0[index_]\
+    |   {BTBTAGLEN{way_id_==1}} & btb_tag_way1[index_]\
+)
+
+reg     [31:0]          btb_target_way0  [BTBNUM/BTBGROUP -1:0];
+reg     [31:0]          btb_target_way1  [BTBNUM/BTBGROUP -1:0];
+
+`define get_target(way_id_,index_) (\
+        {32{way_id_==0}} & btb_target_way0[index_]\
+    |   {32{way_id_==1}} & btb_target_way1[index_]\
+)
+
+reg     [2:0]			btb_ins_type_way0[BTBNUM/BTBGROUP -1:0];
+reg     [2:0]           btb_ins_type_way1[BTBNUM/BTBGROUP -1:0];
+
+`define get_ins_type(way_id_,index_) (\
+        {3{way_id_==0}} & btb_ins_type_way0[index_]\
+    |   {3{way_id_==1}} & btb_ins_type_way1[index_]\
+)
+
+reg   	[$clog2(BTBGROUP)-1:0]	btb_replace_counter	[BTBNUM/BTBGROUP -1:0] ;
 
 //search
 logic   [29:0]          pc_0_32to2;
 logic   [29:0]          pc_1_32to2;
 logic   [29:0]          pc_w_32to2;
-logic   [BTBGROUP-1:0]  btb_hit_0;
-logic   [BTBGROUP-1:0]  btb_hit_1;
-logic   [BTBGROUP-1:0]  btb_hit_w; 
-logic   [BTBGROUP-1:0]  btb_hit_inv;  
+logic   [BTBGROUP-1:0]  btb_hit_way_0;
+logic   [BTBGROUP-1:0]  btb_hit_way_1;
+logic   [BTBGROUP-1:0]  btb_hit_way_w; 
+logic   [BTBGROUP-1:0]  btb_hit_way_inv;  
 logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_0;
 logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_1;
 logic   [$clog2(BTBNUM/BTBGROUP)-1:0]  btb_group_num_w;
 logic   [BTBTAGLEN-1:0] btb_fetch_tag_0;
 logic   [BTBTAGLEN-1:0] btb_fetch_tag_1;
 logic   [BTBTAGLEN-1:0] btb_fetch_tag_w;
-logic   [$clog2(BTBGROUP)-1:0]  btb_index_in_group_0;
-logic   [$clog2(BTBGROUP)-1:0]  btb_index_in_group_1;
-logic   [$clog2(BTBGROUP)-1:0]  btb_index_in_group_w;
-logic   [$clog2(BTBGROUP)-1:0]  btb_index_in_group_inv;
+logic   [$clog2(BTBGROUP)-1:0]  btb_hit_way_id_0;
+logic   [$clog2(BTBGROUP)-1:0]  btb_hit_way_id_1;
+logic   [$clog2(BTBGROUP)-1:0]  btb_hit_way_id_w;
+logic   [$clog2(BTBGROUP)-1:0]  btb_hit_way_id_inv;
 
 
 assign pc_0_32to2 = fetch_pc_0[31:2];
@@ -79,57 +100,42 @@ genvar i;
 generate
     for(i = 0; i < BTBGROUP; i = i + 1)
     begin: BTB_match
-        assign btb_hit_0[i] = btb_valid[btb_group_num_0 * BTBGROUP + i] && btb_tag[btb_group_num_0 * BTBGROUP + i] == btb_fetch_tag_0;
-        assign btb_hit_1[i] = btb_valid[btb_group_num_1 * BTBGROUP + i] && btb_tag[btb_group_num_1 * BTBGROUP + i] == btb_fetch_tag_1;
-        assign btb_hit_w[i] = btb_valid[btb_group_num_w * BTBGROUP + i] && btb_tag[btb_group_num_w * BTBGROUP + i] == btb_fetch_tag_w;
-        assign btb_hit_inv[i] = ~btb_valid[btb_group_num_w * BTBGROUP + i];
+        assign btb_hit_way_0[i] = `get_valid(i, btb_group_num_0) & (`get_tag(i, btb_group_num_0) == btb_fetch_tag_0);
+        assign btb_hit_way_1[i] = `get_valid(i, btb_group_num_1) & (`get_tag(i, btb_group_num_1) == btb_fetch_tag_1);
+        assign btb_hit_way_w[i] = `get_valid(i, btb_group_num_w) & (`get_tag(i, btb_group_num_w) == btb_fetch_tag_w);
+        assign btb_hit_way_inv[i] = ~`get_valid(i, btb_group_num_w);
     end
 endgenerate
 //calc index
-integer j;
-always_comb begin
-    btb_index_in_group_0 = 0;
-	btb_index_in_group_1 = 0;
-	btb_index_in_group_inv = 0;
-	btb_index_in_group_w = 0;
-    for(j = 0; j < BTBGROUP; j = j + 1) begin
-        if(btb_hit_0[j]) begin
-            btb_index_in_group_0 = j;
-        end
-        if(btb_hit_1[j]) begin
-            btb_index_in_group_1 = j;
-        end
-        if(btb_hit_w[j]) begin
-            btb_index_in_group_w = j;
-        end
-        if(btb_hit_inv[j]) begin
-            btb_index_in_group_inv = j;
-        end
-    end
-end
-assign index_0 = {btb_group_num_0,btb_index_in_group_0};
-assign index_1 = {btb_group_num_1,btb_index_in_group_1};
-assign index_w = {btb_group_num_w,btb_index_in_group_w};
-assign index_inv = {btb_group_num_w,btb_index_in_group_inv};
-assign index_replace = {btb_group_num_w,btb_replace_counter[btb_group_num_w]};
 
-assign hit_0 = |btb_hit_0;
-assign hit_1 = |btb_hit_1;
-assign hit_w = |btb_hit_w;
-assign hit_inv = |btb_hit_inv;
+assign btb_hit_way_id_0 =   {1{btb_hit_way_0[0]}} & 0 |
+                            {1{btb_hit_way_0[1]}} & 1;
+assign btb_hit_way_id_1 =   {1{btb_hit_way_1[0]}} & 0 |
+                            {1{btb_hit_way_1[1]}} & 1;
+assign btb_hit_way_id_w =   {1{btb_hit_way_w[0]}} & 0 |
+                            {1{btb_hit_way_w[1]}} & 1;
+assign btb_hit_way_id_inv = {1{btb_hit_way_inv[0]}} & 0 |
+                            {1{btb_hit_way_inv[1]}} & 1;
 
-assign target_0 = btb_target[index_0];
-assign target_1 = btb_target[index_1];
 
-assign target_pc_0 = hit_0 ?target_0 : 32'b0;
-assign target_pc_1 = hit_1 ?target_1 : 32'b0;
 
-assign ins_type_0 = hit_0 ? btb_ins_type[index_0] : 3'b000;
-assign ins_type_1 = hit_1 ? btb_ins_type[index_1] : 3'b000;
+assign hit_0 = |btb_hit_way_0;
+assign hit_1 = |btb_hit_way_1;
+assign hit_w = |btb_hit_way_w;
+assign hit_inv = |btb_hit_way_inv;
+
+
+
+assign target_pc_0 = hit_0 ? `get_target(btb_hit_way_id_0, btb_group_num_0) : 32'b0;
+assign target_pc_1 = hit_1 ? `get_target(btb_hit_way_id_1, btb_group_num_1) : 32'b0;
+
+assign ins_type_0 = hit_0 ? `get_ins_type(btb_hit_way_id_0, btb_group_num_0) : 3'b000;
+assign ins_type_1 = hit_1 ? `get_ins_type(btb_hit_way_id_1, btb_group_num_1) : 3'b000;
 integer k;
 always @(posedge clk) begin
     if(reset) begin
-        btb_valid <= 0;
+        btb_valid_way0 <= 0;
+        btb_valid_way1 <= 0;
         for(k = 0; k < BTBNUM/BTBGROUP; k = k + 1) begin
             btb_replace_counter[k] <= 0;
         end
@@ -139,23 +145,52 @@ always @(posedge clk) begin
             //replace the same tag
             btb_replace_counter[btb_group_num_w] <= ~btb_replace_counter[btb_group_num_w];
             if(hit_w) begin
-                btb_tag[index_w] <= btb_fetch_tag_w;
-                btb_target[index_w] <= right_target;
-                btb_ins_type[index_w] <= ins_type_w;
+                case(btb_hit_way_id_w)
+                    0 : begin
+                        btb_tag_way0[btb_group_num_w] <= btb_fetch_tag_w;
+                        btb_target_way0[btb_group_num_w] <= right_target;
+                        btb_ins_type_way0[btb_group_num_w] <= ins_type_w;
+                    end
+                    1 : begin
+                        btb_tag_way1[btb_group_num_w] <= btb_fetch_tag_w;
+                        btb_target_way1[btb_group_num_w] <= right_target;
+                        btb_ins_type_way1[btb_group_num_w] <= ins_type_w;
+                    end
+                endcase
             end
             //fill empty line
             else if(hit_inv) begin
-                btb_tag[index_inv] <= btb_fetch_tag_w;
-                btb_target[index_inv] <= right_target;
-                btb_ins_type[index_inv] <= ins_type_w;
-                btb_valid[index_inv] <= 1'b1;
+                case(btb_hit_way_id_inv)
+                    0 : begin
+                        btb_tag_way0[btb_group_num_w] <= btb_fetch_tag_w;
+                        btb_target_way0[btb_group_num_w] <= right_target;
+                        btb_ins_type_way0[btb_group_num_w] <= ins_type_w;
+                        btb_valid_way0[btb_group_num_w] <= 1'b1;
+                    end
+                    1 : begin
+                        btb_tag_way1[btb_group_num_w] <= btb_fetch_tag_w;
+                        btb_target_way1[btb_group_num_w] <= right_target;
+                        btb_ins_type_way1[btb_group_num_w] <= ins_type_w;
+                        btb_valid_way1[btb_group_num_w] <= 1'b1;
+                    end
+                endcase
             end
             //random replace
             else begin
-            	btb_tag[index_replace] <= btb_fetch_tag_w;
-                btb_target[index_replace] <= right_target;
-                btb_ins_type[index_replace] <= ins_type_w;
-                btb_valid[index_replace] <= 1'b1;
+            	case(btb_replace_counter[btb_group_num_w])
+                    0 : begin
+                        btb_tag_way0[btb_group_num_w] <= btb_fetch_tag_w;
+                        btb_target_way0[btb_group_num_w] <= right_target;
+                        btb_ins_type_way0[btb_group_num_w] <= ins_type_w;
+                        btb_valid_way0[btb_group_num_w] <= 1'b1;
+                    end
+                    1 : begin
+                        btb_tag_way1[btb_group_num_w] <= btb_fetch_tag_w;
+                        btb_target_way1[btb_group_num_w] <= right_target;
+                        btb_ins_type_way1[btb_group_num_w] <= ins_type_w;
+                        btb_valid_way1[btb_group_num_w] <= 1'b1;
+                    end
+                endcase
             end
         end
     end
