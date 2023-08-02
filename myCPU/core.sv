@@ -896,7 +896,7 @@ module core (
   assign ro_b_delayed = ro_a_optype == OP_ALU && ro_b_optype == OP_ALU && related;
 
   assign allow_issue_a = !ibuf_no_out && ro_a_valid && ro_a_src1_ok && ro_a_src2_ok;
-  assign allow_issue_b = !ibuf_no_out && allow_issue_a
+  assign allow_issue_b = !ibuf_no_out && allow_issue_a && !ro_a_have_excp
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
                       && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB
                       && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU))
@@ -1111,7 +1111,7 @@ module core (
       .result(div_b_result)
   );
 
-  wire mem_cancel = raise_excp || lsu_a_have_excp || ex2_b_br_mistaken || lsu_a_have_excp || lsu_b_have_excp || ex1_a_br_mistaken || EX1_a_have_excp;
+  wire mem_cancel = raise_excp || lsu_a_have_excp || ex2_b_br_mistaken || lsu_a_have_excp || lsu_b_have_excp || ex1_a_br_mistaken;
 
   lsu u_lsu_a (
       .clk(clk),
