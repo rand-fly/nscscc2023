@@ -237,6 +237,20 @@ module core (
   logic                      mmu_i_tlbr;
   logic                      mmu_i_pif;
   logic                      mmu_i_ppi;
+  logic                      mmu_d0_req;
+  logic       [        31:0] mmu_d0_va;
+  logic                      mmu_d0_we;
+  logic       [         1:0] mmu_d0_size;
+  logic       [         3:0] mmu_d0_wstrb;
+  logic       [        31:0] mmu_d0_wdata;
+  logic                      mmu_d0_addr_ok;
+  logic                      mmu_d0_data_ok;
+  logic       [        31:0] mmu_d0_rdata;
+  logic                      mmu_d0_tlbr;
+  logic                      mmu_d0_pil;
+  logic                      mmu_d0_pis;
+  logic                      mmu_d0_ppi;
+  logic                      mmu_d0_pme;
   logic                      mmu_d1_req;
   logic       [        31:0] mmu_d1_va;
   logic                      mmu_d1_we;
@@ -251,20 +265,6 @@ module core (
   logic                      mmu_d1_pis;
   logic                      mmu_d1_ppi;
   logic                      mmu_d1_pme;
-  logic                      mmu_d2_req;
-  logic       [        31:0] mmu_d2_va;
-  logic                      mmu_d2_we;
-  logic       [         1:0] mmu_d2_size;
-  logic       [         3:0] mmu_d2_wstrb;
-  logic       [        31:0] mmu_d2_wdata;
-  logic                      mmu_d2_addr_ok;
-  logic                      mmu_d2_data_ok;
-  logic       [        31:0] mmu_d2_rdata;
-  logic                      mmu_d2_tlbr;
-  logic                      mmu_d2_pil;
-  logic                      mmu_d2_pis;
-  logic                      mmu_d2_ppi;
-  logic                      mmu_d2_pme;
 
 
   // from and to mmu(tlb)
@@ -579,42 +579,38 @@ module core (
       .br_taken      (id_b_br_taken)
   );
 
+  assign br_mistaken = ex2_b_br_mistaken
+                    || ex1_a_br_mistaken
+                    || ex1_b_br_mistaken
+                    || (ID_a_valid && id_a_br_mistaken)
+                    || (ID_b_valid && id_b_br_mistaken);
+
   always_comb begin
     if (ex2_b_br_mistaken) begin
-      br_mistaken  = 1'b1;
       br_type      = EX2_b_br_type;
       wrong_pc     = EX2_b_pc;
       right_target = ex2_b_br_taken ? ex2_b_br_target : EX2_b_pc + 32'd4;
       btb_target   = ex2_b_br_target;
     end else if (ex1_a_br_mistaken) begin
-      br_mistaken  = 1'b1;
       br_type      = EX1_a_br_type;
       wrong_pc     = EX1_a_pc;
       right_target = ex1_a_br_taken ? ex1_a_br_target : EX1_a_pc + 32'd4;
       btb_target   = ex1_a_br_target;
     end else if (ex1_b_br_mistaken) begin
-      br_mistaken  = 1'b1;
       br_type      = EX1_b_br_type;
       wrong_pc     = EX1_b_pc;
       right_target = ex1_b_br_taken ? ex1_b_br_target : EX1_b_pc + 32'd4;
       btb_target   = ex1_b_br_target;
     end else if (ID_a_valid && id_a_br_mistaken) begin
-      br_mistaken = 1'b1;
       br_type = id_a_br_type;
       wrong_pc = ID_a_pc;
       right_target = (id_a_br_taken || id_a_br_type == BR_COND && ID_a_pred_br_taken) ? id_a_br_target : ID_a_pc + 32'd4;
       btb_target = id_a_br_target;
-    end else if (ID_b_valid && id_b_br_mistaken) begin
-      br_mistaken = 1'b1;
+    end else  /*if (ID_b_valid && id_b_br_mistaken)*/ begin
       br_type = id_b_br_type;
       wrong_pc = ID_b_pc;
       right_target = (id_b_br_taken || id_b_br_type == BR_COND && ID_b_pred_br_taken) ? id_b_br_target : ID_b_pc + 32'd4;
       btb_target = id_b_br_target;
-    end else begin
-      br_mistaken  = 1'b0;
-      br_type      = BR_NOP;
-      wrong_pc     = 32'd0;
-      right_target = 32'd0;
     end
   end
 
@@ -967,6 +963,18 @@ module core (
       EX1_b_difftest.TLBFILL_index <= csr_tlbidx;
 `endif
     end
+`ifdef DIFFTEST_EN
+    if (ex1_stall && mmu_d0_addr_ok) begin
+      EX1_a_difftest.storePAddr  <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
+      EX1_a_difftest.loadPAddr   <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
+      EX1_a_difftest.added_paddr <= 1'b1;
+    end
+    if (ex1_stall && mmu_d1_addr_ok) begin
+      EX1_b_difftest.storePAddr  <= {u_mmu.d_ptag, u_lsu_b.addr[31-`TAG_WIDTH:0]};
+      EX1_b_difftest.loadPAddr   <= {u_mmu.d_ptag, u_lsu_b.addr[31-`TAG_WIDTH:0]};
+      EX1_b_difftest.added_paddr <= 1'b1;
+    end
+`endif
   end
 
   always_ff @(posedge clk) begin
@@ -1111,7 +1119,11 @@ module core (
       .result(div_b_result)
   );
 
-  wire mem_cancel = raise_excp || lsu_a_have_excp || ex2_b_br_mistaken || lsu_a_have_excp || lsu_b_have_excp || ex1_a_br_mistaken;
+  wire mem_cancel = raise_excp || replay
+                 ||lsu_a_have_excp || (lsu_b_have_excp && EX1_a_optype != OP_MEM)
+                 || ex1_a_br_mistaken || ex2_b_br_mistaken;
+
+  wire mem_d1_cancel = lsu_b_have_excp;
 
   lsu u_lsu_a (
       .clk(clk),
@@ -1130,6 +1142,39 @@ module core (
       .ok(lsu_a_ok),
       .accept_ok(EX2_a_valid && EX2_a_optype == OP_MEM && !WB_a_ok && lsu_a_ok),
       .ld_data(lsu_a_result),
+      .mmu_req(mmu_d0_req),
+      .mmu_addr(mmu_d0_va),
+      .mmu_we(mmu_d0_we),
+      .mmu_size(mmu_d0_size),
+      .mmu_wstrb(mmu_d0_wstrb),
+      .mmu_wdata(mmu_d0_wdata),
+      .mmu_addr_ok(mmu_d0_addr_ok),
+      .mmu_data_ok(mmu_d0_data_ok),
+      .mmu_rdata(mmu_d0_rdata),
+      .mmu_tlbr(mmu_d0_tlbr),
+      .mmu_pil(mmu_d0_pil),
+      .mmu_pis(mmu_d0_pis),
+      .mmu_ppi(mmu_d0_ppi),
+      .mmu_pme(mmu_d0_pme)
+  );
+
+  lsu u_lsu_b (
+      .clk(clk),
+      .reset(reset),
+      .cancel(mem_cancel || mem_d1_cancel),
+      .ready(lsu_b_ready),
+      .valid(EX1_b_valid && EX1_b_optype == OP_MEM),
+      .start(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling),
+      .base(ex1_b_src1),
+      .offset(EX1_b_imm),
+      .mem_type(mem_type_t'(EX1_b_opcode[3:2])),
+      .mem_size(mem_size_t'(EX1_b_opcode[1:0])),
+      .st_data(ex1_b_src2),
+      .have_excp(lsu_b_have_excp),
+      .excp_type(lsu_b_excp_type),
+      .ok(lsu_b_ok),
+      .accept_ok(EX2_b_valid && EX2_b_optype == OP_MEM && !WB_b_ok && lsu_b_ok),
+      .ld_data(lsu_b_result),
       .mmu_req(mmu_d1_req),
       .mmu_addr(mmu_d1_va),
       .mmu_we(mmu_d1_we),
@@ -1146,53 +1191,20 @@ module core (
       .mmu_pme(mmu_d1_pme)
   );
 
-  lsu u_lsu_b (
-      .clk(clk),
-      .reset(reset),
-      .cancel(mem_cancel),
-      .ready(lsu_b_ready),
-      .valid(EX1_b_valid && EX1_b_optype == OP_MEM),
-      .start(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling),
-      .base(ex1_b_src1),
-      .offset(EX1_b_imm),
-      .mem_type(mem_type_t'(EX1_b_opcode[3:2])),
-      .mem_size(mem_size_t'(EX1_b_opcode[1:0])),
-      .st_data(ex1_b_src2),
-      .have_excp(lsu_b_have_excp),
-      .excp_type(lsu_b_excp_type),
-      .ok(lsu_b_ok),
-      .accept_ok(EX2_b_valid && EX2_b_optype == OP_MEM && !WB_b_ok && lsu_b_ok),
-      .ld_data(lsu_b_result),
-      .mmu_req(mmu_d2_req),
-      .mmu_addr(mmu_d2_va),
-      .mmu_we(mmu_d2_we),
-      .mmu_size(mmu_d2_size),
-      .mmu_wstrb(mmu_d2_wstrb),
-      .mmu_wdata(mmu_d2_wdata),
-      .mmu_addr_ok(mmu_d2_addr_ok),
-      .mmu_data_ok(mmu_d2_data_ok),
-      .mmu_rdata(mmu_d2_rdata),
-      .mmu_tlbr(mmu_d2_tlbr),
-      .mmu_pil(mmu_d2_pil),
-      .mmu_pis(mmu_d2_pis),
-      .mmu_ppi(mmu_d2_ppi),
-      .mmu_pme(mmu_d2_pme)
-  );
-
   assign ex1_have_excp = (EX1_a_valid && EX1_a_have_excp) || (EX2_b_valid && EX2_b_have_excp) || lsu_a_have_excp || lsu_b_have_excp;
 
-  assign invtlb_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_INVTLB;
+  assign invtlb_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_INVTLB && !flush_ex1;
   assign invtlb_op = EX1_a_imm[4:0];
   assign invtlb_asid = ex1_a_src1[9:0];
   assign invtlb_va = ex1_a_src2;
-  assign tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && (EX1_a_opcode == TLB_TLBWR || EX1_a_opcode == TLB_TLBFILL);
+  assign tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && (EX1_a_opcode == TLB_TLBWR || EX1_a_opcode == TLB_TLBFILL) && !flush_ex1;
   assign tlb_w_index = csr_tlbidx;
   assign tlb_w_entry = csr_tlb_rdata;
   assign tlb_r_index = csr_tlbidx;
   assign csr_tlb_wdata = tlb_r_entry;
-  assign tlbsrch_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBSRCH;
+  assign tlbsrch_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBSRCH && !flush_ex1;
   assign tlbsrch_vppn = csr_tlb_rdata.vppn;
-  assign csr_tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBRD;
+  assign csr_tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBRD && !flush_ex1;
 
   always_ff @(posedge clk) begin
     if (reset) begin
@@ -1200,7 +1212,7 @@ module core (
       EX2_b_valid <= 1'b0;
     end else if (!ex2_stall) begin
       EX2_a_valid <= !ex1_stall && EX1_a_valid && !flush_ex1 && !ex2_b_br_mistaken;
-      EX2_b_valid <= !ex1_stall && EX1_b_valid && !ex1_a_br_mistaken_long && !ex1_have_excp && !flush_ex1 && !ex2_b_br_mistaken;
+      EX2_b_valid <= !ex1_stall && EX1_b_valid && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1 && !ex2_b_br_mistaken;
     end
 
     EX2_stalling <= ex2_stall;
@@ -1228,7 +1240,8 @@ module core (
         EX1_a_opcode[3:2] == MEM_STORE && EX1_a_opcode[1:0] == MEM_HALF,
         EX1_a_opcode[3:2] == MEM_STORE && EX1_a_opcode[1:0] == MEM_BYTE
       };
-      EX2_a_difftest.storePAddr <= u_mmu.d1_pa;
+      if (!EX1_a_difftest.added_paddr)
+        EX2_a_difftest.storePAddr <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
       EX2_a_difftest.storeVAddr <= u_lsu_a.addr;
       EX2_a_difftest.storeData <= EX1_a_opcode[1:0] == MEM_BYTE ? ex1_a_src2[7:0] << (u_lsu_a.addr[1:0]*8) :
                                   EX1_a_opcode[1:0] == MEM_HALF ? ex1_a_src2[15:0] << (u_lsu_a.addr[1]*16) :
@@ -1242,10 +1255,11 @@ module core (
         EX1_a_opcode[3:2] == MEM_LOAD_U && EX1_a_opcode[1:0] == MEM_BYTE,
         EX1_a_opcode[3:2] == MEM_LOAD_S && EX1_a_opcode[1:0] == MEM_BYTE
       };
-      EX2_a_difftest.loadPAddr <= u_mmu.d1_pa;
+      if (!EX1_a_difftest.added_paddr)
+        EX2_a_difftest.loadPAddr <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
       EX2_a_difftest.loadVAddr <= u_lsu_a.addr;
       EX2_a_difftest.csr_rstat <= EX1_a_optype == OP_CSR && EX1_a_csr_addr == 14'h5;
-      EX2_a_difftest.csr_data <= u_csr.ESTAT;
+      EX2_a_difftest.csr_data  <= u_csr.ESTAT;
 `endif
     end
 
@@ -1283,7 +1297,8 @@ module core (
         EX1_b_opcode[3:2] == MEM_STORE && EX1_b_opcode[1:0] == MEM_HALF,
         EX1_b_opcode[3:2] == MEM_STORE && EX1_b_opcode[1:0] == MEM_BYTE
       };
-      EX2_b_difftest.storePAddr <= u_mmu.d2_pa;
+      if (!EX1_b_difftest.added_paddr)
+        EX2_b_difftest.storePAddr <= {u_mmu.d_ptag, u_lsu_b.addr[31-`TAG_WIDTH:0]};
       EX2_b_difftest.storeVAddr <= u_lsu_b.addr;
       EX2_b_difftest.storeData <= EX1_b_opcode[1:0] == MEM_BYTE ? ex1_b_src2[7:0] << (u_lsu_b.addr[1:0]*8) :
                                   EX1_b_opcode[1:0] == MEM_HALF ? ex1_b_src2[15:0] << (u_lsu_b.addr[1]*16) :
@@ -1297,7 +1312,8 @@ module core (
         EX1_b_opcode[3:2] == MEM_LOAD_U && EX1_b_opcode[1:0] == MEM_BYTE,
         EX1_b_opcode[3:2] == MEM_LOAD_S && EX1_b_opcode[1:0] == MEM_BYTE
       };
-      EX2_b_difftest.loadPAddr <= u_mmu.d2_pa;
+      if (!EX1_b_difftest.added_paddr)
+        EX2_b_difftest.loadPAddr <= {u_mmu.d_ptag, u_lsu_b.addr[31-`TAG_WIDTH:0]};
       EX2_b_difftest.loadVAddr <= u_lsu_b.addr;
 `endif
     end
@@ -1555,7 +1571,22 @@ module core (
       .i_tlbr          (mmu_i_tlbr),
       .i_pif           (mmu_i_pif),
       .i_ppi           (mmu_i_ppi),
+      .d0_req          (mmu_d0_req),
       .d_cancel        (mem_cancel),
+      .d1_cancel       (mem_d1_cancel),
+      .d0_va           (mmu_d0_va),
+      .d0_we           (mmu_d0_we),
+      .d0_size         (mmu_d0_size),
+      .d0_wstrb        (mmu_d0_wstrb),
+      .d0_wdata        (mmu_d0_wdata),
+      .d0_addr_ok      (mmu_d0_addr_ok),
+      .d0_data_ok      (mmu_d0_data_ok),
+      .d0_rdata        (mmu_d0_rdata),
+      .d0_tlbr         (mmu_d0_tlbr),
+      .d0_pil          (mmu_d0_pil),
+      .d0_pis          (mmu_d0_pis),
+      .d0_ppi          (mmu_d0_ppi),
+      .d0_pme          (mmu_d0_pme),
       .d1_req          (mmu_d1_req),
       .d1_va           (mmu_d1_va),
       .d1_we           (mmu_d1_we),
@@ -1570,20 +1601,6 @@ module core (
       .d1_pis          (mmu_d1_pis),
       .d1_ppi          (mmu_d1_ppi),
       .d1_pme          (mmu_d1_pme),
-      .d2_req          (mmu_d2_req),
-      .d2_va           (mmu_d2_va),
-      .d2_we           (mmu_d2_we),
-      .d2_size         (mmu_d2_size),
-      .d2_wstrb        (mmu_d2_wstrb),
-      .d2_wdata        (mmu_d2_wdata),
-      .d2_addr_ok      (mmu_d2_addr_ok),
-      .d2_data_ok      (mmu_d2_data_ok),
-      .d2_rdata        (mmu_d2_rdata),
-      .d2_tlbr         (mmu_d2_tlbr),
-      .d2_pil          (mmu_d2_pil),
-      .d2_pis          (mmu_d2_pis),
-      .d2_ppi          (mmu_d2_ppi),
-      .d2_pme          (mmu_d2_pme),
       .invtlb_valid    (invtlb_valid),
       .invtlb_op       (invtlb_op),
       .invtlb_asid     (invtlb_asid),

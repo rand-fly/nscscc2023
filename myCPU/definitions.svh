@@ -10,7 +10,7 @@ parameter TLBNUM = 16;
 parameter TLBIDLEN = $clog2(TLBNUM);
 parameter PALEN = 32;
 
-`define CACHE_LINE_32B
+`define CACHE_LINE_32B 
 
 `ifdef CACHE_LINE_16B
 `define LINE_SIZE 16
@@ -219,6 +219,7 @@ typedef struct packed {
   logic [7:0]          load_valid;
   logic [31:0]         loadPAddr;
   logic [31:0]         loadVAddr;
+  logic                added_paddr;
 } difftest_t;
 
 typedef struct packed {
