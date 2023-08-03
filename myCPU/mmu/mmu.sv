@@ -22,6 +22,7 @@ module mmu (
     output              i_tlbr,
     output              i_pif,
     output              i_ppi,
+    input               d_cancel,
     // from lsu a
     input               d1_req,
     input        [31:0] d1_va,
@@ -265,18 +266,18 @@ module mmu (
 
   always @(posedge clk) begin
     if (reset) begin
-      d2_only_reg  <= 1'b0;
-      d1_req_reg <= 1'b0;
-      d2_req_reg <= 1'b0;
+      d2_only_reg <= 1'b0;
+      d1_req_reg  <= 1'b0;
+      d2_req_reg  <= 1'b0;
     end else if (dcache_addr_ok) begin
-      d2_only_reg  <= d2_only;
-      d1_req_reg <= d1_req;
-      d2_req_reg <= d2_req && !conflict;
+      d2_only_reg <= d2_only;
+      d1_req_reg  <= d1_req;
+      d2_req_reg  <= d2_req && !conflict;
     end
   end
 
-  assign dcache_p0_valid = d2_only ? d2_req : d1_req;
-  assign dcache_p1_valid = d2_req && !d2_only && !conflict;
+  assign dcache_p0_valid = (d2_only ? d2_req : d1_req) && !d_cancel;
+  assign dcache_p1_valid = (d2_req && !d2_only && !conflict) && !d_cancel;
   assign dcache_op = d1_req ? d1_we : d2_we;
   assign dcache_tag = d2_only ? d2_pa[31:31-`TAG_WIDTH+1] : d1_pa[31:31-`TAG_WIDTH+1];
   assign dcache_index = d2_only ? d2_pa[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1] : d1_pa[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1];
