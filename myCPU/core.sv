@@ -1215,13 +1215,13 @@ module core (
       EX2_a_valid <= 1'b0;
       EX2_b_valid <= 1'b0;
     end else if (!ex2_stall) begin
-      EX2_a_valid <= !ex1_stall && EX1_a_valid && !flush_ex1 && !ex2_b_br_mistaken;
-      EX2_b_valid <= !ex1_stall && EX1_b_valid && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1 && !ex2_b_br_mistaken;
+      EX2_a_valid <= ex1_ready && EX1_a_valid && !flush_ex1 && !ex2_b_br_mistaken;
+      EX2_b_valid <= ex1_ready && EX1_b_valid && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1 && !ex2_b_br_mistaken;
     end
 
     EX2_stalling <= ex2_stall;
 
-    if (!ex2_stall && !ex1_stall && EX1_a_valid && !flush_ex1) begin
+    if (!ex2_stall && ex1_ready && EX1_a_valid && !flush_ex1) begin
       EX2_a_pc         <= EX1_a_pc;
       EX2_a_optype     <= EX1_a_optype;
       EX2_a_dest       <= EX1_a_dest;
@@ -1267,7 +1267,7 @@ module core (
 `endif
     end
 
-    if (!ex2_stall && !ex1_stall && EX1_b_valid && !flush_ex1 && !ex1_a_br_mistaken) begin
+    if (!ex2_stall && ex1_ready && EX1_b_valid && !flush_ex1 && !ex1_a_br_mistaken) begin
       EX2_b_pc             <= EX1_b_pc;
       EX2_b_delayed        <= EX1_b_delayed;
       EX2_b_optype         <= EX1_b_optype;
