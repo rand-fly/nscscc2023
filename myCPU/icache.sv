@@ -566,7 +566,7 @@ always @(posedge clk) begin
     end
 end
 
-`define PERF_COUNT
+// `define PERF_COUNT
 
 `ifdef PERF_COUNT
 reg [31:0] last_print_time;
