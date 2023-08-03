@@ -48,20 +48,18 @@ module lsu (
   mem_size_t        mem_size_buf;
   logic      [31:0] ld_data_inner;
 
-  logic             start_req;
   logic             stage2_allowin;
   logic      [31:0] addr;
 
-  assign start_req = start && !have_excp;
   assign addr = base + offset;
-  assign ready = (!wait_for_addr_ok || mmu_addr_ok && stage2_allowin) && !(start_req && !mmu_addr_ok);
+  assign ready = (!wait_for_addr_ok || mmu_addr_ok && stage2_allowin) && !(start && !mmu_addr_ok);
   assign stage2_allowin = !ok_not_accepted && (!wait_for_data_ok || mmu_data_ok);
 
   always_ff @(posedge clk) begin
     if (reset) begin
       wait_for_addr_ok <= 1'b0;
     end else begin
-      if (start_req && !mmu_addr_ok && !cancel) begin
+      if (start && !mmu_addr_ok && !cancel) begin
         wait_for_addr_ok <= 1'b1;
       end
       if (mmu_addr_ok) begin
@@ -101,7 +99,7 @@ module lsu (
     end
   end
 
-  assign mmu_req  = start_req || wait_for_addr_ok;
+  assign mmu_req  = start || wait_for_addr_ok;
   assign mmu_addr = addr;
   assign mmu_we   = mem_type == MEM_STORE;
   assign mmu_size = mem_size == MEM_BYTE ? 2'd0 : mem_size == MEM_HALF ? 2'd1 : 2'd2;
