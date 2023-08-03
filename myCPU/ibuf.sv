@@ -1,26 +1,5 @@
 `include "definitions.svh"
 
-typedef struct packed {
-  logic [31:0] pc;
-  optype_t     optype;
-  opcode_t     opcode;
-  logic [4:0]  dest;
-  logic [31:0] imm;
-  logic        pred_br_taken;
-  logic [31:0] pred_br_target;
-  br_type_t    br_type;
-  logic        br_condition;
-  logic [31:0] br_target;
-  logic        br_taken;
-  logic        have_excp;
-  excp_t       excp_type;
-  csr_addr_t   csr_addr;
-  logic        csr_wr;
-  logic [4:0]  r1;
-  logic [4:0]  r2;
-  logic        src2_is_imm;
-} ibuf_entry_t;
-
 module ibuf (
     input                    clk,
     input                    reset,
@@ -119,15 +98,24 @@ module ibuf (
     output                   o_b_src2_is_imm
 );
 
-  ibuf_entry_t data[16];
+  logic [187:0] data_way0[8];
+  logic [187:0] data_way1[8];
 
 `ifdef DIFFTEST_EN
-  difftest_t difftest[16];
+  difftest_t difftest_way0[8];
+  difftest_t difftest_way1[8];
 `endif
 
-  logic [3:0] head;
-  logic [3:0] tail;
-  logic [4:0] length;
+  logic [  2:0] head_way0;
+  logic [  2:0] head_way1;
+  logic         head_way;
+  logic [  2:0] tail_way0;
+  logic [  2:0] tail_way1;
+  logic         tail_way;
+  logic [  4:0] length;
+
+  logic [187:0] input_data0;
+  logic [187:0] input_data1;
 
   assign i_ready = length <= 5'd10; // 本周期最多可能进来两条，ID阶段可能有两条，同时最多可能发起两条请求，16-6=10
 
@@ -150,7 +138,7 @@ module ibuf (
          o_a_r1,
          o_a_r2,
          o_a_src2_is_imm
-        } = data[head];
+  } = head_way ? data_way1[head_way1] : data_way0[head_way0];
 
   assign o_b_valid = length >= 5'd2;
   assign{o_b_pc,
@@ -171,71 +159,87 @@ module ibuf (
          o_b_r1,
          o_b_r2,
          o_b_src2_is_imm
-        } = data[head + 1'b1];
+  } = head_way ? data_way0[head_way0] : data_way1[head_way1];
 
+
+  assign input_data0 = {
+    i_a_pc,
+    i_a_optype,
+    i_a_opcode,
+    i_a_dest,
+    i_a_imm,
+    i_a_pred_br_taken,
+    i_a_pred_br_target,
+    i_a_br_type,
+    i_a_br_condition,
+    i_a_br_target,
+    i_a_br_taken,
+    i_a_have_excp || interrupt,
+    interrupt ? INT : i_a_excp_type,
+    i_a_csr_addr,
+    i_a_csr_wr,
+    i_a_r1,
+    i_a_r2,
+    i_a_src2_is_imm
+  };
+
+  assign input_data1 = {
+    i_b_pc,
+    i_b_optype,
+    i_b_opcode,
+    i_b_dest,
+    i_b_imm,
+    i_b_pred_br_taken,
+    i_b_pred_br_target,
+    i_b_br_type,
+    i_b_br_condition,
+    i_b_br_target,
+    i_b_br_taken,
+    i_b_have_excp,
+    i_b_excp_type,
+    i_b_csr_addr,
+    i_b_csr_wr,
+    i_b_r1,
+    i_b_r2,
+    i_b_src2_is_imm
+  };
 
 `ifdef DIFFTEST_EN
-  assign o_a_difftest = difftest[head];
-  assign o_b_difftest = difftest[head+1'b1];
+  assign o_a_difftest = head_way ? difftest_way1[head_way1] : difftest_way0[head_way0];
+  assign o_b_difftest = head_way ? difftest_way0[head_way0] : difftest_way1[head_way1];
 `endif
 
   always_ff @(posedge clk) begin
     if (reset || flush) begin
-      head   <= 4'd0;
-      tail   <= 4'd0;
+      head_way <= 1'd0;
+      head_way0 <= 3'd0;
+      head_way1 <= 3'd0;
+      tail_way <= 1'd0;
+      tail_way0 <= 3'd0;
+      tail_way1 <= 3'd0;
       length <= 5'd0;
     end else begin
-      tail   <= tail + i_size;
-      head   <= head + o_size;
-      length <= length + {1'b0, i_size} - {1'b0, o_size};
+      if (tail_way == 1'b0 && i_size == 2'd1 || i_size == 2'd2) tail_way0 <= tail_way0 + 3'd1;
+      if (tail_way == 1'b1 && i_size == 2'd1 || i_size == 2'd2) tail_way1 <= tail_way1 + 3'd1;
+      if (head_way == 1'b0 && o_size == 2'd1 || o_size == 2'd2) head_way0 <= head_way0 + 3'd1;
+      if (head_way == 1'b1 && o_size == 2'd1 || o_size == 2'd2) head_way1 <= head_way1 + 3'd1;
+      tail_way <= tail_way ^ i_size[0];
+      head_way <= head_way ^ o_size[0];
+      length   <= length + {2'b0, i_size} - {2'b0, o_size};
       if (i_size == 2'd1 || i_size == 2'd2) begin
-        data[tail] <= {
-          i_a_pc,
-          i_a_optype,
-          i_a_opcode,
-          i_a_dest,
-          i_a_imm,
-          i_a_pred_br_taken,
-          i_a_pred_br_target,
-          i_a_br_type,
-          i_a_br_condition,
-          i_a_br_target,
-          i_a_br_taken,
-          i_a_have_excp || interrupt,
-          interrupt ? INT : i_a_excp_type,
-          i_a_csr_addr,
-          i_a_csr_wr,
-          i_a_r1,
-          i_a_r2,
-          i_a_src2_is_imm
-        };
+        if (tail_way == 1'b0) data_way0[tail_way0] <= input_data0;
+        else data_way1[tail_way1] <= input_data0;
 `ifdef DIFFTEST_EN
-        difftest[tail] <= i_a_difftest;
+        if (tail_way == 1'b0) difftest_way0[tail_way0] <= i_a_difftest;
+        else difftest_way1[tail_way1] <= i_a_difftest;
 `endif
       end
       if (i_size == 2'd2) begin
-        data[tail+1'b1] <= {
-          i_b_pc,
-          i_b_optype,
-          i_b_opcode,
-          i_b_dest,
-          i_b_imm,
-          i_b_pred_br_taken,
-          i_b_pred_br_target,
-          i_b_br_type,
-          i_b_br_condition,
-          i_b_br_target,
-          i_b_br_taken,
-          i_b_have_excp,
-          i_b_excp_type,
-          i_b_csr_addr,
-          i_b_csr_wr,
-          i_b_r1,
-          i_b_r2,
-          i_b_src2_is_imm
-        };
+        if (tail_way == 1'b0) data_way1[tail_way1] <= input_data1;
+        else data_way0[tail_way0] <= input_data1;
 `ifdef DIFFTEST_EN
-        difftest[tail+2'd1] <= i_b_difftest;
+        if (tail_way == 1'b0) difftest_way1[tail_way1] <= i_b_difftest;
+        else difftest_way0[tail_way0] <= i_b_difftest;
 `endif
       end
     end
