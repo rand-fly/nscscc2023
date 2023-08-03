@@ -1,4 +1,4 @@
-`include "definitions.svh"
+`include "../definitions.svh"
 
 module addr_trans (
     input wire             direct_access,
@@ -13,8 +13,8 @@ module addr_trans (
     output logic             [ 9:0] tlb_s_asid,
     input  wire tlb_result_t        tlb_s_result,
 
-    input  wire  [31:0] vtag,
-    output logic [31:0] ptag,
+    input  wire  [19:0] vtag,
+    output logic [19:0] ptag,
     output logic [ 1:0] mat,
     output logic        page_fault,
     output logic        page_invalid,
@@ -29,17 +29,17 @@ module addr_trans (
       ptag = vtag;
       mat = direct_access_mat;
       use_tlb = 1'b0;
-    end else if (vtag == dmw0.vseg && (plv == 2'd0 && dmw0.plv0 || plv == 2'd3 && dmw0.plv3)) begin
+    end else if (vtag[19:17] == dmw0.vseg && (plv == 2'd0 && dmw0.plv0 || plv == 2'd3 && dmw0.plv3)) begin
       ptag = {dmw0.pseg, vtag[16:0]};
       mat = dmw0.mat;
       use_tlb = 1'b0;
-    end else if (vtag == dmw1.vseg && (plv == 2'd0 && dmw1.plv0 || plv == 2'd3 && dmw1.plv3)) begin
+    end else if (vtag[19:17] == dmw1.vseg && (plv == 2'd0 && dmw1.plv0 || plv == 2'd3 && dmw1.plv3)) begin
       ptag = {dmw1.pseg, vtag[16:0]};
       mat = dmw1.mat;
       use_tlb = 1'b0;
     end else begin
       // only 4KB
-      ptag = vtag; // tlb_s_result.ppn;
+      ptag = vtag;  // tlb_s_result.ppn;
       mat = tlb_s_result.mat;
       use_tlb = 1'b1;
     end

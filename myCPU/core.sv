@@ -579,38 +579,42 @@ module core (
       .br_taken      (id_b_br_taken)
   );
 
-  assign br_mistaken = ex2_b_br_mistaken
-                    || ex1_a_br_mistaken
-                    || ex1_b_br_mistaken
-                    || (ID_a_valid && id_a_br_mistaken)
-                    || (ID_b_valid && id_b_br_mistaken);
-
   always_comb begin
     if (ex2_b_br_mistaken) begin
+      br_mistaken  = 1'b1;
       br_type      = EX2_b_br_type;
       wrong_pc     = EX2_b_pc;
       right_target = ex2_b_br_taken ? ex2_b_br_target : EX2_b_pc + 32'd4;
       btb_target   = ex2_b_br_target;
     end else if (ex1_a_br_mistaken) begin
+      br_mistaken  = 1'b1;
       br_type      = EX1_a_br_type;
       wrong_pc     = EX1_a_pc;
       right_target = ex1_a_br_taken ? ex1_a_br_target : EX1_a_pc + 32'd4;
       btb_target   = ex1_a_br_target;
     end else if (ex1_b_br_mistaken) begin
+      br_mistaken  = 1'b1;
       br_type      = EX1_b_br_type;
       wrong_pc     = EX1_b_pc;
       right_target = ex1_b_br_taken ? ex1_b_br_target : EX1_b_pc + 32'd4;
       btb_target   = ex1_b_br_target;
     end else if (ID_a_valid && id_a_br_mistaken) begin
+      br_mistaken = 1'b1;
       br_type = id_a_br_type;
       wrong_pc = ID_a_pc;
       right_target = (id_a_br_taken || id_a_br_type == BR_COND && ID_a_pred_br_taken) ? id_a_br_target : ID_a_pc + 32'd4;
       btb_target = id_a_br_target;
-    end else  /*if (ID_b_valid && id_b_br_mistaken)*/ begin
+    end else if (ID_b_valid && id_b_br_mistaken) begin
+      br_mistaken = 1'b1;
       br_type = id_b_br_type;
       wrong_pc = ID_b_pc;
       right_target = (id_b_br_taken || id_b_br_type == BR_COND && ID_b_pred_br_taken) ? id_b_br_target : ID_b_pc + 32'd4;
       btb_target = id_b_br_target;
+    end else begin
+      br_mistaken  = 1'b0;
+      br_type      = BR_NOP;
+      wrong_pc     = 32'd0;
+      right_target = 32'd0;
     end
   end
 
@@ -1571,9 +1575,9 @@ module core (
       .i_tlbr          (mmu_i_tlbr),
       .i_pif           (mmu_i_pif),
       .i_ppi           (mmu_i_ppi),
-      .d0_req          (mmu_d0_req),
       .d_cancel        (mem_cancel),
       .d1_cancel       (mem_d1_cancel),
+      .d0_req          (mmu_d0_req),
       .d0_va           (mmu_d0_va),
       .d0_we           (mmu_d0_we),
       .d0_size         (mmu_d0_size),
