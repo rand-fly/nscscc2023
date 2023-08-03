@@ -274,7 +274,6 @@ wire cache_hit_and_cached;
 wire [`CACHE_WAY_NUM-1:0] cache_hit_way;
 wire [`CACHE_WAY_NUM_LOG2-1:0] cache_hit_way_id;
 
-wire pipe_interface_latch_without_valid;
 wire pipe_interface_latch;
 
 wire [`LINE_WIDTH-1:0] buffer_read_data_new;
@@ -718,6 +717,48 @@ always @(posedge clk) begin
         if (replace & !uncached_reg) begin
             $display("[%t] replace (%h,%h), line: %h",$time, tag_reg,index_reg, wr_data);
         end
+    end
+end
+
+`endif
+
+`define PERF_COUNT
+
+`ifdef PERF_COUNT
+reg [31:0] last_print_time;
+
+reg [31:0] access_count;
+reg [31:0] hit_count;
+reg [31:0] uncached_count;
+
+always @(posedge clk) begin
+    if (!resetn) begin
+        last_print_time <= 0;
+
+        access_count <= 0;
+        hit_count <= 0;
+        uncached_count <= 0;
+    end
+    else begin
+        if (data_ok) begin
+            access_count <= access_count + 1;
+            if (uncached_reg) begin
+                uncached_count <= uncached_count + 1;
+            end
+            else begin
+                if (cache_hit) begin
+                    hit_count <= hit_count + 1;
+                end
+            end
+        end
+    end
+
+    if (last_print_time + 10000 < $time) begin
+        last_print_time <= $time;
+
+        $display("[%t] dcache1_2 access_count  : %d", $time, access_count);
+        $display("[%t] dcache1_2 hit_count     : %d", $time, hit_count);
+        $display("[%t] dcache1_2 uncached_count: %d", $time, uncached_count);
     end
 end
 

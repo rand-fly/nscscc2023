@@ -46,7 +46,7 @@ module axi_bridge(
     input    wire[ 1:0] bresp,
     input    wire       bvalid,
     output   reg    bready,
-    //cache sign
+    //cache signal
     input  wire                     inst_rd_req     ,
     input  wire[ 2:0]               inst_rd_type    ,
     input  wire[31:0]               inst_rd_addr    ,
@@ -170,7 +170,7 @@ always @(posedge clk) begin
         RD_REQ_ST_IDLE: begin
             if (data_rd_req) begin
                 if (write_wait_enable) begin
-                    if (bvalid & bready) begin // TODO faster
+                    if (bid[0] & bvalid & bready) begin // TODO faster
                         read_requst_state <= RD_REQ_ST_RDY;
                         arid <= 4'b1;
                         araddr <= data_rd_addr;
@@ -190,7 +190,8 @@ always @(posedge clk) begin
             end
             else if (inst_rd_req) begin
                 if (write_wait_enable) begin
-                    if (bvalid & bready) begin
+                // if (write_wait_enable & (inst_rd_addr[31:`OFFSET_WIDTH] == awaddr[31:`OFFSET_WIDTH])) begin // wait for write only when in the same line
+                    if (bid[0] & bvalid & bready) begin
                         read_requst_state <= RD_REQ_ST_RDY;
                         arid <= 4'b0;
                         araddr <= inst_rd_addr;
@@ -279,7 +280,7 @@ always @(posedge clk) begin
             if (awready) begin
                 write_state <= WR_ST_TX;
                 awvalid <= 1'b0;
-		wvalid  <= 1'b1;
+		        wvalid  <= 1'b1;
             end
         end 
         WR_ST_TX: begin
@@ -305,7 +306,7 @@ always @(posedge clk) begin
             end
         end
         WR_ST_WAIT_B: begin
-            if (bvalid & bready) begin
+            if (bid[0] & bvalid & bready) begin
                 write_state <= WR_ST_REQ_IDLE;
                 bready <= 1'b0;
             end
@@ -317,5 +318,62 @@ always @(posedge clk) begin
 end
 
 assign write_wait_enable = !(write_state == WR_ST_REQ_IDLE);
+
+
+`define PERF_COUNT
+
+`ifdef PERF_COUNT
+reg [31:0] last_print_time;
+
+reg [31:0] clk_count;
+reg [31:0] rd_count;
+reg [31:0] wr_count;
+reg [31:0] ar_count;
+reg [31:0] aw_count;
+reg [31:0] rdy_count;
+
+always @(posedge clk) begin
+    if (reset) begin
+        last_print_time <= 0;
+
+        clk_count <= 0;
+        rd_count <= 0;
+        wr_count <= 0;
+        ar_count <= 0;
+        aw_count <= 0;
+        rdy_count <= 0;
+    end
+    else begin
+        clk_count <= clk_count + 1;
+        if (wvalid) begin
+            wr_count <= wr_count + 1;
+        end
+        if (rvalid) begin
+            rd_count <= rd_count + 1;
+        end
+        if (arvalid) begin
+            ar_count <= ar_count + 1;
+        end
+        if (awvalid) begin
+            aw_count <= aw_count + 1;
+        end
+        if ((read_requst_state == RD_REQ_ST_IDLE) & (write_state == WR_ST_REQ_IDLE) & arready & awready) begin
+            rdy_count <= rdy_count + 1;
+        end
+    end
+
+    if (last_print_time + 10000 < $time) begin
+        last_print_time <= $time;
+
+        $display("[%t] axi_bridge all_clk_count: %d", $time, clk_count);
+        $display("[%t] axi_bridge ar_clk_count : %d", $time, ar_count);
+        $display("[%t] axi_bridge rd_clk_count : %d", $time, rd_count);
+        $display("[%t] axi_bridge aw_clk_count : %d", $time, aw_count);
+        $display("[%t] axi_bridge wr_clk_count : %d", $time, wr_count);
+        $display("[%t] axi_bridge rdy_clk_count: %d", $time, rdy_count);
+    end
+end
+
+`endif
 
 endmodule

@@ -40,6 +40,8 @@ wire [`INDEX_WIDTH-1:0] data_addr;
 
 `define CACHE_2WAY
 
+// `define PREFETCH
+
 `ifdef CACHE_2WAY
 
 `define CACHE_WAY_NUM 2
@@ -548,18 +550,62 @@ always @(posedge clk) begin
         prefetch_tag_reg <= 0;
         prefetch_index_reg <= 0;
     end
+`ifdef PREFETCH
     else if (!prefetching & (lookup & cache_hit_and_cached) & (prefetch_index!=0) & !prefetch_cached & !uncached_reg & ((prefetch_tag != prefetch_tag_reg) | (prefetch_index != prefetch_index_reg))) begin
         prefetching <= 1;
         prefetch_valid_reg <= 0;
         prefetch_tag_reg <= prefetch_tag;
         prefetch_index_reg <= prefetch_index;
     end
+`endif
+
     if (prefetching & ret_valid_last) begin
         prefetching <= 0;
         prefetch_valid_reg <= 1;
         prefetch_data_reg <= buffer_read_data_new;
     end
 end
+
+`define PERF_COUNT
+
+`ifdef PERF_COUNT
+reg [31:0] last_print_time;
+
+`ifdef PREFETCH
+reg [31:0] prefetch_count;
+reg [31:0] prefetch_hit_count;
+`endif
+
+always @(posedge clk) begin
+    if (!resetn) begin
+        last_print_time <= 0;
+
+`ifdef PREFETCH
+        prefetch_count <= 0;
+        prefetch_hit_count <= 0;
+`endif
+    end
+    else begin
+`ifdef PREFETCH
+        if (prefetching & ret_valid_last) begin
+            prefetch_count <= prefetch_count + 1;
+        end
+        if (data_ok & prefetch_hit) begin
+            prefetch_hit_count <= prefetch_hit_count + 1;
+        end
+`endif
+    end
+
+    if (last_print_time + 10000 < $time) begin
+        last_print_time <= $time;
+`ifdef PREFETCH
+        $display("[%t] icache prefetch_count    : %d", $time, prefetch_count);
+        $display("[%t] icache prefetch_hit_count: %d", $time, prefetch_hit_count);
+`endif
+    end
+end
+
+`endif
 
 
 endmodule
