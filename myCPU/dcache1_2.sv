@@ -381,7 +381,7 @@ always @(posedge clk) begin
                 cache_wstrb_reg <= cache_wstrb_reg | ({{(`LINE_SIZE-4){1'b0}},p0_wstrb} << p0_offset_cell_w) | ({{(`LINE_SIZE-4){1'b0}},p1_wstrb_valid} << p1_offset_cell_w);
                 cache_write_data_reg <= (cache_write_data_reg & ~cache_write_data_strobe) 
                                         | ((
-                                            ({{(`LINE_WIDTH-32){1'b0}},p0_wdata} << (p0_offset_cell_w*8) & p0_cache_write_data_strobe) 
+                                            ({{(`LINE_WIDTH-32){1'b0}},p0_wdata} << (p0_offset_cell_w*8) & p0_cache_write_data_strobe & ~p1_cache_write_data_strobe) 
                                             | ({{(`LINE_WIDTH-32){1'b0}},p1_wdata} << (p1_offset_cell_w*8) & p1_cache_write_data_strobe)
                                             ));
             end
@@ -685,8 +685,8 @@ blk_mem_gen_cache_32 data_way1_ram(
 );
 
 
-`define DBG_TAG 20'h0205
-`define DBG_INDEX 7'h6e
+`define DBG_TAG 20'h1c012
+`define DBG_INDEX 7'h3c
 // `define DCACHE_DBG
 
 `ifdef DCACHE_DBG
