@@ -667,7 +667,7 @@ always @(posedge clk) begin
     end
 end
 
-blk_mem_gen_cache_32 data_way0_ram(
+blk_mem_gen_cache_32 dcache_way0_ram(
     .addra(data_addr),
     .clka(clk),
     .dina(cache_write_data_actually),
@@ -675,7 +675,7 @@ blk_mem_gen_cache_32 data_way0_ram(
     .wea(cache_write & (cache_write_way_id == 0))
 );
 
-blk_mem_gen_cache_32 data_way1_ram(
+blk_mem_gen_cache_32 dcache_way1_ram(
     .addra(data_addr),
     .clka(clk),
     .dina(cache_write_data_actually),
@@ -733,12 +733,6 @@ module blk_mem_gen_cache_32(
   input wire [6:0]addra,
   input wire [255:0]dina,
   output reg [255:0]douta
-
-//   input wire clkb,
-//   input wire [0:0]web,
-//   input wire [6:0]addrb,
-//   input wire [255:0]dinb,
-//   output reg [255:0]doutb
 );
 
 reg [255:0] mem [0:127];
@@ -750,14 +744,6 @@ always @(posedge clka) begin
     douta <= mem[addra];
 end
 
-// always @(posedge clkb) begin
-//     if (web) begin
-//         mem[addrb] <= dinb;
-//     end
-//     doutb <= mem[addrb];
-// end
-
 endmodule
-
 
 `endif
