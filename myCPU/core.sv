@@ -440,10 +440,8 @@ module core (
   logic  [31:0] mul_a_result;
   logic         mul_b_ok;
   logic  [31:0] mul_b_result;
-  logic         div_a_ok;
-  logic  [31:0] div_a_result;
-  logic         div_b_ok;
-  logic  [31:0] div_b_result;
+  logic         div_ok;
+  logic  [31:0] div_result;
   // from lsu a
   logic         lsu_a_ready;
   logic         lsu_a_ok;
@@ -901,6 +899,7 @@ module core (
   assign allow_issue_b = !ibuf_no_out && allow_issue_a && !ro_a_have_excp
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
                       && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB
+                      && !(ro_a_optype == OP_DIV && ro_b_optype == OP_DIV)
                       && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU))
                       && ro_b_optype != OP_TLB && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
 
@@ -1107,24 +1106,14 @@ module core (
       .result(mul_b_result)
   );
 
-  div u_div_a (
-      .clk   (clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !EX1_stalling && !ex2_b_br_mistaken),
-      .opcode(div_opcode_t'(EX1_a_opcode)),
-      .src1  (ex1_a_src1),
-      .src2  (ex1_a_src2),
-      .ok    (div_a_ok),
-      .result(div_a_result)
-  );
-
-  div u_div_b (
+  div u_div (
       .clk(clk),
-      .valid (EX1_b_valid && EX1_b_optype == OP_DIV && !EX1_stalling && !ex1_a_br_mistaken && !lsu_a_have_excp && !ex2_b_br_mistaken),
-      .opcode(div_opcode_t'(EX1_b_opcode)),
-      .src1(ex1_b_src1),
-      .src2(ex1_b_src2),
-      .ok(div_b_ok),
-      .result(div_b_result)
+      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !EX1_stalling && !ex2_b_br_mistaken || EX1_b_valid && EX1_b_optype == OP_DIV && !EX1_stalling && !ex1_a_br_mistaken && !lsu_a_have_excp && !ex2_b_br_mistaken),
+      .opcode(EX1_a_optype == OP_DIV ? div_opcode_t'(EX1_a_opcode) : div_opcode_t'(EX1_b_opcode)),
+      .src1(EX1_a_optype == OP_DIV ? ex1_a_src1 : ex1_b_src1),
+      .src2(EX1_a_optype == OP_DIV ? ex1_a_src2 : ex1_b_src2),
+      .ok(div_ok),
+      .result(div_result)
   );
 
   wire mem_cancel = raise_excp || replay
@@ -1358,8 +1347,8 @@ module core (
     );
   assign csr_vppn_wdata = ex2_excp_type == PIF ? ex2_excp_pc[31:13] : ex2_excp_addr[31:13];
 
-  assign ex2_a_ok = !(EX2_a_optype == OP_DIV && !div_a_ok || EX2_a_optype == OP_MUL && !mul_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
-  assign ex2_b_ok = !(EX2_b_optype == OP_DIV && !div_b_ok || EX2_b_optype == OP_MUL && !mul_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);
+  assign ex2_a_ok = !(EX2_a_optype == OP_DIV && !div_ok || EX2_a_optype == OP_MUL && !mul_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
+  assign ex2_b_ok = !(EX2_b_optype == OP_DIV && !div_ok || EX2_b_optype == OP_MUL && !mul_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);
   assign ex2_stall  = /*(EX2_a_valid || EX2_b_valid) &&*/ (EX2_a_valid && !ex2_a_ok && !WB_a_ok || EX2_b_valid && !ex2_b_ok && !WB_b_ok);
   assign ex2_b_src1 = EX2_b_src1_delayed ? EX2_a_alu_result : EX2_b_src1;
   assign ex2_b_src2 = EX2_b_src2_delayed ? EX2_a_alu_result : EX2_b_src2;
@@ -1440,7 +1429,7 @@ module core (
         unique case (EX2_a_optype)
           OP_ALU:  WB_a_result <= EX2_a_alu_result;
           OP_MUL:  WB_a_result <= mul_a_result;
-          OP_DIV:  WB_a_result <= div_a_result;
+          OP_DIV:  WB_a_result <= div_result;
           OP_MEM:  WB_a_result <= lsu_a_result;
           OP_CSR:  WB_a_result <= csr_rdata;
           default: WB_a_result <= 32'd0;
@@ -1461,7 +1450,7 @@ module core (
         unique case (EX2_b_optype)
           OP_ALU:  WB_b_result <= EX2_b_delayed ? alu_b2_result : EX2_b_alu_result;
           OP_MUL:  WB_b_result <= mul_b_result;
-          OP_DIV:  WB_b_result <= div_b_result;
+          OP_DIV:  WB_b_result <= div_result;
           OP_MEM:  WB_b_result <= lsu_b_result;
           OP_CSR:  WB_b_result <= csr_rdata;
           default: WB_b_result <= 32'd0;
