@@ -6,6 +6,7 @@ module mul (
     input mul_opcode_t opcode,
     input [31:0] src1,
     input [31:0] src2,
+    output reg ok,
     output [31:0] result
 );
 
@@ -16,8 +17,15 @@ module mul (
 
   mul_opcode_t opcode_buf;
 
+  logic valid_buf;
+
   always_ff @(posedge clk) begin
-    opcode_buf <= opcode;
+    if (valid) opcode_buf <= opcode;
+  end
+
+  always_ff @(posedge clk) begin
+    valid_buf <= valid;
+    ok <= valid_buf;
   end
 
   assign result = opcode_buf == MUL_MUL ? mul_output[31:0] : mul_output[63:32];
@@ -35,15 +43,24 @@ endmodule
 // for verilator simulation
 `ifdef SIMU
 module mult_gen_0 (
-    input  wire         CLK,
-    input  wire  [32:0] A,
-    input  wire  [32:0] B,
-    input  wire         CE,
-    output logic [63:0] P
+    input             CLK,
+    input      [32:0] A,
+    input      [32:0] B,
+    input             CE,
+    output reg [63:0] P
 );
+  logic [32:0] A_reg;
+  logic [32:0] B_reg;
+  logic [32:0] CE_reg;
 
   always_ff @(posedge CLK) begin
-    if (CE) P <= $signed(A) * $signed(B);
+    A_reg  <= A;
+    B_reg  <= B;
+    CE_reg <= CE;
+  end
+
+  always_ff @(posedge CLK) begin
+    if (CE_reg) P <= $signed(A_reg) * $signed(B_reg);
   end
 endmodule
 `endif
