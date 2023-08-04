@@ -255,7 +255,7 @@ icache icache(
 // );
 
 
-dcache1_2 dcache(
+dcache dcache(
     .clk(aclk),
     .resetn(aresetn),
 
