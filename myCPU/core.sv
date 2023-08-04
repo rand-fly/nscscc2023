@@ -1036,7 +1036,7 @@ module core (
   end
 
   assign ex1_ready = lsu_a_ready && lsu_b_ready || mem_cancel;
-  assign ex1_stall = (EX1_a_valid || EX1_b_valid) && (!ex1_ready || ex2_stall);
+  assign ex1_stall = /*(EX1_a_valid || EX1_b_valid) &&*/ (!ex1_ready || ex2_stall);
 
   alu u_alu_a (
       .opcode(alu_opcode_t'(EX1_a_opcode)),
@@ -1105,7 +1105,7 @@ module core (
 
   div u_div_a (
       .clk   (clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !ex1_stall && !ex2_b_br_mistaken),
+      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !EX1_stall && !ex2_b_br_mistaken),
       .opcode(div_opcode_t'(EX1_a_opcode)),
       .src1  (ex1_a_src1),
       .src2  (ex1_a_src2),
@@ -1115,7 +1115,7 @@ module core (
 
   div u_div_b (
       .clk(clk),
-      .valid (EX1_b_valid && EX1_b_optype == OP_DIV && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp && !ex2_b_br_mistaken),
+      .valid (EX1_b_valid && EX1_b_optype == OP_DIV && !EX1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp && !ex2_b_br_mistaken),
       .opcode(div_opcode_t'(EX1_b_opcode)),
       .src1(ex1_b_src1),
       .src2(ex1_b_src2),
@@ -1354,9 +1354,9 @@ module core (
     );
   assign csr_vppn_wdata = ex2_excp_type == PIF ? ex2_excp_pc[31:13] : ex2_excp_addr[31:13];
 
-  assign ex2_a_ok = EX2_a_valid && !(EX2_a_optype == OP_DIV && !div_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
-  assign ex2_b_ok = EX2_b_valid && !(EX2_b_optype == OP_DIV && !div_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);
-  assign ex2_stall  = (EX2_a_valid || EX2_b_valid) && (EX2_a_valid && !ex2_a_ok && !WB_a_ok || EX2_b_valid && !ex2_b_ok && !WB_b_ok);
+  assign ex2_a_ok = !(EX2_a_optype == OP_DIV && !div_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
+  assign ex2_b_ok = !(EX2_b_optype == OP_DIV && !div_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);
+  assign ex2_stall  = /*(EX2_a_valid || EX2_b_valid) &&*/ (EX2_a_valid && !ex2_a_ok && !WB_a_ok || EX2_b_valid && !ex2_b_ok && !WB_b_ok);
   assign ex2_b_src1 = EX2_b_src1_delayed ? EX2_a_alu_result : EX2_b_src1;
   assign ex2_b_src2 = EX2_b_src2_delayed ? EX2_a_alu_result : EX2_b_src2;
 
