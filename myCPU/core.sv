@@ -615,6 +615,7 @@ module core (
       br_type      = BR_NOP;
       wrong_pc     = 32'd0;
       right_target = 32'd0;
+      btb_target   = 32'd0;
     end
   end
 
@@ -755,6 +756,7 @@ module core (
 
   // forward prediction
   always_comb begin
+    ro_a_src1_passed = 32'd0;
     if (ro_a_r1 == 5'd0) begin
       ro_a_src1_ok = 1'b1;
       ro_a_src1_source = SRC_ZERO;
@@ -786,6 +788,7 @@ module core (
   end
 
   always_comb begin
+    ro_a_src2_passed = 32'd0;
     if (ro_a_src2_is_imm) begin
       ro_a_src2_ok = 1'b1;
       ro_a_src2_source = SRC_IMM;
@@ -820,6 +823,7 @@ module core (
   end
 
   always_comb begin
+    ro_b_src1_passed = 32'd0;
     if (ro_b_r1 == 5'd0) begin
       ro_b_src1_ok = 1'b1;
       ro_b_src1_source = SRC_ZERO;
@@ -854,6 +858,7 @@ module core (
   end
 
   always_comb begin
+    ro_b_src2_passed = 32'd0;
     if (ro_b_src2_is_imm) begin
       ro_b_src2_ok = 1'b1;
       ro_b_src2_source = SRC_IMM;
