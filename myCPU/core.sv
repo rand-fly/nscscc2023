@@ -378,10 +378,6 @@ module core (
   logic      [31:0] EX2_b_alu_result;
   logic      [31:0] EX2_b_imm;
   br_type_t         EX2_b_br_type;
-  logic             EX2_b_br_condition;
-  logic      [31:0] EX2_b_br_target;
-  logic             EX2_b_pred_br_taken;
-  logic      [31:0] EX2_b_pred_br_target;
   logic             EX2_b_br_taken;
   logic             EX2_b_have_excp;
   excp_t            EX2_b_excp_type;
@@ -398,9 +394,6 @@ module core (
   logic            ex2_stall;
   logic     [31:0] ex2_b_src1;
   logic     [31:0] ex2_b_src2;
-  logic            ex2_b_br_taken;
-  logic     [31:0] ex2_b_br_target;
-  logic            ex2_b_br_mistaken;
   logic     [31:0] ex2_csr_mask;
   logic     [31:0] ex2_csr_wdata;
   logic            ex2_have_excp;
@@ -580,13 +573,7 @@ module core (
   );
 
   always_comb begin
-    if (ex2_b_br_mistaken) begin
-      br_mistaken  = 1'b1;
-      br_type      = EX2_b_br_type;
-      wrong_pc     = EX2_b_pc;
-      right_target = ex2_b_br_taken ? ex2_b_br_target : EX2_b_pc + 32'd4;
-      btb_target   = ex2_b_br_target;
-    end else if (ex1_a_br_mistaken) begin
+    if (ex1_a_br_mistaken) begin
       br_mistaken  = 1'b1;
       br_type      = EX1_a_br_type;
       wrong_pc     = EX1_a_pc;
@@ -620,9 +607,9 @@ module core (
   end
 
   assign flush_id = raise_excp || replay || br_mistaken;
-  assign flush_ibuf  = raise_excp || replay || ex2_b_br_mistaken || ex1_a_br_mistaken || ex1_b_br_mistaken;
+  assign flush_ibuf  = raise_excp || replay || ex1_a_br_mistaken || ex1_b_br_mistaken;
   assign ibuf_no_out = ex1_a_br_mistaken || ex1_b_br_mistaken;
-  assign flush_ex1 = raise_excp || replay || ex2_b_br_mistaken;
+  assign flush_ex1 = raise_excp || replay;
 
   always_comb begin
     if (ID_b_valid) begin
@@ -905,7 +892,7 @@ module core (
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
                       && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB
                       && !(ro_a_optype == OP_DIV && ro_b_optype == OP_DIV)
-                      && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU))
+                      && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU || ro_b_br_type != BR_NOP))
                       && ro_b_optype != OP_TLB && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
@@ -1093,7 +1080,7 @@ module core (
 
   mul u_mul_a (
       .clk   (clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_MUL && !ex1_stall && !ex2_b_br_mistaken),
+      .valid (EX1_a_valid && EX1_a_optype == OP_MUL && !ex1_stall),
       .opcode(mul_opcode_t'(EX1_a_opcode)),
       .src1  (ex1_a_src1),
       .src2  (ex1_a_src2),
@@ -1103,7 +1090,7 @@ module core (
 
   mul u_mul_b (
       .clk(clk),
-      .valid (EX1_b_valid && EX1_b_optype == OP_MUL && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp && !ex2_b_br_mistaken),
+      .valid (EX1_b_valid && EX1_b_optype == OP_MUL && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp),
       .opcode(mul_opcode_t'(EX1_b_opcode)),
       .src1(ex1_b_src1),
       .src2(ex1_b_src2),
@@ -1113,7 +1100,7 @@ module core (
 
   div u_div (
       .clk(clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !EX1_stalling && !ex2_b_br_mistaken || EX1_b_valid && EX1_b_optype == OP_DIV && !EX1_stalling && !ex1_a_br_mistaken && !lsu_a_have_excp && !ex2_b_br_mistaken),
+      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !EX1_stalling || EX1_b_valid && EX1_b_optype == OP_DIV && !EX1_stalling && !ex1_a_br_mistaken && !lsu_a_have_excp),
       .opcode(EX1_a_optype == OP_DIV ? div_opcode_t'(EX1_a_opcode) : div_opcode_t'(EX1_b_opcode)),
       .src1(EX1_a_optype == OP_DIV ? ex1_a_src1 : ex1_b_src1),
       .src2(EX1_a_optype == OP_DIV ? ex1_a_src2 : ex1_b_src2),
@@ -1123,7 +1110,7 @@ module core (
 
   wire mem_cancel = raise_excp || replay
                  || lsu_a_have_excp || (lsu_b_have_excp && EX1_a_optype != OP_MEM)
-                 || ex1_a_br_mistaken || ex2_b_br_mistaken;
+                 || ex1_a_br_mistaken;
 
   wire mem_d1_cancel = lsu_b_have_excp;
 
@@ -1213,8 +1200,8 @@ module core (
       EX2_a_valid <= 1'b0;
       EX2_b_valid <= 1'b0;
     end else if (!ex2_stall) begin
-      EX2_a_valid <= ex1_ready && EX1_a_valid && !flush_ex1 && !ex2_b_br_mistaken;
-      EX2_b_valid <= ex1_ready && EX1_b_valid && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1 && !ex2_b_br_mistaken;
+      EX2_a_valid <= ex1_ready && EX1_a_valid && !flush_ex1;
+      EX2_b_valid <= ex1_ready && EX1_b_valid && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1;
     end
 
     EX2_stalling <= ex2_stall;
@@ -1278,10 +1265,6 @@ module core (
       EX2_b_alu_result <= alu_b1_result;
       EX2_b_imm <= EX1_b_imm;
       EX2_b_br_type <= EX1_b_br_type;
-      EX2_b_br_condition <= EX1_b_br_condition;
-      EX2_b_br_target <= EX1_b_br_target;
-      EX2_b_pred_br_taken <= EX1_b_pred_br_taken;
-      EX2_b_pred_br_target <= EX1_b_pred_br_target;
       EX2_b_br_taken <= ex1_b_br_taken || EX1_b_br_taken;
       EX2_b_have_excp <= EX1_b_have_excp || lsu_b_have_excp;
       EX2_b_excp_type <= lsu_b_have_excp ? lsu_b_excp_type : EX1_b_excp_type;
@@ -1365,22 +1348,6 @@ module core (
       .result(alu_b2_result)
   );
 
-  always_comb begin
-    if (EX2_b_delayed && EX2_b_br_type == BR_COND) begin
-      ex2_b_br_taken = EX2_b_br_condition == alu_b2_result[0];
-      ex2_b_br_target = EX2_b_br_target;
-      ex2_b_br_mistaken = EX2_b_valid && !EX2_stalling && ex2_b_br_taken != EX2_b_pred_br_taken;
-    end else if (EX2_b_delayed && (EX2_b_br_type == BR_INDIR || EX2_b_br_type == BR_RET)) begin
-      ex2_b_br_taken = 1'b1;
-      ex2_b_br_target = ex2_b_src1 + EX2_b_br_target;
-      ex2_b_br_mistaken = EX2_b_valid && !EX2_stalling && (!EX2_b_pred_br_taken || ex2_b_br_target != EX2_b_pred_br_target);
-    end else begin
-      ex2_b_br_taken = 1'b0;
-      ex2_b_br_target = 32'd0;
-      ex2_b_br_mistaken = 1'b0;
-    end
-  end
-
   assign ex2_csr_mask = EX2_a_optype == OP_CSR ? (EX2_a_csr_wr ? 32'hffffffff :EX2_a_src1): (EX2_b_csr_wr ? 32'hffffffff :ex2_b_src1);
   assign ex2_csr_wdata = EX2_a_optype == OP_CSR ? EX2_a_src2 : ex2_b_src2;
 
@@ -1411,7 +1378,7 @@ module core (
       WB_b_pc <= EX2_b_pc;
       WB_b_dest <= EX2_b_dest;
       WB_b_br_type <= EX2_b_br_type;
-      WB_b_br_taken <= ex2_b_br_taken || EX2_b_br_taken;
+      WB_b_br_taken <= EX2_b_br_taken;
       WB_b_have_excp <= EX2_b_have_excp;
       WB_b_excp_type <= EX2_b_excp_type;
 `ifdef DIFFTEST_EN
