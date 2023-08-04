@@ -66,14 +66,14 @@ reg uncached_reg;
 
 reg [`TAG_WIDTH-1:0] tag_way0 [0:`LINE_NUM-1];
 reg [`TAG_WIDTH-1:0] tag_way1 [0:`LINE_NUM-1];
-(* keep = "true" *) reg [`TAG_WIDTH-1:0] preload_tag_way0;
-(* keep = "true" *) reg [`TAG_WIDTH-1:0] preload_tag_way1;
+reg [`TAG_WIDTH-1:0] preload_tag_way0;
+reg [`TAG_WIDTH-1:0] preload_tag_way1;
 
 `ifdef CACHE_4WAY
 reg [`TAG_WIDTH-1:0] tag_way2 [0:255];
 reg [`TAG_WIDTH-1:0] tag_way3 [0:255];
-(* keep = "true" *) reg [`TAG_WIDTH-1:0] preload_tag_way2;
-(* keep = "true" *) reg [`TAG_WIDTH-1:0] preload_tag_way3;
+reg [`TAG_WIDTH-1:0] preload_tag_way2;
+reg [`TAG_WIDTH-1:0] preload_tag_way3;
 `endif
 
 `define get_tag(way_id_,index_) (\
