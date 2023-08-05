@@ -34,7 +34,6 @@ module mul (
       .CLK(clk),
       .A  (src1_sign_ex),
       .B  (src2_sign_ex),
-      .CE (valid),
       .P  (mul_output)
   );
 
@@ -46,21 +45,18 @@ module mult_gen_0 (
     input             CLK,
     input      [32:0] A,
     input      [32:0] B,
-    input             CE,
     output reg [63:0] P
 );
   logic [32:0] A_reg;
   logic [32:0] B_reg;
-  logic [32:0] CE_reg;
 
   always_ff @(posedge CLK) begin
-    A_reg  <= A;
-    B_reg  <= B;
-    CE_reg <= CE;
+    A_reg <= A;
+    B_reg <= B;
   end
 
   always_ff @(posedge CLK) begin
-    if (CE_reg) P <= $signed(A_reg) * $signed(B_reg);
+    P <= $signed(A_reg) * $signed(B_reg);
   end
 endmodule
 `endif
