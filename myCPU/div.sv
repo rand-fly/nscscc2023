@@ -18,11 +18,11 @@ module div (
   wire div_sign = is_signed && (src1[31] ^ src2[31]);
   wire mod_sign = is_signed && src1[31];
 
+  wire [63:0] div_output;
   wire [31:0] div_result = div_sign_buf ? -div_output[63:32] : div_output[63:32];
   wire [31:0] mod_result = mod_sign_buf ? -div_output[31:0] : div_output[31:0];
   wire [31:0] src1_signed = (is_signed && src1[31]) ? -src1 : src1;
   wire [31:0] src2_signed = (is_signed && src2[31]) ? -src2 : src2;
-  wire [63:0] div_output;
 
   always_ff @(posedge clk) begin
     if (valid) begin

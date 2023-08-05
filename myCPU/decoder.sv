@@ -34,9 +34,6 @@ module decoder (
   wire valid_inst;
   wire ine;
 
-  assign csr_addr = inst_rdcntid_w ? 14'h40 : inst[23:10];
-  assign csr_wr   = rj == `R1;
-
   wire [21:0] op_31_10 = inst[31:10];
   wire [16:0] op_31_15 = inst[31:15];
   wire [13:0] op_31_18 = inst[31:18];
@@ -190,6 +187,8 @@ assign           {valid_inst, optype, opcode,                r1,    r2, src2_is_
 {56{inst_invtlb   }} & {1'b1, OP_TLB, TLB_INVTLB,            rj,    rk,   1'b0,{27'd0,rd},`R0 } | // special
 {56{inst_ertn     }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } ;
 
+assign csr_addr = inst_rdcntid_w ? 14'h40 : inst[23:10];
+assign csr_wr   = rj == `R1;
 
 br_type_t jirl_type;
 
@@ -209,7 +208,7 @@ assign                 {br_type,   br_target, br_condition    } =
 
 assign br_taken = inst_b | inst_bl;
 assign br_mistaken = pred_br_taken && (br_type == BR_NOP || (!inst_jirl && pred_br_target != br_target))
-                     || !pred_br_taken && br_taken;
+                                          || !pred_br_taken && br_taken;
 
 assign ine = !valid_inst || inst_invtlb && rd > 5'd6;
 

@@ -133,6 +133,12 @@ module mmu (
   logic        [              9:0] tlb_s1_asid;
   tlb_result_t                     tlb_s1_result;
 
+  logic                            d1_only;
+  logic                            d1_only_reg;
+  logic                            d0_req_reg;
+  logic                            d1_req_reg;
+  logic                            conflict;
+
   assign i_vtag = i_va[31:31-`TAG_WIDTH+1];
   assign i_pa   = {i_ptag, i_va[31-`TAG_WIDTH:0]};
 
@@ -235,11 +241,8 @@ module mmu (
   assign i_data_ok = icache_data_ok;
   assign i_rdata = icache_rdata;
 
-  wire d1_only = !d0_req && d1_req;
-  reg d1_only_reg;
-  reg d0_req_reg;
-  reg d1_req_reg;
-  wire conflict = d0_req && (dcache_uncached || d0_va[31:`OFFSET_WIDTH] != d1_va[31:`OFFSET_WIDTH]);
+  assign d1_only = !d0_req && d1_req;
+  assign conflict = d0_req && (dcache_uncached || d0_va[31:`OFFSET_WIDTH] != d1_va[31:`OFFSET_WIDTH]);
 
   always @(posedge clk) begin
     if (reset) begin
@@ -255,7 +258,7 @@ module mmu (
 
   assign dcache_p0_valid = (d1_only ? d1_req : d0_req) && !d_cancel;
   assign dcache_p1_valid = (d1_req && !d1_only && !conflict) && !d_cancel && !d1_cancel;
-  assign dcache_op = d1_only ? d1_we : d0_we;
+  assign dcache_op = d1_only ? {2'd0, d1_we} : {2'd0, d0_we};
   assign dcache_tag = d_ptag;
   assign dcache_index = d1_only ? d1_va[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1] : d0_va[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1];
   assign dcache_p0_offset = d1_only ? d1_va[`OFFSET_WIDTH-1:0] : d0_va[`OFFSET_WIDTH-1:0];

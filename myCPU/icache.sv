@@ -7,7 +7,6 @@ module icache(
 
     // Pipe interface
     input wire valid,
-    input wire [2:0] op,
     input wire [`TAG_WIDTH-1:0] tag,
     input wire [`INDEX_WIDTH-1:0] index,
     input wire [`OFFSET_WIDTH-1:0] offset,

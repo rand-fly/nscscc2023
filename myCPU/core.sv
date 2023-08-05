@@ -266,6 +266,9 @@ module core (
   logic                      mmu_d1_ppi;
   logic                      mmu_d1_pme;
 
+  logic                      mem_cancel;
+  logic                      mem_d1_cancel;
+
 
   // from and to mmu(tlb)
   logic                      invtlb_valid;
@@ -607,7 +610,7 @@ module core (
   end
 
   assign flush_id = raise_excp || replay || br_mistaken;
-  assign flush_ibuf  = raise_excp || replay || ex1_a_br_mistaken || ex1_b_br_mistaken;
+  assign flush_ibuf = raise_excp || replay || ex1_a_br_mistaken || ex1_b_br_mistaken;
   assign ibuf_no_out = ex1_a_br_mistaken || ex1_b_br_mistaken;
   assign flush_ex1 = raise_excp || replay;
 
@@ -1108,11 +1111,11 @@ module core (
       .result(div_result)
   );
 
-  wire mem_cancel = raise_excp || replay
+  assign mem_cancel = raise_excp || replay
                  || lsu_a_have_excp || (lsu_b_have_excp && EX1_a_optype != OP_MEM)
                  || ex1_a_br_mistaken;
 
-  wire mem_d1_cancel = lsu_b_have_excp;
+  assign mem_d1_cancel = lsu_b_have_excp;
 
   lsu u_lsu_a (
       .clk(clk),
