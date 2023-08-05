@@ -162,9 +162,30 @@ module lsu (
     end
   end
 
-  wire [31:0] load_mask = mem_size_buf == MEM_BYTE ? 8'hff : mem_size_buf == MEM_HALF ? 16'hffff : 32'hffffffff;
-  wire [31:0] load_shift = (mmu_rdata >> (addr_lowbit_buf * 8)) & load_mask;
-  wire [31:0] load_sign = {32{load_shift[mem_size_buf*8+7]&& mem_type_buf == MEM_LOAD_S}} & ~load_mask;
-  assign ld_data_inner = load_shift | load_sign;
+  always_comb begin
+    unique case (mem_size_buf)
+      MEM_BYTE: begin
+        logic [7:0] load_b;
+        unique case (addr_lowbit_buf)
+          2'b00:   load_b = mmu_rdata[7:0];
+          2'b01:   load_b = mmu_rdata[15:8];
+          2'b10:   load_b = mmu_rdata[23:16];
+          default: load_b = mmu_rdata[31:24];
+        endcase
+        ld_data_inner = {{24{load_b[7] && mem_type_buf == MEM_LOAD_S}}, load_b};
+      end
+      MEM_HALF: begin
+        logic [15:0] load_h;
+        unique case (addr_lowbit_buf[1])
+          1'b0:    load_h = mmu_rdata[15:0];
+          default: load_h = mmu_rdata[31:16];
+        endcase
+        ld_data_inner = {{16{load_h[15] && mem_type_buf == MEM_LOAD_S}}, load_h};
+      end
+      default: begin
+        ld_data_inner = mmu_rdata;
+      end
+    endcase
+  end
 
 endmodule
