@@ -1100,7 +1100,7 @@ module core (
 
   div u_div (
       .clk(clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !EX1_stalling || EX1_b_valid && EX1_b_optype == OP_DIV && !EX1_stalling && !ex1_a_br_mistaken && !lsu_a_have_excp),
+      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !ex1_stall || EX1_b_valid && EX1_b_optype == OP_DIV && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp),
       .opcode(EX1_a_optype == OP_DIV ? div_opcode_t'(EX1_a_opcode) : div_opcode_t'(EX1_b_opcode)),
       .src1(EX1_a_optype == OP_DIV ? ex1_a_src1 : ex1_b_src1),
       .src2(EX1_a_optype == OP_DIV ? ex1_a_src2 : ex1_b_src2),
