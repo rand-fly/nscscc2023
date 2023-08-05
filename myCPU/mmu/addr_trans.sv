@@ -39,7 +39,7 @@ module addr_trans (
       use_tlb = 1'b0;
     end else begin
       // only 4KB
-      ptag = vtag;  // tlb_s_result.ppn;
+      ptag = tlb_s_result.ppn;
       mat = tlb_s_result.mat;
       use_tlb = 1'b1;
     end
@@ -49,9 +49,9 @@ module addr_trans (
   assign tlb_s_va_bit12 = vtag[0];
   assign tlb_s_asid = asid;
 
-  // assign page_fault = use_tlb && !tlb_s_result.found;
-  // assign page_invalid = use_tlb && !tlb_s_result.v;
-  // assign page_dirty = use_tlb && tlb_s_result.d == 1'b0;
-  // assign plv_fault = use_tlb && plv > tlb_s_result.plv;
+  assign page_fault = use_tlb && !tlb_s_result.found;
+  assign page_invalid = use_tlb && !tlb_s_result.v;
+  assign page_dirty = use_tlb && tlb_s_result.d == 1'b0;
+  assign plv_fault = use_tlb && plv > tlb_s_result.plv;
 
 endmodule
