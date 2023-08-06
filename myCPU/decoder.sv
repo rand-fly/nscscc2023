@@ -133,8 +133,8 @@ module decoder (
   assign mem_opcode.store = inst_st_b | inst_st_h | inst_st_w;
   assign mem_opcode.load_sign = inst_ld_b | inst_ld_h | inst_ld_w;
   assign mem_opcode.size_word = inst_ld_w | inst_st_w;
-  assign mem_opcode.size_half = inst_ld_h | inst_st_h;
-  assign mem_opcode.size_byte = inst_ld_b | inst_st_b;
+  assign mem_opcode.size_half = inst_ld_h | inst_ld_hu | inst_st_h;
+  assign mem_opcode.size_byte = inst_ld_b | inst_ld_bu | inst_st_b;
   assign mem_opcode.atomic = 1'b0;
 
 // base table
@@ -219,7 +219,7 @@ assign                 {br_type,   br_target, br_condition    } =
 
 assign br_taken = inst_b | inst_bl;
 assign br_mistaken = pred_br_taken && (br_type == BR_NOP || (!inst_jirl && pred_br_target != br_target))
-                                                                                    || !pred_br_taken && br_taken;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                || !pred_br_taken && br_taken;
 
 assign ine = !valid_inst || inst_invtlb && rd > 5'd6;
 

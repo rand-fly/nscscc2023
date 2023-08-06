@@ -145,37 +145,6 @@ typedef enum logic [14:0] {
   ERTN = {6'h3c, 9'h3c}
 } excp_t;
 
-typedef enum logic [1:0] {
-  MEM_LOAD_S,
-  MEM_LOAD_U,
-  MEM_STORE
-} mem_type_t;
-
-typedef enum logic [1:0] {
-  MEM_BYTE,
-  MEM_HALF,
-  MEM_WORD,
-  MEM_WORD_ATOMIC
-} mem_size_t;
-
-typedef enum logic [2:0] {
-  SPEC_CSR,
-  SPEC_TLBSRCH,
-  SPEC_TLBRD,
-  SPEC_TLBWR,
-  SPEC_TLBFILL,
-  SPEC_INVTLB
-} spec_opcode_t;
-
-typedef struct packed {
-  spec_opcode_t opcode;
-  logic [13:0]  csr_addr;
-  logic [31:0]  csr_mask;
-  logic [4:0]   invtlb_op;
-  logic [9:0]   invtlb_asid;
-  logic [31:0]  invtlb_va;
-} spec_op_t;
-
 typedef struct packed {
   logic       plv0;
   logic       plv3;

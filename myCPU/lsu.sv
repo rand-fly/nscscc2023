@@ -99,31 +99,22 @@ module lsu (
   assign mmu_size = opcode.size_byte ? 2'd0 : opcode.size_half ? 2'd1 : 2'd2;
 
   always_comb begin
-    if (opcode.store) begin
-      unique case (1'b1)
-        opcode.size_byte: begin
-          unique case (addr[1:0])
-            2'b00:   mmu_wstrb = 4'b0001;
-            2'b01:   mmu_wstrb = 4'b0010;
-            2'b10:   mmu_wstrb = 4'b0100;
-            default: mmu_wstrb = 4'b1000;
-          endcase
-          mmu_wdata = {4{st_data[7:0]}};
-        end
-        opcode.size_half: begin
-          unique case (addr[1])
-            1'b0:    mmu_wstrb = 4'b0011;
-            default: mmu_wstrb = 4'b1100;
-          endcase
-          mmu_wdata = {2{st_data[15:0]}};
-        end
-        opcode.size_word: begin
-          mmu_wstrb = 4'b1111;
-          mmu_wdata = st_data;
-        end
+    unique if (opcode.size_byte) begin
+      unique case (addr[1:0])
+        2'b00: mmu_wstrb = 4'b0001;
+        2'b01: mmu_wstrb = 4'b0010;
+        2'b10: mmu_wstrb = 4'b0100;
+        2'b11: mmu_wstrb = 4'b1000;
       endcase
+      mmu_wdata = {4{st_data[7:0]}};
+    end else if (opcode.size_half) begin
+      unique case (addr[1])
+        1'b0: mmu_wstrb = 4'b0011;
+        1'b1: mmu_wstrb = 4'b1100;
+      endcase
+      mmu_wdata = {2{st_data[15:0]}};
     end else begin
-      mmu_wstrb = 4'b0000;
+      mmu_wstrb = 4'b1111;
       mmu_wdata = st_data;
     end
   end
@@ -157,29 +148,25 @@ module lsu (
   end
 
   always_comb begin
-    unique case (1'b1)
-      opcode_buf.size_byte: begin
-        logic [7:0] load_b;
-        unique case (addr_lowbit_buf)
-          2'b00:   load_b = mmu_rdata[7:0];
-          2'b01:   load_b = mmu_rdata[15:8];
-          2'b10:   load_b = mmu_rdata[23:16];
-          default: load_b = mmu_rdata[31:24];
-        endcase
-        ld_data_inner = {{24{load_b[7] && opcode_buf.load_sign}}, load_b};
-      end
-      opcode_buf.size_half: begin
-        logic [15:0] load_h;
-        unique case (addr_lowbit_buf[1])
-          1'b0:    load_h = mmu_rdata[15:0];
-          default: load_h = mmu_rdata[31:16];
-        endcase
-        ld_data_inner = {{16{load_h[15] && opcode_buf.load_sign}}, load_h};
-      end
-      opcode_buf.size_word: begin
-        ld_data_inner = mmu_rdata;
-      end
-    endcase
+    unique if (opcode_buf.size_byte) begin
+      logic [7:0] load_b;
+      unique case (addr_lowbit_buf)
+        2'b00: load_b = mmu_rdata[7:0];
+        2'b01: load_b = mmu_rdata[15:8];
+        2'b10: load_b = mmu_rdata[23:16];
+        2'b11: load_b = mmu_rdata[31:24];
+      endcase
+      ld_data_inner = {{24{load_b[7] && opcode_buf.load_sign}}, load_b};
+    end else if (opcode_buf.size_half) begin
+      logic [15:0] load_h;
+      unique case (addr_lowbit_buf[1])
+        1'b0: load_h = mmu_rdata[15:0];
+        1'b1: load_h = mmu_rdata[31:16];
+      endcase
+      ld_data_inner = {{16{load_h[15] && opcode_buf.load_sign}}, load_h};
+    end else begin
+      ld_data_inner = mmu_rdata;
+    end
   end
 
 endmodule
