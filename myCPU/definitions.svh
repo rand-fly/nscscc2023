@@ -52,7 +52,7 @@ typedef enum logic [2:0] {
   OP_CACHE
 } optype_t;
 
-typedef logic [3:0] opcode_t;
+typedef logic [6:0] opcode_t;
 
 typedef enum opcode_t {
   ALU_OUT2,  // ALU output src2
@@ -82,6 +82,16 @@ typedef enum opcode_t {
   DIV_MOD,
   DIV_MODU
 } div_opcode_t;
+
+typedef struct packed {
+  logic load;
+  logic store;
+  logic load_sign;
+  logic size_word;
+  logic size_half;
+  logic size_byte;
+  logic atomic;
+} mem_opcode_t;
 
 typedef enum opcode_t {
   TLB_TLBSRCH,

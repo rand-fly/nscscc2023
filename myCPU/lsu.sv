@@ -9,10 +9,8 @@ module lsu (
     // from ex1
     input valid,
     input start,  // 仅发出请求的第一个周期置为1，但要保证下面的输入不变
-    input [31:0] base,
-    input [31:0] offset,
-    input mem_type_t mem_type,
-    input mem_size_t mem_size,
+    input [31:0] addr,
+    input mem_opcode_t opcode,
     input [31:0] st_data,
     // to ex1
     output logic have_excp,
@@ -38,20 +36,17 @@ module lsu (
     input mmu_ppi,
     input mmu_pme
 );
-  logic             wait_for_addr_ok;
-  logic             wait_for_data_ok;
-  logic             ok_not_accepted;
-  logic      [31:0] ld_data_buf;
+  logic               wait_for_addr_ok;
+  logic               wait_for_data_ok;
+  logic               ok_not_accepted;
+  logic        [31:0] ld_data_buf;
 
-  logic      [ 1:0] addr_lowbit_buf;
-  mem_type_t        mem_type_buf;
-  mem_size_t        mem_size_buf;
-  logic      [31:0] ld_data_inner;
+  logic        [ 1:0] addr_lowbit_buf;
+  mem_opcode_t        opcode_buf;
+  logic        [31:0] ld_data_inner;
 
-  logic             stage2_allowin;
-  logic      [31:0] addr;
+  logic               stage2_allowin;
 
-  assign addr = base + offset;
   assign ready = (!wait_for_addr_ok || mmu_addr_ok && stage2_allowin) && !(start && !mmu_addr_ok);
   assign stage2_allowin = !ok_not_accepted && (!wait_for_data_ok || mmu_data_ok);
 
@@ -65,8 +60,7 @@ module lsu (
       if (mmu_addr_ok) begin
         wait_for_addr_ok <= 1'b0;
         addr_lowbit_buf <= mmu_addr[1:0];
-        mem_type_buf    <= mem_type;
-        mem_size_buf    <= mem_size;
+        opcode_buf <= opcode;
       end
     end
   end
@@ -101,13 +95,13 @@ module lsu (
 
   assign mmu_req  = start || wait_for_addr_ok;
   assign mmu_addr = addr;
-  assign mmu_we   = mem_type == MEM_STORE;
-  assign mmu_size = mem_size == MEM_BYTE ? 2'd0 : mem_size == MEM_HALF ? 2'd1 : 2'd2;
+  assign mmu_we   = opcode.store;
+  assign mmu_size = opcode.size_byte ? 2'd0 : opcode.size_half ? 2'd1 : 2'd2;
 
   always_comb begin
-    if (mem_type == MEM_STORE) begin
-      unique case (mem_size)
-        MEM_BYTE: begin
+    if (opcode.store) begin
+      unique case (1'b1)
+        opcode.size_byte: begin
           unique case (addr[1:0])
             2'b00:   mmu_wstrb = 4'b0001;
             2'b01:   mmu_wstrb = 4'b0010;
@@ -116,14 +110,14 @@ module lsu (
           endcase
           mmu_wdata = {4{st_data[7:0]}};
         end
-        MEM_HALF: begin
+        opcode.size_half: begin
           unique case (addr[1])
             1'b0:    mmu_wstrb = 4'b0011;
             default: mmu_wstrb = 4'b1100;
           endcase
           mmu_wdata = {2{st_data[15:0]}};
         end
-        default: begin
+        opcode.size_word: begin
           mmu_wstrb = 4'b1111;
           mmu_wdata = st_data;
         end
@@ -138,7 +132,7 @@ module lsu (
     if (!valid) begin
       have_excp = 1'b0;
       excp_type = ALE;
-    end else if (mem_size == MEM_HALF && addr[0] || mem_size == MEM_WORD && addr[1:0] != 2'h0) begin
+    end else if (opcode.size_half && addr[0] || opcode.size_word && addr[1:0] != 2'h0) begin
       have_excp = 1'b1;
       excp_type = ALE;
     end else if (mmu_tlbr) begin
@@ -163,8 +157,8 @@ module lsu (
   end
 
   always_comb begin
-    unique case (mem_size_buf)
-      MEM_BYTE: begin
+    unique case (1'b1)
+      opcode_buf.size_byte: begin
         logic [7:0] load_b;
         unique case (addr_lowbit_buf)
           2'b00:   load_b = mmu_rdata[7:0];
@@ -172,17 +166,17 @@ module lsu (
           2'b10:   load_b = mmu_rdata[23:16];
           default: load_b = mmu_rdata[31:24];
         endcase
-        ld_data_inner = {{24{load_b[7] && mem_type_buf == MEM_LOAD_S}}, load_b};
+        ld_data_inner = {{24{load_b[7] && opcode_buf.load_sign}}, load_b};
       end
-      MEM_HALF: begin
+      opcode_buf.size_half: begin
         logic [15:0] load_h;
         unique case (addr_lowbit_buf[1])
           1'b0:    load_h = mmu_rdata[15:0];
           default: load_h = mmu_rdata[31:16];
         endcase
-        ld_data_inner = {{16{load_h[15] && mem_type_buf == MEM_LOAD_S}}, load_h};
+        ld_data_inner = {{16{load_h[15] && opcode_buf.load_sign}}, load_h};
       end
-      default: begin
+      opcode_buf.size_word: begin
         ld_data_inner = mmu_rdata;
       end
     endcase

@@ -893,10 +893,11 @@ module core (
   assign allow_issue_a = !ibuf_no_out && ro_a_valid && ro_a_src1_ok && ro_a_src2_ok;
   assign allow_issue_b = !ibuf_no_out && allow_issue_a && !ro_a_have_excp
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
-                      && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB
+                      && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB && ro_a_optype != OP_CACHE
                       && !(ro_a_optype == OP_DIV && ro_b_optype == OP_DIV)
                       && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU || ro_b_br_type != BR_NOP))
-                      && ro_b_optype != OP_TLB && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
+                      && ro_b_optype != OP_TLB && ro_b_optype != OP_CACHE
+                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
@@ -1124,10 +1125,8 @@ module core (
       .ready(lsu_a_ready),
       .valid(EX1_a_valid && EX1_a_optype == OP_MEM),
       .start(EX1_a_valid && EX1_a_optype == OP_MEM && !EX1_stalling),
-      .base(ex1_a_src1),
-      .offset(EX1_a_imm),
-      .mem_type(mem_type_t'(EX1_a_opcode[3:2])),
-      .mem_size(mem_size_t'(EX1_a_opcode[1:0])),
+      .addr(ex1_a_src1 + EX1_a_imm),
+      .opcode(EX1_a_opcode),
       .st_data(ex1_a_src2),
       .have_excp(lsu_a_have_excp),
       .excp_type(lsu_a_excp_type),
@@ -1157,10 +1156,8 @@ module core (
       .ready(lsu_b_ready),
       .valid(EX1_b_valid && EX1_b_optype == OP_MEM),
       .start(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling),
-      .base(ex1_b_src1),
-      .offset(EX1_b_imm),
-      .mem_type(mem_type_t'(EX1_b_opcode[3:2])),
-      .mem_size(mem_size_t'(EX1_b_opcode[1:0])),
+      .addr(ex1_b_src1 + EX1_b_imm),
+      .opcode(EX1_b_opcode),
       .st_data(ex1_b_src2),
       .have_excp(lsu_b_have_excp),
       .excp_type(lsu_b_excp_type),
@@ -1210,6 +1207,9 @@ module core (
     EX2_stalling <= ex2_stall;
 
     if (!ex2_stall && ex1_ready && EX1_a_valid && !flush_ex1) begin
+`ifdef DIFFTEST_EN
+      mem_opcode_t opcode = EX1_a_opcode;
+`endif
       EX2_a_pc <= EX1_a_pc;
       EX2_a_optype <= EX1_a_optype;
       EX2_a_dest <= EX1_a_dest;
@@ -1226,26 +1226,24 @@ module core (
 `ifdef DIFFTEST_EN
       EX2_a_difftest <= EX1_a_difftest;
       EX2_a_difftest.store_valid <= {8{EX1_a_optype == OP_MEM && !lsu_a_have_excp}} & {
-        4'b0,
-        1'b0,
-        EX1_a_opcode[3:2] == MEM_STORE && EX1_a_opcode[1:0] == MEM_WORD,
-        EX1_a_opcode[3:2] == MEM_STORE && EX1_a_opcode[1:0] == MEM_HALF,
-        EX1_a_opcode[3:2] == MEM_STORE && EX1_a_opcode[1:0] == MEM_BYTE
+        4'b0, 1'b0,
+        opcode.store && opcode.size_word,
+        opcode.store && opcode.size_half,
+        opcode.store && opcode.size_byte
       };
       if (!EX1_a_difftest.added_paddr)
         EX2_a_difftest.storePAddr <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
       EX2_a_difftest.storeVAddr <= u_lsu_a.addr;
-      EX2_a_difftest.storeData <= EX1_a_opcode[1:0] == MEM_BYTE ? ex1_a_src2[7:0] << (u_lsu_a.addr[1:0]*8) :
-                                  EX1_a_opcode[1:0] == MEM_HALF ? ex1_a_src2[15:0] << (u_lsu_a.addr[1]*16) :
+      EX2_a_difftest.storeData <= opcode.size_byte ? ex1_a_src2[7:0] << (u_lsu_a.addr[1:0]*8) :
+                                  opcode.size_half ? ex1_a_src2[15:0] << (u_lsu_a.addr[1]*16) :
                                   ex1_a_src2;
       EX2_a_difftest.load_valid <= {8{EX1_a_optype == OP_MEM && !lsu_a_have_excp}} & {
-        2'b0,
-        1'b0,
-        EX1_a_opcode[3:2] == MEM_LOAD_S && EX1_a_opcode[1:0] == MEM_WORD,
-        EX1_a_opcode[3:2] == MEM_LOAD_U && EX1_a_opcode[1:0] == MEM_HALF,
-        EX1_a_opcode[3:2] == MEM_LOAD_S && EX1_a_opcode[1:0] == MEM_HALF,
-        EX1_a_opcode[3:2] == MEM_LOAD_U && EX1_a_opcode[1:0] == MEM_BYTE,
-        EX1_a_opcode[3:2] == MEM_LOAD_S && EX1_a_opcode[1:0] == MEM_BYTE
+        2'b0, 1'b0,
+        opcode.load && opcode.size_word,
+        opcode.load && opcode.size_half && !opcode.load_sign,
+        opcode.load && opcode.size_half && opcode.load_sign,
+        opcode.load && opcode.size_byte && !opcode.load_sign,
+        opcode.load && opcode.size_byte && opcode.load_sign
       };
       if (!EX1_a_difftest.added_paddr)
         EX2_a_difftest.loadPAddr <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
@@ -1256,6 +1254,9 @@ module core (
     end
 
     if (!ex2_stall && ex1_ready && EX1_b_valid && !flush_ex1 && !ex1_a_br_mistaken) begin
+`ifdef DIFFTEST_EN
+      mem_opcode_t opcode = EX1_b_opcode;
+`endif
       EX2_b_pc <= EX1_b_pc;
       EX2_b_delayed <= EX1_b_delayed;
       EX2_b_optype <= EX1_b_optype;
@@ -1279,26 +1280,24 @@ module core (
       EX2_b_difftest.csr_rstat <= EX1_b_optype == OP_CSR && EX1_b_csr_addr == 14'h5;
       EX2_b_difftest.csr_data <= u_csr.ESTAT;
       EX2_b_difftest.store_valid <= {8{EX1_b_optype == OP_MEM && !lsu_b_have_excp && !lsu_a_have_excp}} & {
-        4'b0,
-        1'b0,
-        EX1_b_opcode[3:2] == MEM_STORE && EX1_b_opcode[1:0] == MEM_WORD,
-        EX1_b_opcode[3:2] == MEM_STORE && EX1_b_opcode[1:0] == MEM_HALF,
-        EX1_b_opcode[3:2] == MEM_STORE && EX1_b_opcode[1:0] == MEM_BYTE
+        4'b0, 1'b0,
+        opcode.store && opcode.size_word,
+        opcode.store && opcode.size_half,
+        opcode.store && opcode.size_byte
       };
       if (!EX1_b_difftest.added_paddr)
         EX2_b_difftest.storePAddr <= {u_mmu.d_ptag, u_lsu_b.addr[31-`TAG_WIDTH:0]};
       EX2_b_difftest.storeVAddr <= u_lsu_b.addr;
-      EX2_b_difftest.storeData <= EX1_b_opcode[1:0] == MEM_BYTE ? ex1_b_src2[7:0] << (u_lsu_b.addr[1:0]*8) :
-                                  EX1_b_opcode[1:0] == MEM_HALF ? ex1_b_src2[15:0] << (u_lsu_b.addr[1]*16) :
+      EX2_b_difftest.storeData <= opcode.size_byte ? ex1_b_src2[7:0] << (u_lsu_b.addr[1:0]*8) :
+                                  opcode.size_half ? ex1_b_src2[15:0] << (u_lsu_b.addr[1]*16) :
                                   ex1_b_src2;
       EX2_b_difftest.load_valid <= {8{EX1_b_optype == OP_MEM && !lsu_b_have_excp && !lsu_a_have_excp}} & {
-        2'b0,
-        1'b0,
-        EX1_b_opcode[3:2] == MEM_LOAD_S && EX1_b_opcode[1:0] == MEM_WORD,
-        EX1_b_opcode[3:2] == MEM_LOAD_U && EX1_b_opcode[1:0] == MEM_HALF,
-        EX1_b_opcode[3:2] == MEM_LOAD_S && EX1_b_opcode[1:0] == MEM_HALF,
-        EX1_b_opcode[3:2] == MEM_LOAD_U && EX1_b_opcode[1:0] == MEM_BYTE,
-        EX1_b_opcode[3:2] == MEM_LOAD_S && EX1_b_opcode[1:0] == MEM_BYTE
+        2'b0, 1'b0,
+        opcode.load && opcode.size_word,
+        opcode.load && opcode.size_half && !opcode.load_sign,
+        opcode.load && opcode.size_half && opcode.load_sign,
+        opcode.load && opcode.size_byte && !opcode.load_sign,
+        opcode.load && opcode.size_byte && opcode.load_sign
       };
       if (!EX1_b_difftest.added_paddr)
         EX2_b_difftest.loadPAddr <= {u_mmu.d_ptag, u_lsu_b.addr[31-`TAG_WIDTH:0]};
