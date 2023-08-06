@@ -22,6 +22,7 @@ module decoder (
     output excp_t            excp_type,
     output csr_addr_t        csr_addr,
     output                   csr_wr,
+    output                   is_spec_op,
     // to forward pred
     output            [ 4:0] r1,
     output            [ 4:0] r2,
@@ -218,15 +219,15 @@ assign                 {br_type,   br_target, br_condition    } =
 {36{inst_jirl     }} & {jirl_type, si16,      1'b0            } ;
 
 assign br_taken = inst_b | inst_bl;
-assign br_mistaken = pred_br_taken && (br_type == BR_NOP || (!inst_jirl && pred_br_target != br_target))
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                || !pred_br_taken && br_taken;
+assign br_mistaken = pred_br_taken && (br_type == BR_NOP || (!inst_jirl && pred_br_target != br_target)) || !pred_br_taken && br_taken;
 
 assign ine = !valid_inst || inst_invtlb && rd > 5'd6;
-
 assign               {have_excp, excp_type} =
 {16{inst_ertn   }} & {1'b1,      ERTN     } |
 {16{inst_syscall}} & {1'b1,      SYS      } |
 {16{inst_break  }} & {1'b1,      BRK      } |
 {16{ine         }} & {1'b1,      INE      } ;
+
+assign is_spec_op = optype == OP_TLB || optype == OP_CSR || optype == OP_CACHE;
 
 endmodule

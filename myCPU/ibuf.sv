@@ -24,6 +24,7 @@ module ibuf (
     input  excp_t            i_a_excp_type,
     input  csr_addr_t        i_a_csr_addr,
     input                    i_a_csr_wr,
+    input                    i_a_is_spec_op,
     input             [ 4:0] i_a_r1,
     input             [ 4:0] i_a_r2,
     input                    i_a_src2_is_imm,
@@ -43,6 +44,7 @@ module ibuf (
     input  excp_t            i_b_excp_type,
     input  csr_addr_t        i_b_csr_addr,
     input                    i_b_csr_wr,
+    input                    i_b_is_spec_op,
     input             [ 4:0] i_b_r1,
     input             [ 4:0] i_b_r2,
     input                    i_b_src2_is_imm,
@@ -73,6 +75,7 @@ module ibuf (
     output excp_t            o_a_excp_type,
     output csr_addr_t        o_a_csr_addr,
     output                   o_a_csr_wr,
+    output                   o_a_is_spec_op,
     output            [ 4:0] o_a_r1,
     output            [ 4:0] o_a_r2,
     output                   o_a_src2_is_imm,
@@ -93,13 +96,14 @@ module ibuf (
     output excp_t            o_b_excp_type,
     output csr_addr_t        o_b_csr_addr,
     output                   o_b_csr_wr,
+    output                   o_b_is_spec_op,
     output            [ 4:0] o_b_r1,
     output            [ 4:0] o_b_r2,
     output                   o_b_src2_is_imm
 );
 
-  logic [190:0] data_way0[8];
-  logic [190:0] data_way1[8];
+  logic [191:0] data_way0[8];
+  logic [191:0] data_way1[8];
 
 `ifdef DIFFTEST_EN
   difftest_t difftest_way0[8];
@@ -114,8 +118,8 @@ module ibuf (
   logic         tail_way;
   logic [  4:0] length;
 
-  logic [190:0] input_data0;
-  logic [190:0] input_data1;
+  logic [191:0] input_data0;
+  logic [191:0] input_data1;
 
   assign i_ready = length <= 5'd10; // 本周期最多可能进来两条，ID阶段可能有两条，同时最多可能发起两条请求，16-6=10
 
@@ -135,6 +139,7 @@ module ibuf (
          o_a_excp_type,
          o_a_csr_addr,
          o_a_csr_wr,
+         o_a_is_spec_op,
          o_a_r1,
          o_a_r2,
          o_a_src2_is_imm
@@ -156,6 +161,7 @@ module ibuf (
          o_b_excp_type,
          o_b_csr_addr,
          o_b_csr_wr,
+         o_b_is_spec_op,
          o_b_r1,
          o_b_r2,
          o_b_src2_is_imm
@@ -178,6 +184,7 @@ module ibuf (
     interrupt ? INT : i_a_excp_type,
     i_a_csr_addr,
     i_a_csr_wr,
+    i_a_is_spec_op,
     i_a_r1,
     i_a_r2,
     i_a_src2_is_imm
@@ -199,6 +206,7 @@ module ibuf (
     i_b_excp_type,
     i_b_csr_addr,
     i_b_csr_wr,
+    i_b_is_spec_op,
     i_b_r1,
     i_b_r2,
     i_b_src2_is_imm

@@ -91,6 +91,7 @@ module core (
   excp_t            id_a_excp_type;
   csr_addr_t        id_a_csr_addr;
   logic             id_a_csr_wr;
+  logic             id_a_is_spec_op;
   logic      [ 4:0] id_a_r1;
   logic      [ 4:0] id_a_r2;
   logic             id_a_src2_is_imm;
@@ -107,6 +108,7 @@ module core (
   excp_t            id_b_excp_type;
   csr_addr_t        id_b_csr_addr;
   logic             id_b_csr_wr;
+  logic             id_b_is_spec_op;
   logic      [ 4:0] id_b_r1;
   logic      [ 4:0] id_b_r2;
   logic             id_b_src2_is_imm;
@@ -139,6 +141,7 @@ module core (
   excp_t            ro_a_excp_type;
   csr_addr_t        ro_a_csr_addr;
   logic             ro_a_csr_wr;
+  logic             ro_a_is_spec_op;
   logic      [ 4:0] ro_a_r1;
   logic      [ 4:0] ro_a_r2;
   logic             ro_a_src2_is_imm;
@@ -159,6 +162,7 @@ module core (
   excp_t            ro_b_excp_type;
   csr_addr_t        ro_b_csr_addr;
   logic             ro_b_csr_wr;
+  logic             ro_b_is_spec_op;
   logic      [ 4:0] ro_b_r1;
   logic      [ 4:0] ro_b_r2;
   logic             ro_b_src2_is_imm;
@@ -330,8 +334,6 @@ module core (
   logic                      EX1_b_br_taken;
   logic                      EX1_b_have_excp;
   excp_t                     EX1_b_excp_type;
-  csr_addr_t                 EX1_b_csr_addr;
-  logic                      EX1_b_csr_wr;
 `ifdef DIFFTEST_EN
   difftest_t EX1_a_difftest;
   difftest_t EX1_b_difftest;
@@ -385,8 +387,6 @@ module core (
   logic             EX2_b_have_excp;
   excp_t            EX2_b_excp_type;
   logic      [31:0] EX2_b_excp_addr;
-  csr_addr_t        EX2_b_csr_addr;
-  logic             EX2_b_csr_wr;
 `ifdef DIFFTEST_EN
   difftest_t EX2_a_difftest;
   difftest_t EX2_b_difftest;
@@ -397,8 +397,6 @@ module core (
   logic            ex2_stall;
   logic     [31:0] ex2_b_src1;
   logic     [31:0] ex2_b_src2;
-  logic     [31:0] ex2_csr_mask;
-  logic     [31:0] ex2_csr_wdata;
   logic            ex2_have_excp;
   excp_t           ex2_excp_type;
   logic     [31:0] ex2_excp_pc;
@@ -544,6 +542,7 @@ module core (
       .excp_type     (id_a_excp_type),
       .csr_addr      (id_a_csr_addr),
       .csr_wr        (id_a_csr_wr),
+      .is_spec_op    (id_a_is_spec_op),
       .r1            (id_a_r1),
       .r2            (id_a_r2),
       .src2_is_imm   (id_a_src2_is_imm),
@@ -568,6 +567,7 @@ module core (
       .excp_type     (id_b_excp_type),
       .csr_addr      (id_b_csr_addr),
       .csr_wr        (id_b_csr_wr),
+      .is_spec_op    (id_b_is_spec_op),
       .r1            (id_b_r1),
       .r2            (id_b_r2),
       .src2_is_imm   (id_b_src2_is_imm),
@@ -656,6 +656,7 @@ module core (
       .i_a_excp_type     (ID_a_have_excp ? ID_a_excp_type : id_a_excp_type),
       .i_a_csr_addr      (id_a_csr_addr),
       .i_a_csr_wr        (id_a_csr_wr),
+      .i_a_is_spec_op    (id_a_is_spec_op),
       .i_a_r1            (id_a_r1),
       .i_a_r2            (id_a_r2),
       .i_a_src2_is_imm   (id_a_src2_is_imm),
@@ -674,6 +675,7 @@ module core (
       .i_b_excp_type     (id_b_excp_type),
       .i_b_csr_addr      (id_b_csr_addr),
       .i_b_csr_wr        (id_b_csr_wr),
+      .i_b_is_spec_op    (id_b_is_spec_op),
       .i_b_r1            (id_b_r1),
       .i_b_r2            (id_b_r2),
       .i_b_src2_is_imm   (id_b_src2_is_imm),
@@ -702,6 +704,7 @@ module core (
       .o_a_excp_type     (ro_a_excp_type),
       .o_a_csr_addr      (ro_a_csr_addr),
       .o_a_csr_wr        (ro_a_csr_wr),
+      .o_a_is_spec_op    (ro_a_is_spec_op),
       .o_a_r1            (ro_a_r1),
       .o_a_r2            (ro_a_r2),
       .o_a_src2_is_imm   (ro_a_src2_is_imm),
@@ -721,6 +724,7 @@ module core (
       .o_b_excp_type     (ro_b_excp_type),
       .o_b_csr_addr      (ro_b_csr_addr),
       .o_b_csr_wr        (ro_b_csr_wr),
+      .o_b_is_spec_op    (ro_b_is_spec_op),
       .o_b_r1            (ro_b_r1),
       .o_b_r2            (ro_b_r2),
       .o_b_src2_is_imm   (ro_b_src2_is_imm)
@@ -893,11 +897,10 @@ module core (
   assign allow_issue_a = !ibuf_no_out && ro_a_valid && ro_a_src1_ok && ro_a_src2_ok;
   assign allow_issue_b = !ibuf_no_out && allow_issue_a && !ro_a_have_excp
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
-                      && ro_a_optype != OP_CSR && ro_a_optype != OP_TLB && ro_a_optype != OP_CACHE
+                      && !ro_a_is_spec_op && !ro_b_is_spec_op
                       && !(ro_a_optype == OP_DIV && ro_b_optype == OP_DIV)
                       && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU || ro_b_br_type != BR_NOP))
-                      && ro_b_optype != OP_TLB && ro_b_optype != OP_CACHE
-                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[3]^ro_b_opcode[3]));
+                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && ro_a_opcode[6:5] != ro_b_opcode[6:5]);
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
@@ -956,8 +959,6 @@ module core (
       EX1_b_br_taken       <= ro_b_br_taken;
       EX1_b_have_excp      <= ro_b_have_excp;
       EX1_b_excp_type      <= ro_b_excp_type;
-      EX1_b_csr_addr       <= ro_b_csr_addr;
-      EX1_b_csr_wr         <= ro_b_csr_wr;
 `ifdef DIFFTEST_EN
       EX1_b_difftest <= ro_b_difftest;
       EX1_b_difftest.is_TLBFILL <= id_b_optype == OP_TLB || id_b_opcode == TLB_TLBFILL;
@@ -1032,7 +1033,7 @@ module core (
     end
   end
 
-  assign ex1_ready = lsu_a_ready && lsu_b_ready || mem_cancel;
+  assign ex1_ready = lsu_a_ready && lsu_b_ready;
   assign ex1_stall =  /*(EX1_a_valid || EX1_b_valid) &&*/ (!ex1_ready || ex2_stall);
 
   alu u_alu_a (
@@ -1273,12 +1274,9 @@ module core (
       EX2_b_have_excp <= EX1_b_have_excp || lsu_b_have_excp;
       EX2_b_excp_type <= lsu_b_have_excp ? lsu_b_excp_type : EX1_b_excp_type;
       EX2_b_excp_addr <= u_lsu_b.addr;
-      EX2_b_csr_addr <= EX1_b_csr_addr;
-      EX2_b_csr_wr <= EX1_b_csr_wr;
 `ifdef DIFFTEST_EN
       EX2_b_difftest <= EX1_b_difftest;
-      EX2_b_difftest.csr_rstat <= EX1_b_optype == OP_CSR && EX1_b_csr_addr == 14'h5;
-      EX2_b_difftest.csr_data <= u_csr.ESTAT;
+      EX2_b_difftest.csr_rstat <= 1'b0;
       EX2_b_difftest.store_valid <= {8{EX1_b_optype == OP_MEM && !lsu_b_have_excp && !lsu_a_have_excp}} & {
         4'b0, 1'b0,
         opcode.store && opcode.size_word,
@@ -1350,11 +1348,7 @@ module core (
       .result(alu_b2_result)
   );
 
-  assign ex2_csr_mask = EX2_a_optype == OP_CSR ? (EX2_a_csr_wr ? 32'hffffffff :EX2_a_src1): (EX2_b_csr_wr ? 32'hffffffff :ex2_b_src1);
-  assign ex2_csr_wdata = EX2_a_optype == OP_CSR ? EX2_a_src2 : ex2_b_src2;
-
-  assign replay = !EX2_stalling && (EX2_a_valid && (EX2_a_optype == OP_CSR || EX2_a_optype == OP_TLB)
-                                 || EX2_b_valid && (EX2_b_optype == OP_CSR || EX2_b_optype == OP_TLB));
+  assign replay = !EX2_stalling && EX2_a_valid && (EX2_a_optype == OP_CSR || EX2_a_optype == OP_TLB);
   assign replay_target = (EX2_a_valid && (EX2_a_optype == OP_CSR || EX2_a_optype == OP_TLB)) ? EX2_a_pc + 32'd4 : EX2_b_pc + 32'd4;
 
   always_ff @(posedge clk) begin
@@ -1393,7 +1387,6 @@ module core (
   assign retire_pc = (WB_a_valid && WB_a_br_type == BR_COND) ? WB_a_pc : WB_b_pc;
   assign right_orien = (WB_a_valid && WB_a_br_type == BR_COND) ? WB_a_br_taken : WB_b_br_taken;
 
-
   always_ff @(posedge clk) begin
     if (reset) begin
       WB_a_ok <= 1'b0;
@@ -1426,7 +1419,6 @@ module core (
           OP_MUL:  WB_b_result <= mul_b_result;
           OP_DIV:  WB_b_result <= div_result;
           OP_MEM:  WB_b_result <= lsu_b_result;
-          OP_CSR:  WB_b_result <= csr_rdata;
           default: WB_b_result <= 32'd0;
         endcase
       end
@@ -1492,11 +1484,11 @@ module core (
   csr u_csr (
       .clk(clk),
       .reset(reset),
-      .addr(EX2_a_optype == OP_CSR ? EX2_a_csr_addr : EX2_b_csr_addr),
+      .addr(EX2_a_csr_addr),
       .rdata(csr_rdata),
-      .we(EX2_a_valid && EX2_a_optype == OP_CSR || EX2_b_valid && EX2_b_optype == OP_CSR),
-      .mask(ex2_csr_mask),
-      .wdata(ex2_csr_wdata),
+      .we(EX2_a_valid && EX2_a_optype == OP_CSR),
+      .mask(EX2_a_csr_wr ? 32'hffffffff : EX2_a_src1),
+      .wdata(EX2_a_src2),
       .raise_excp(raise_excp),
       .excp_type(ex2_excp_type),
       .pc_in(ex2_excp_pc),
