@@ -77,6 +77,7 @@ module mycpu_top(
 );
 
 logic        icache_req;
+logic [ 2:0] icache_op;
 logic [31:0] icache_addr;
 logic        icache_uncached;
 logic        icache_addr_ok;
@@ -144,6 +145,7 @@ core core_0(
     .resetn(aresetn),
 
     .icache_req(icache_req),
+    .icache_op(icache_op),
     .icache_addr(icache_addr),
     .icache_uncached(icache_uncached),
     .icache_addr_ok(icache_addr_ok),
@@ -197,7 +199,7 @@ icache icache(
     .resetn(aresetn),
 
     .valid(icache_req),
-    .op(0),
+    .op(icache_op),
     .tag(icache_addr[31:12]),
     .index(icache_addr[11:`OFFSET_WIDTH]),
     .offset(icache_addr[`OFFSET_WIDTH-1:0]),

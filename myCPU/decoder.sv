@@ -96,7 +96,7 @@ module decoder (
   wire inst_ori       = op_31_22 == 10'b0000001110;
   wire inst_xori      = op_31_22 == 10'b0000001111;
   wire inst_csrx      = op_31_24 == 8'b00000100;  // CSRRD, CSRWR, CSRXCHG
-  // CACOP
+  wire inst_cacop     = op_31_22 == 10'b0000011000;
   wire inst_tlbsrch   = op_31_10 == 22'b0000011001001000001010;
   wire inst_tlbrd     = op_31_10 == 22'b0000011001001000001011;
   wire inst_tlbwr     = op_31_10 == 22'b0000011001001000001100;
@@ -192,6 +192,7 @@ assign           {valid_inst, optype, opcode,                r1,    r2, src2_is_
 {59{inst_rdcntvh_w}} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b1,counter[63:32],rd} |
 {59{inst_rdcntid_w}} & {1'b1, OP_CSR, 7'd0,                 `R0,   `R0,   1'b0,  32'd0,   rj  } |
 {59{inst_csrx     }} & {1'b1, OP_CSR, 7'd0,                  rj,    rd,   1'b0,  32'd0,   rd  } |
+{59{inst_cacop    }} & {1'b1, OP_CACHE, {2'd0,rd},           rj,   `R0,   1'b1,  si12,   `R0  } |
 {59{inst_tlbsrch  }} & {1'b1, OP_TLB, TLB_TLBSRCH,          `R0,   `R0,   1'b0,  32'd0,  `R0  } |
 {59{inst_tlbrd    }} & {1'b1, OP_TLB, TLB_TLBRD,            `R0,   `R0,   1'b0,  32'd0,  `R0  } |
 {59{inst_tlbwr    }} & {1'b1, OP_TLB, TLB_TLBWR,            `R0,   `R0,   1'b0,  32'd0,  `R0  } |

@@ -1,67 +1,73 @@
 `include "../definitions.svh"
 
 module mmu (
-    input               clk,
-    input               reset,
+    input                clk,
+    input                reset,
     // from csr
-    input               da,
-    input        [ 1:0] datf,
-    input        [ 1:0] datm,
-    input        [ 1:0] plv,
-    input        [ 9:0] asid,
-    input  dmw_t        dmw0,
-    input  dmw_t        dmw1,
+    input                da,
+    input         [ 1:0] datf,
+    input         [ 1:0] datm,
+    input         [ 1:0] plv,
+    input         [ 9:0] asid,
+    input  dmw_t         dmw0,
+    input  dmw_t         dmw1,
     // from ifu
-    input               i_req,
-    input        [31:0] i_va,
+    input                i_req,
+    input         [31:0] i_va,
     // to ifu
-    output              i_addr_ok,
-    output              i_double,
-    output              i_data_ok,
-    output       [63:0] i_rdata,
-    output              i_tlbr,
-    output              i_pif,
-    output              i_ppi,
-    input               d_cancel,
-    input               d1_cancel,
+    output               i_addr_ok,
+    output               i_double,
+    output               i_data_ok,
+    output        [63:0] i_rdata,
+    output               i_tlbr,
+    output               i_pif,
+    output               i_ppi,
+    input                d_cancel,
+    input                d1_cancel,
     // from lsu a
-    input               d0_req,
-    input        [31:0] d0_va,
-    input               d0_we,
-    input        [ 1:0] d0_size,
-    input        [ 3:0] d0_wstrb,
-    input        [31:0] d0_wdata,
+    input                d0_req,
+    input         [31:0] d0_va,            // 同时用于cacop
+    input                d0_we,
+    input         [ 1:0] d0_size,
+    input         [ 3:0] d0_wstrb,
+    input         [31:0] d0_wdata,
     // to lsu a
-    output              d0_addr_ok,
-    output              d0_data_ok,
-    output       [31:0] d0_rdata,
-    output              d0_tlbr,
-    output              d0_pil,
-    output              d0_pis,
-    output              d0_ppi,
-    output              d0_pme,
+    output               d0_addr_ok,
+    output               d0_data_ok,
+    output        [31:0] d0_rdata,
+    output               d0_tlbr,
+    output               d0_pil,
+    output               d0_pis,
+    output               d0_ppi,
+    output               d0_pme,
     // from lsu b
-    input               d1_req,
-    input        [31:0] d1_va,
-    input               d1_we,
-    input        [ 1:0] d1_size,
-    input        [ 3:0] d1_wstrb,
-    input        [31:0] d1_wdata,
+    input                d1_req,
+    input         [31:0] d1_va,
+    input                d1_we,
+    input         [ 1:0] d1_size,
+    input         [ 3:0] d1_wstrb,
+    input         [31:0] d1_wdata,
     // to lsu b
-    output              d1_addr_ok,
-    output              d1_data_ok,
-    output       [31:0] d1_rdata,
-    output              d1_tlbr,
-    output              d1_pil,
-    output              d1_pis,
-    output              d1_ppi,
-    output              d1_pme,
+    output               d1_addr_ok,
+    output               d1_data_ok,
+    output        [31:0] d1_rdata,
+    output               d1_tlbr,
+    output               d1_pil,
+    output               d1_pis,
+    output               d1_ppi,
+    output               d1_pme,
     // from ex1
-    input               invtlb_valid,
-    input        [ 4:0] invtlb_op,
-    input        [ 9:0] invtlb_asid,
-    input        [31:0] invtlb_va,
-    input               tlb_we,
+    input                invtlb_valid,
+    input         [ 4:0] invtlb_op,
+    input         [ 9:0] invtlb_asid,
+    input         [31:0] invtlb_va,
+    input                tlb_we,
+    input                icacop_en,
+    input                dcacop_en,
+    input         [ 1:0] cacop_op,
+    output               cacop_ok,
+    output               cacop_have_excp,
+    output excp_t        cacop_excp_type,
 
     // from csr
     input              [TLBIDLEN-1:0] tlb_w_index,
@@ -76,6 +82,7 @@ module mmu (
 
     // to and from icache
     output                     icache_req,
+    output [              2:0] icache_op,
     output [             31:0] icache_addr,
     output                     icache_uncached,
     input                      icache_addr_ok,
@@ -102,38 +109,39 @@ module mmu (
     input  [             31:0] dcache_p1_rdata
 );
 
-  logic        [   `TAG_WIDTH-1:0] i_vtag;
-  logic        [   `TAG_WIDTH-1:0] i_ptag;
-  logic        [             31:0] i_pa;
-  logic        [              1:0] i_mat;
-  logic                            i_page_fault;
-  logic                            i_page_invalid;
-  logic                            i_plv_fault;
+  logic        [`TAG_WIDTH-1:0] i_vtag;
+  logic        [`TAG_WIDTH-1:0] i_ptag;
+  logic        [          31:0] i_pa;
+  logic        [           1:0] i_mat;
+  logic                         i_page_fault;
+  logic                         i_page_invalid;
+  logic                         i_page_dirty;
+  logic                         i_plv_fault;
 
-  logic        [   `TAG_WIDTH-1:0] d_vtag;
-  logic        [   `TAG_WIDTH-1:0] d_ptag;
+  logic        [`TAG_WIDTH-1:0] d_vtag;
+  logic        [`TAG_WIDTH-1:0] d_ptag;
 
-  logic        [              1:0] d_mat;
-  logic                            d_page_fault;
-  logic                            d_page_invalid;
-  logic                            d_page_dirty;
-  logic                            d_plv_fault;
+  logic        [           1:0] d_mat;
+  logic                         d_page_fault;
+  logic                         d_page_invalid;
+  logic                         d_page_dirty;
+  logic                         d_plv_fault;
 
-  logic        [             18:0] tlb_s0_vppn;
-  logic                            tlb_s0_va_bit12;
-  logic        [              9:0] tlb_s0_asid;
-  tlb_result_t                     tlb_s0_result;
+  logic        [          18:0] tlb_s0_vppn;
+  logic                         tlb_s0_va_bit12;
+  logic        [           9:0] tlb_s0_asid;
+  tlb_result_t                  tlb_s0_result;
 
-  logic        [             18:0] tlb_s1_vppn;
-  logic                            tlb_s1_va_bit12;
-  logic        [              9:0] tlb_s1_asid;
-  tlb_result_t                     tlb_s1_result;
+  logic        [          18:0] tlb_s1_vppn;
+  logic                         tlb_s1_va_bit12;
+  logic        [           9:0] tlb_s1_asid;
+  tlb_result_t                  tlb_s1_result;
 
-  logic                            d1_only;
-  logic                            d1_only_reg;
-  logic                            d0_req_reg;
-  logic                            d1_req_reg;
-  logic                            conflict;
+  logic                         d1_only;
+  logic                         d1_only_reg;
+  logic                         d0_req_reg;
+  logic                         d1_req_reg;
+  logic                         conflict;
 
   assign i_vtag = i_va[31:31-`TAG_WIDTH+1];
   assign i_pa   = {i_ptag, i_va[31-`TAG_WIDTH:0]};
@@ -229,10 +237,11 @@ module mmu (
       .r_entry(tlb_r_entry)
   );
 
-  assign icache_req = i_req;
-  assign icache_addr = i_pa;
+  assign icache_req = i_req || icacop_en;
+  assign icache_op = icacop_en ? {1'b1, cacop_op} : 3'd0;
+  assign icache_addr = icacop_en ? d0_va : i_pa;
   assign icache_uncached = i_mat == 2'd0;
-  assign i_addr_ok = icache_addr_ok;
+  assign i_addr_ok = !icacop_en && icache_addr_ok;
   assign i_double = i_mat == 2'd1 && i_va[`OFFSET_WIDTH-1:2] != {(`OFFSET_WIDTH - 2) {1'b1}};
   assign i_data_ok = icache_data_ok;
   assign i_rdata = icache_rdata;
@@ -252,9 +261,9 @@ module mmu (
     end
   end
 
-  assign dcache_p0_valid = (d1_only ? d1_req : d0_req) && !d_cancel;
+  assign dcache_p0_valid = (d1_only ? d1_req : d0_req) && !d_cancel || dcacop_en;
   assign dcache_p1_valid = (d1_req && !d1_only && !conflict) && !d_cancel && !d1_cancel;
-  assign dcache_op = d1_only ? {2'd0, d1_we} : {2'd0, d0_we};
+  assign dcache_op = dcacop_en ? {1'b1, cacop_op} : d1_only ? {2'd0, d1_we} : {2'd0, d0_we};
   assign dcache_tag = d_ptag;
   assign dcache_index = d1_only ? d1_va[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1] : d0_va[31-`TAG_WIDTH:31-`TAG_WIDTH-`INDEX_WIDTH+1];
   assign dcache_p0_offset = d1_only ? d1_va[`OFFSET_WIDTH-1:0] : d0_va[`OFFSET_WIDTH-1:0];
@@ -275,5 +284,8 @@ module mmu (
   assign d1_data_ok = d1_req_reg && dcache_data_ok;
   assign d1_rdata = dcache_p1_rdata;
 
+  assign cacop_ok = (icacop_en && icache_addr_ok) || (dcacop_en && dcache_addr_ok);
+  assign cacop_have_excp = (icacop_en || dcacop_en) && cacop_op == 2 && (d_page_fault || d_page_invalid);
+  assign cacop_excp_type = d_page_fault ? TLBR : PIS;
 
 endmodule

@@ -5,6 +5,7 @@ module core (
     input resetn,
 
     output        icache_req,
+    output [ 2:0] icache_op,
     output [31:0] icache_addr,
     output        icache_uncached,
     input         icache_addr_ok,
@@ -269,7 +270,6 @@ module core (
   logic                      mmu_d1_pis;
   logic                      mmu_d1_ppi;
   logic                      mmu_d1_pme;
-
   logic                      mem_cancel;
   logic                      mem_d1_cancel;
 
@@ -353,7 +353,14 @@ module core (
   logic             ex1_b_br_taken;
   logic      [31:0] ex1_b_br_target;
   logic             ex1_b_br_mistaken;
-  logic             ex1_have_excp;
+  logic             have_excp;
+  logic             icacop_en;
+  logic             dcacop_en;
+  logic      [ 1:0] cacop_op;
+  logic             cacop_ok;
+  logic             cacop_have_excp;
+  excp_t            cacop_excp_type;
+
 
   // EX2 stage reg
   logic             EX2_stalling;
@@ -1037,7 +1044,7 @@ module core (
     end
   end
 
-  assign ex1_ready = lsu_a_ready && lsu_b_ready;
+  assign ex1_ready = lsu_a_ready && lsu_b_ready && !(EX1_a_valid && EX1_a_optype == OP_CACHE && !cacop_ok);
   assign ex1_stall =  /*(EX1_a_valid || EX1_b_valid) &&*/ (!ex1_ready || ex2_stall);
 
   alu u_alu_a (
@@ -1185,8 +1192,6 @@ module core (
       .mmu_pme(mmu_d1_pme)
   );
 
-  assign ex1_have_excp = (EX1_a_valid && EX1_a_have_excp) || (EX2_b_valid && EX2_b_have_excp) || lsu_a_have_excp || lsu_b_have_excp;
-
   assign invtlb_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_INVTLB && !flush_ex1;
   assign invtlb_op = EX1_a_imm[4:0];
   assign invtlb_asid = ex1_a_src1[9:0];
@@ -1199,6 +1204,10 @@ module core (
   assign tlbsrch_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBSRCH && !flush_ex1;
   assign tlbsrch_vppn = csr_tlb_rdata.vppn;
   assign csr_tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBRD && !flush_ex1;
+
+  assign icacop_en = EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 0;
+  assign dcacop_en = EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 1;
+  assign cacop_op = EX1_a_opcode[4:3];
 
   always_ff @(posedge clk) begin
     if (reset) begin
@@ -1224,7 +1233,9 @@ module core (
       EX2_a_br_type <= EX1_a_br_type;
       EX2_a_br_taken <= ex1_a_br_taken || EX1_a_br_taken;
       EX2_a_have_excp <= EX1_a_have_excp || lsu_a_have_excp;
-      EX2_a_excp_type <= lsu_a_have_excp ? lsu_a_excp_type : EX1_a_excp_type;
+      EX2_a_excp_type <= lsu_a_have_excp ? lsu_a_excp_type :
+                         cacop_have_excp ? cacop_excp_type :
+                                           EX1_a_excp_type;
       EX2_a_excp_addr <= u_lsu_a.addr;
       EX2_a_csr_addr <= EX1_a_csr_addr;
       EX2_a_csr_wr <= EX1_a_csr_wr;
@@ -1574,6 +1585,12 @@ module core (
       .invtlb_asid     (invtlb_asid),
       .invtlb_va       (invtlb_va),
       .tlb_we          (tlb_we),
+      .icacop_en       (icacop_en),
+      .dcacop_en       (dcacop_en),
+      .cacop_op        (cacop_op),
+      .cacop_ok        (cacop_ok),
+      .cacop_have_excp (cacop_have_excp),
+      .cacop_excp_type (cacop_excp_type),
       .tlb_w_index     (tlb_w_index),
       .tlb_w_entry     (tlb_w_entry),
       .tlb_r_index     (tlb_r_index),
@@ -1583,6 +1600,7 @@ module core (
       .tlbsrch_found   (tlbsrch_found),
       .tlbsrch_index   (tlbsrch_index),
       .icache_req      (icache_req),
+      .icache_op       (icache_op),
       .icache_addr     (icache_addr),
       .icache_uncached (icache_uncached),
       .icache_addr_ok  (icache_addr_ok),
