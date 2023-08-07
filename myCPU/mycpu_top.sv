@@ -197,6 +197,7 @@ icache icache(
     .resetn(aresetn),
 
     .valid(icache_req),
+    .op(0),
     .tag(icache_addr[31:12]),
     .index(icache_addr[11:`OFFSET_WIDTH]),
     .offset(icache_addr[`OFFSET_WIDTH-1:0]),

@@ -7,6 +7,7 @@ module icache(
 
     // Pipe interface
     input wire valid,
+    input wire [2:0] op,
     input wire [`TAG_WIDTH-1:0] tag,
     input wire [`INDEX_WIDTH-1:0] index,
     input wire [`OFFSET_WIDTH-1:0] offset,
@@ -54,6 +55,11 @@ wire [`INDEX_WIDTH-1:0] data_addr;
 `endif
 
 reg [2:0] op_reg;
+wire cacop;
+wire cacop_reg;
+wire [1:0] cacop_id_reg;
+wire cacop_way_id;
+
 reg [`INDEX_WIDTH-1:0] index_reg;
 reg [`INDEX_WIDTH-1:0] index_reg_miss;
 reg [`TAG_WIDTH-1:0] tag_reg;
@@ -206,6 +212,9 @@ wire refill;
 wire cache_hit;
 wire cache_hit_and_cached;
 wire refill_write;
+wire cacop0_write;
+wire cacop1_write;
+wire cacop2_write;
 
 wire [`CACHE_WAY_NUM-1:0] cache_hit_way;
 wire [`CACHE_WAY_NUM_LOG2-1:0] cache_hit_way_id;
@@ -246,6 +255,11 @@ wire prefetch_next_same_line;
 
 wire fetch_ok;
 
+assign cacop = op[2];
+assign cacop_reg = op_reg[2];
+assign cacop_id_reg = op_reg[1:0];
+assign cacop_way_id = (op_reg == OP_CACOP2) ? cache_hit_way_id : offset[`CACHE_WAY_NUM_LOG2-1:0];
+
 assign data_addr = pipe_interface_latch ? index : index_reg;
 
 assign offset_w_reg = offset_reg[`OFFSET_WIDTH-1:2];
@@ -259,11 +273,12 @@ assign ret_valid_last = (ret_valid & ret_last);
 
 assign next_same_line = (index == index_reg) & (tag == tag_reg);
 
-assign pipe_interface_latch = valid & (
-    (idle & !(prefetching & prefetch_next_same_line & ret_valid_last)) | 
+assign pipe_interface_latch = valid & (cacop
+    ? (!prefetching & (idle | (lookup & cache_hit_and_cached)))
+    : ((idle & !(prefetching & prefetch_next_same_line & ret_valid_last)) | 
     (lookup & cache_hit_and_cached) |
     (miss & ((!prefetching & next_same_line) | prefetch_next_same_line)) |
-    (refill & !uncached_reg & (data_ok | finished) & next_same_line & !fetch_ok));
+    (refill & !uncached_reg & (data_ok | finished) & next_same_line & !fetch_ok)));
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -283,6 +298,7 @@ always @(posedge clk) begin
     end
     else begin
         if (pipe_interface_latch) begin
+            op_reg <= op;
             index_reg <= index;
             tag_reg <= tag;
             // offset_w_reg <= offset[3:2];
@@ -297,6 +313,9 @@ always @(posedge clk) begin
 end
 
 assign addr_ok = pipe_interface_latch;
+assign cacop0_write = lookup & (op_reg == OP_CACOP0);
+assign cacop1_write = lookup & (op_reg == OP_CACOP1);
+assign cacop2_write = lookup & (op_reg == OP_CACOP2) & cache_hit;
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -330,7 +349,7 @@ always @(posedge clk) begin
                 end
             end
             MAIN_ST_LOOKUP: begin
-                if (cache_hit_and_cached) begin
+                if (cache_hit_and_cached | cacop_reg) begin
                     if (!valid) begin
                         main_state <= MAIN_ST_IDLE;
                     end
@@ -496,6 +515,24 @@ always @(posedge clk) begin
             3 : begin
                 tag_way3[index_reg] <= tag_reg;
                 valid_way3[index_reg] <= 1;
+            end
+`endif
+        endcase
+    end
+    else if (cacop0_write | cacop1_write | cacop2_write) begin
+        case (cacop_way_id)
+            0 : begin
+                valid_way0[index_reg] <= 0;
+            end
+            1 : begin
+                valid_way1[index_reg] <= 0;
+            end
+`ifdef CACHE_4WAY
+            2 : begin
+                valid_way2[index_reg] <= 0;
+            end
+            3 : begin
+                valid_way3[index_reg] <= 0;
             end
 `endif
         endcase
