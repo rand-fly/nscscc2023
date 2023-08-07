@@ -108,14 +108,10 @@ module mmu (
   logic        [              1:0] i_mat;
   logic                            i_page_fault;
   logic                            i_page_invalid;
-  logic                            i_page_dirty;
   logic                            i_plv_fault;
 
   logic        [   `TAG_WIDTH-1:0] d_vtag;
   logic        [   `TAG_WIDTH-1:0] d_ptag;
-  logic        [ `INDEX_WIDTH-1:0] d_index;
-  logic        [`OFFSET_WIDTH-1:0] d_offset0;
-  logic        [`OFFSET_WIDTH-1:0] d_offset1;
 
   logic        [              1:0] d_mat;
   logic                            d_page_fault;
