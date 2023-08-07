@@ -416,13 +416,14 @@ assign rdata_h = `get_word(cache_rd_data, offset_w_reg+1);
 assign rdata_h_valid = (offset_w_reg != {(`OFFSET_WIDTH-2){1'b1}}) & !uncached_reg;
 
 // assign data_ok = (op_reg == OP_READ) ? ((lookup & cache_hit) | ret_valid_last) : wdata_ok_reg;
-assign data_ok = !finished & ((lookup & cache_hit_and_cached) 
+assign data_ok = !cacop_reg & !finished & ((lookup & cache_hit_and_cached) 
                                 | prefetch_hit
                                 | (uncached_reg
                                     ?   (refill & ret_valid_last)
-                                    :   ((refill | (prefetching & prefetch_same_line)) & ret_valid & (rdata_h_valid
-                                                                                                                ? (buffer_read_data_count > {(offset_w_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),offset_w_reg})
-                                                                                                                : (buffer_read_data_count >= {(offset_w_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),offset_w_reg}))
+                                    :   ((refill | (prefetching & prefetch_same_line))
+                                            & ret_valid & (rdata_h_valid
+                                                            ? (buffer_read_data_count > {(offset_w_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),offset_w_reg})
+                                                            : (buffer_read_data_count >= {(offset_w_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),offset_w_reg}))
                                         )
                                 )
                             );
