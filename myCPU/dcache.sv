@@ -529,7 +529,7 @@ assign cache_rd_data = cache_hit
 assign p0_rdata = uncached_reg ? ret_data : `get_word(cache_rd_data, p0_offset_w_reg);
 assign p1_rdata = `get_word(cache_rd_data, p1_offset_w_reg);
 
-assign data_ok = !finished & ((op_reg == OP_READ)
+assign data_ok = !cacop_reg & !finished & ((op_reg == OP_READ)
                     ? ((lookup & cache_hit_and_cached) | (uncached_reg
                                                     ? (refill & ret_valid_last)
                                                     : (refill & ret_valid & (buffer_read_data_count >= {(p_offset_w_last_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),p_offset_w_last_reg}))))
