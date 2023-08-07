@@ -15,7 +15,7 @@ module ifu (
     output           [31:0] inst1,
     output reg              pred_br_taken1,
     output reg       [31:0] pred_br_target1,
-    output logic            have_excp,
+    output reg              have_excp,
     output excp_t           excp_type,
     // from branch ctrl
     input                   br_mistaken,
@@ -45,6 +45,8 @@ module ifu (
 
   logic     [31:0] pc_start;
   logic     [31:0] pc_start_sent;
+  logic            have_excp_inner;
+  excp_t           excp_type_inner;
 
   logic            pred_br_taken0_inner;
   logic     [31:0] pred_br_target0_inner;
@@ -82,7 +84,7 @@ module ifu (
     else pred_pc_start = pc_start + 32'd4;
   end
 
-  assign pc0   = have_excp ? pc_start : pc_start_sent;
+  assign pc0   = pc_start_sent;
   assign pc1   = pc0 + 32'd4;
 
   assign inst0 = have_excp ? 32'h03400000  /* NOP */ : mmu_i_rdata[31:0];
@@ -93,6 +95,7 @@ module ifu (
       pc_start <= 32'h1c000000;
       pending_data <= 1'b0;
       cancel <= 1'b0;
+      have_excp <= 1'b0;
     end else begin
       if (br_mistaken || raise_excp || replay) begin
         if ((mmu_i_req && mmu_i_addr_ok) || (pending_data && !mmu_i_data_ok)) begin
@@ -111,6 +114,7 @@ module ifu (
         end else begin
           pc_start <= right_target;
         end
+        have_excp <= 1'b0;
       end else begin
         if (mmu_i_data_ok) begin
           if (cancel) begin
@@ -118,13 +122,17 @@ module ifu (
           end
           pending_data <= 1'b0;
         end
-        if (mmu_i_req && mmu_i_addr_ok) begin
+        if (mmu_i_req && mmu_i_addr_ok || have_excp_inner && (!pending_data || mmu_i_data_ok)) begin
           pc_start_sent <= pc_start;
           pred_br_taken0 <= pred_br_taken0_inner;
           pred_br_target0 <= pred_br_target0_inner;
           pred_br_taken1 <= pred_br_taken1_inner;
           pred_br_target1 <= pred_br_target1_inner;
           is_sent_double <= mmu_i_double;
+          have_excp <= have_excp_inner;
+          excp_type <= excp_type_inner;
+        end
+        if (mmu_i_req && mmu_i_addr_ok) begin
           pc_start <= pred_pc_start;
           pending_data <= 1'b1;
         end
@@ -132,7 +140,7 @@ module ifu (
     end
   end
 
-  assign mmu_i_req = !reset && !have_excp && ibuf_i_ready && (!pending_data || mmu_i_data_ok);
+  assign mmu_i_req = !reset && !have_excp_inner && ibuf_i_ready && (!pending_data || mmu_i_data_ok);
   assign mmu_i_addr = pc_start;
   assign output_size = have_excp                        ? 2'd1 :
                       !mmu_i_data_ok || cancel          ? 2'd0 :
@@ -141,20 +149,20 @@ module ifu (
 
   always_comb begin
     if (pc_start[1:0] != 2'h0) begin
-      have_excp = 1'b1;
-      excp_type = ADEF;
+      have_excp_inner = 1'b1;
+      excp_type_inner = ADEF;
     end else if (mmu_i_tlbr) begin
-      have_excp = 1'b1;
-      excp_type = TLBR;
+      have_excp_inner = 1'b1;
+      excp_type_inner = TLBR;
     end else if (mmu_i_pif) begin
-      have_excp = 1'b1;
-      excp_type = PIF;
+      have_excp_inner = 1'b1;
+      excp_type_inner = PIF;
     end else if (mmu_i_ppi) begin
-      have_excp = 1'b1;
-      excp_type = PPI;
+      have_excp_inner = 1'b1;
+      excp_type_inner = PPI;
     end else begin
-      have_excp = 1'b0;
-      excp_type = ADEF;
+      have_excp_inner = 1'b0;
+      excp_type_inner = ADEF;
     end
   end
 
