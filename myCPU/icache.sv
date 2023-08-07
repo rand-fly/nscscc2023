@@ -350,7 +350,7 @@ always @(posedge clk) begin
             end
             MAIN_ST_LOOKUP: begin
                 if (cache_hit_and_cached | cacop_reg) begin
-                    if (!valid) begin
+                    if (!pipe_interface_latch) begin
                         main_state <= MAIN_ST_IDLE;
                     end
                 end

@@ -444,7 +444,7 @@ always @(posedge clk) begin
             end
             MAIN_ST_LOOKUP: begin
                 if ((!cacop_reg & cache_hit_and_cached) | (op_reg == OP_CACOP0) | ((op_reg == OP_CACOP2) & !cache_hit_and_cached)) begin
-                    if (!p0_valid | hit_write) begin
+                    if (!pipe_interface_latch | hit_write) begin
                         main_state <= MAIN_ST_IDLE;
                     end
                 end
