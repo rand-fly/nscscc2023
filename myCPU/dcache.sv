@@ -236,7 +236,7 @@ parameter MAIN_ST_LOOKUP    = 1;
 parameter MAIN_ST_MISS      = 2;      // wait for memory finish writing previous data
 parameter MAIN_ST_REPLACE   = 3;   // write data and wait for memory finish reading miss data
 parameter MAIN_ST_REFILL    = 4;
-parameter MAIN_ST_CACOP12   = 5;   // unvalid cache line
+parameter MAIN_ST_CACOP12   = 5;   // make cache line invalid
 
 parameter SUB_ST_IDLE = 0;
 parameter SUB_ST_WRITE = 1;
@@ -302,13 +302,13 @@ wire [`LINE_WIDTH-1:0] p1_cache_write_data_strobe;
 wire next_same_line;
 wire [3:0] p1_wstrb_valid;
 
-assign data_addr = pipe_interface_latch ? index : index_reg;
 
 assign cacop_reg = op_reg[2];
 assign cacop_id_reg = op_reg[1:0];
 assign cacop_iiw_reg = cacop_reg & (cacop_id_reg[0] ^ cacop_id_reg[1]);
 assign cacop_way_id = (op_reg == OP_CACOP2) ? cache_hit_way_id : p0_offset[`CACHE_WAY_NUM_LOG2-1:0];
 
+assign data_addr = pipe_interface_latch ? index : index_reg;
 
 // assign p1_wdata_valid = p1_valid ? p1_wdata : 0;
 assign p1_wstrb_valid = p1_valid ? p1_wstrb : 0;
@@ -766,26 +766,4 @@ end
 
 endmodule
 
-// for verilator simulation
-`ifdef SIMU
 
-module blk_mem_gen_cache_32(
-  input wire clka,
-  input wire [0:0]wea,
-  input wire [6:0]addra,
-  input wire [255:0]dina,
-  output reg [255:0]douta
-);
-
-reg [255:0] mem [0:127];
-
-always @(posedge clka) begin
-    if (wea) begin
-        mem[addra] <= dina;
-    end
-    douta <= mem[addra];
-end
-
-endmodule
-
-`endif
