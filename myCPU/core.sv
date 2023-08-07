@@ -313,6 +313,7 @@ module core (
   excp_t                     EX1_a_excp_type;
   csr_addr_t                 EX1_a_csr_addr;
   logic                      EX1_a_csr_wr;
+  logic                      EX1_a_is_spec_op;
   logic                      EX1_b_valid;
   logic       [        31:0] EX1_b_pc;
   logic                      EX1_b_delayed;
@@ -370,6 +371,7 @@ module core (
   logic      [31:0] EX2_a_excp_addr;
   csr_addr_t        EX2_a_csr_addr;
   logic             EX2_a_csr_wr;
+  logic             EX2_a_is_spec_op;
   logic             EX2_b_valid;
   logic      [31:0] EX2_b_pc;
   logic             EX2_b_delayed;
@@ -748,7 +750,7 @@ module core (
       .wdata2(rf_wdata2)
   );
 
-  // forward prediction
+  // forward planning
   always_comb begin
     ro_a_src1_passed = 32'd0;
     if (ro_a_r1 == 5'd0) begin
@@ -891,6 +893,7 @@ module core (
 
 
   wire related = (ro_a_dest == ro_b_r1 || ro_a_dest == ro_b_r2) && ro_a_dest != 5'd0;
+  wire b_will_br = ro_b_br_type == BR_COND || ro_b_br_type == BR_INDIR || ro_b_br_type == BR_RET;
 
   assign ro_b_delayed = ro_a_optype == OP_ALU && ro_b_optype == OP_ALU && related;
 
@@ -899,7 +902,7 @@ module core (
                       && ro_b_valid && ro_b_src1_ok && ro_b_src2_ok
                       && !ro_a_is_spec_op && !ro_b_is_spec_op
                       && !(ro_a_optype == OP_DIV && ro_b_optype == OP_DIV)
-                      && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU || ro_b_br_type != BR_NOP))
+                      && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU || b_will_br))
                       && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && ro_a_opcode[6:5] != ro_b_opcode[6:5]);
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
@@ -909,11 +912,11 @@ module core (
       EX1_a_valid <= 1'b0;
       EX1_b_valid <= 1'b0;
     end else if (!ex1_stall) begin
-      EX1_a_valid <= allow_issue_a && !ex1_have_excp;
-      EX1_b_valid <= allow_issue_b && !ex1_have_excp;
+      EX1_a_valid <= allow_issue_a;
+      EX1_b_valid <= allow_issue_b;
     end
 
-    if (!ex1_stall && allow_issue_a && !ex1_have_excp) begin
+    if (!ex1_stall && allow_issue_a) begin
       EX1_a_pc             <= ro_a_pc;
       EX1_a_optype         <= ro_a_optype;
       EX1_a_opcode         <= ro_a_opcode;
@@ -933,6 +936,7 @@ module core (
       EX1_a_excp_type      <= ro_a_excp_type;
       EX1_a_csr_addr       <= ro_a_csr_addr;
       EX1_a_csr_wr         <= ro_a_csr_wr;
+      EX1_a_is_spec_op     <= ro_a_is_spec_op;
 `ifdef DIFFTEST_EN
       EX1_a_difftest <= ro_a_difftest;
       EX1_a_difftest.is_TLBFILL <= ro_a_optype == OP_TLB || ro_a_opcode == TLB_TLBFILL;
@@ -940,7 +944,7 @@ module core (
 `endif
     end
 
-    if (!ex1_stall && allow_issue_b && !ex1_have_excp) begin
+    if (!ex1_stall && allow_issue_b) begin
       EX1_b_pc             <= ro_b_pc;
       EX1_b_delayed        <= ro_b_delayed;
       EX1_b_optype         <= ro_b_optype;
@@ -1224,6 +1228,7 @@ module core (
       EX2_a_excp_addr <= u_lsu_a.addr;
       EX2_a_csr_addr <= EX1_a_csr_addr;
       EX2_a_csr_wr <= EX1_a_csr_wr;
+      EX2_a_is_spec_op <= EX1_a_is_spec_op;
 `ifdef DIFFTEST_EN
       EX2_a_difftest <= EX1_a_difftest;
       EX2_a_difftest.store_valid <= {8{EX1_a_optype == OP_MEM && !lsu_a_have_excp}} & {
@@ -1348,8 +1353,8 @@ module core (
       .result(alu_b2_result)
   );
 
-  assign replay = !EX2_stalling && EX2_a_valid && (EX2_a_optype == OP_CSR || EX2_a_optype == OP_TLB);
-  assign replay_target = (EX2_a_valid && (EX2_a_optype == OP_CSR || EX2_a_optype == OP_TLB)) ? EX2_a_pc + 32'd4 : EX2_b_pc + 32'd4;
+  assign replay = !EX2_stalling && EX2_a_valid && EX2_a_is_spec_op;
+  assign replay_target = EX2_a_pc + 32'd4;
 
   always_ff @(posedge clk) begin
     if (reset) begin
