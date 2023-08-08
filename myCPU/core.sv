@@ -1232,7 +1232,7 @@ module core (
       EX2_a_alu_result <= alu_a_result;
       EX2_a_br_type <= EX1_a_br_type;
       EX2_a_br_taken <= ex1_a_br_taken || EX1_a_br_taken;
-      EX2_a_have_excp <= EX1_a_have_excp || lsu_a_have_excp;
+      EX2_a_have_excp <= EX1_a_have_excp || lsu_a_have_excp || cacop_have_excp;
       EX2_a_excp_type <= lsu_a_have_excp ? lsu_a_excp_type :
                          cacop_have_excp ? cacop_excp_type :
                                            EX1_a_excp_type;
