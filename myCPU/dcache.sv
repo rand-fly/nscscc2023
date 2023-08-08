@@ -338,7 +338,7 @@ assign addr_ok = cache_rdy;
 assign pipe_interface_latch = p0_valid & cache_rdy;
 assign cache_rdy = idle
     | (lookup & (op_reg == OP_READ) & cache_hit_and_cached) //|
-    // (refill & !uncached_reg & (op_reg == OP_READ) & (data_ok | finished) & next_same_line & !fetch_ok) |
+    // (refill & !uncached_reg & !uncached & (op_reg == OP_READ) & (data_ok | finished) & next_same_line & !fetch_ok) |
     // ((op_reg == OP_WRITE) & cache_hit_and_cached & !hit_write & !refill_write & (op == OP_WRITE) & next_same_line)
     ;
 

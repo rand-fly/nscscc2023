@@ -271,14 +271,14 @@ assign refill = (main_state == MAIN_ST_REFILL);
 
 assign ret_valid_last = (ret_valid & ret_last);
 
-assign next_same_line = 1'b0;//(index == index_reg) & (tag == tag_reg);
+assign next_same_line = (index == index_reg) & (tag == tag_reg);
 
-assign pipe_interface_latch = valid & (cacop
+assign pipe_interface_latch = valid & ((cacop | cacop_reg)
     ? (!prefetching & (idle | (lookup & cache_hit_and_cached)))
     : ((idle & !(prefetching & prefetch_next_same_line & ret_valid_last)) | 
     (lookup & cache_hit_and_cached) |
     (miss & ((!prefetching & next_same_line) | prefetch_next_same_line)) |
-    (refill & !uncached_reg & (data_ok | finished) & next_same_line & !fetch_ok)));
+    (refill & !uncached_reg & uncached & (data_ok | finished) & next_same_line & !fetch_ok)));
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -644,7 +644,7 @@ end
 
 `endif
 
-`define ICACHE_CHECK
+// `define ICACHE_CHECK
 
 `ifdef ICACHE_CHECK
 
@@ -680,7 +680,7 @@ wire [31:0] icache_rdata_h;
 assign ram_addr = ((icache_addr[31:28] == 4'h0 ||
                       icache_addr[31:28] == 4'h1 ||
                       icache_addr[31:28] == 4'h7) ? icache_addr :
-                      {12'b0, 4'hf, icache_addr[31:28], icache_addr[11:0]}) >> 2 & 30'hfffff;
+                      {12'b0, 4'hf, icache_addr[31:28], icache_addr[11:0]}) >> 2 & 32'hfffff;
 assign icache_rdata_l = rdata_l;
 assign icache_rdata_h = rdata_h;
 assign icache_addr = {tag, index, offset};
