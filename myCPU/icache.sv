@@ -58,7 +58,7 @@ reg [2:0] op_reg;
 wire cacop;
 wire cacop_reg;
 wire [1:0] cacop_id_reg;
-wire cacop_way_id;
+wire [`CACHE_WAY_NUM_LOG2-1:0] cacop_way_id;
 
 reg [`INDEX_WIDTH-1:0] index_reg;
 reg [`INDEX_WIDTH-1:0] index_reg_miss;
@@ -258,7 +258,7 @@ wire fetch_ok;
 assign cacop = op[2];
 assign cacop_reg = op_reg[2];
 assign cacop_id_reg = op_reg[1:0];
-assign cacop_way_id = (op_reg == OP_CACOP2) ? cache_hit_way_id : offset[`CACHE_WAY_NUM_LOG2-1:0];
+assign cacop_way_id = (op_reg == OP_CACOP2) ? cache_hit_way_id : offset_reg[`CACHE_WAY_NUM_LOG2-1:0];
 
 assign data_addr = pipe_interface_latch ? index : index_reg;
 
