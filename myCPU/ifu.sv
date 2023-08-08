@@ -85,10 +85,10 @@ module ifu (
   always @(posedge clk) begin
     if (reset) begin
       idle_state <= 1'b0;
-    end else if (idle) begin
-      idle_state <= 1'b1;
     end else if (interrupt) begin
       idle_state <= 1'b0;
+    end else if (idle) begin
+      idle_state <= 1'b1;
     end
   end
 
