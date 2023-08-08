@@ -93,6 +93,7 @@ module core (
   csr_addr_t        id_a_csr_addr;
   logic             id_a_csr_wr;
   logic             id_a_is_spec_op;
+  logic             id_a_is_idle;
   logic      [ 4:0] id_a_r1;
   logic      [ 4:0] id_a_r2;
   logic             id_a_src2_is_imm;
@@ -110,6 +111,7 @@ module core (
   csr_addr_t        id_b_csr_addr;
   logic             id_b_csr_wr;
   logic             id_b_is_spec_op;
+  logic             id_b_is_idle;
   logic      [ 4:0] id_b_r1;
   logic      [ 4:0] id_b_r2;
   logic             id_b_src2_is_imm;
@@ -145,6 +147,7 @@ module core (
   csr_addr_t        ro_a_csr_addr;
   logic             ro_a_csr_wr;
   logic             ro_a_is_spec_op;
+  logic             ro_a_is_idle;
   logic      [ 4:0] ro_a_r1;
   logic      [ 4:0] ro_a_r2;
   logic             ro_a_src2_is_imm;
@@ -166,6 +169,7 @@ module core (
   csr_addr_t        ro_b_csr_addr;
   logic             ro_b_csr_wr;
   logic             ro_b_is_spec_op;
+  logic             ro_b_is_idle;
   logic      [ 4:0] ro_b_r1;
   logic      [ 4:0] ro_b_r2;
   logic             ro_b_src2_is_imm;
@@ -316,6 +320,7 @@ module core (
   csr_addr_t                 EX1_a_csr_addr;
   logic                      EX1_a_csr_wr;
   logic                      EX1_a_is_spec_op;
+  logic                      EX1_a_is_idle;
   logic                      EX1_b_valid;
   logic       [        31:0] EX1_b_pc;
   logic                      EX1_b_delayed;
@@ -381,6 +386,7 @@ module core (
   csr_addr_t        EX2_a_csr_addr;
   logic             EX2_a_csr_wr;
   logic             EX2_a_is_spec_op;
+  logic             EX2_a_is_idle;
   logic             EX2_b_valid;
   logic      [31:0] EX2_b_pc;
   logic             EX2_b_delayed;
@@ -412,6 +418,7 @@ module core (
   excp_t           ex2_excp_type;
   logic     [31:0] ex2_excp_pc;
   logic     [31:0] ex2_excp_addr;
+  logic            idle;
 
   // WB stage reg
   logic            WB_a_valid;
@@ -493,6 +500,8 @@ module core (
       .excp_target    (excp_target),
       .replay         (replay),
       .replay_target  (replay_target),
+      .interrupt      (interrupt),
+      .idle           (idle),
       .mmu_i_req      (mmu_i_req),
       .mmu_i_addr     (mmu_i_va),
       .mmu_i_addr_ok  (mmu_i_addr_ok),
@@ -554,6 +563,7 @@ module core (
       .csr_addr      (id_a_csr_addr),
       .csr_wr        (id_a_csr_wr),
       .is_spec_op    (id_a_is_spec_op),
+      .is_idle       (id_a_is_idle),
       .r1            (id_a_r1),
       .r2            (id_a_r2),
       .src2_is_imm   (id_a_src2_is_imm),
@@ -579,6 +589,7 @@ module core (
       .csr_addr      (id_b_csr_addr),
       .csr_wr        (id_b_csr_wr),
       .is_spec_op    (id_b_is_spec_op),
+      .is_idle       (id_b_is_idle),
       .r1            (id_b_r1),
       .r2            (id_b_r2),
       .src2_is_imm   (id_b_src2_is_imm),
@@ -667,6 +678,7 @@ module core (
       .i_a_csr_addr      (id_a_csr_addr),
       .i_a_csr_wr        (id_a_csr_wr),
       .i_a_is_spec_op    (id_a_is_spec_op),
+      .i_a_is_idle       (id_a_is_idle),
       .i_a_r1            (id_a_r1),
       .i_a_r2            (id_a_r2),
       .i_a_src2_is_imm   (id_a_src2_is_imm),
@@ -686,6 +698,7 @@ module core (
       .i_b_csr_addr      (id_b_csr_addr),
       .i_b_csr_wr        (id_b_csr_wr),
       .i_b_is_spec_op    (id_b_is_spec_op),
+      .i_b_is_idle       (id_b_is_idle),
       .i_b_r1            (id_b_r1),
       .i_b_r2            (id_b_r2),
       .i_b_src2_is_imm   (id_b_src2_is_imm),
@@ -715,6 +728,7 @@ module core (
       .o_a_csr_addr      (ro_a_csr_addr),
       .o_a_csr_wr        (ro_a_csr_wr),
       .o_a_is_spec_op    (ro_a_is_spec_op),
+      .o_a_is_idle       (ro_a_is_idle),
       .o_a_r1            (ro_a_r1),
       .o_a_r2            (ro_a_r2),
       .o_a_src2_is_imm   (ro_a_src2_is_imm),
@@ -735,6 +749,7 @@ module core (
       .o_b_csr_addr      (ro_b_csr_addr),
       .o_b_csr_wr        (ro_b_csr_wr),
       .o_b_is_spec_op    (ro_b_is_spec_op),
+      .o_b_is_idle       (ro_b_is_idle),
       .o_b_r1            (ro_b_r1),
       .o_b_r2            (ro_b_r2),
       .o_b_src2_is_imm   (ro_b_src2_is_imm)
@@ -948,6 +963,7 @@ module core (
       EX1_a_csr_addr       <= ro_a_csr_addr;
       EX1_a_csr_wr         <= ro_a_csr_wr;
       EX1_a_is_spec_op     <= ro_a_is_spec_op;
+      EX1_a_is_idle        <= ro_a_is_idle;
 `ifdef DIFFTEST_EN
       EX1_a_difftest <= ro_a_difftest;
       EX1_a_difftest.is_TLBFILL <= ro_a_optype == OP_TLB || ro_a_opcode == TLB_TLBFILL;
@@ -1244,6 +1260,7 @@ module core (
       EX2_a_csr_addr <= EX1_a_csr_addr;
       EX2_a_csr_wr <= EX1_a_csr_wr;
       EX2_a_is_spec_op <= EX1_a_is_spec_op;
+      EX2_a_is_idle <= EX1_a_is_idle;
 `ifdef DIFFTEST_EN
       EX2_a_difftest <= EX1_a_difftest;
       EX2_a_difftest.store_valid <= {8{EX1_a_optype == OP_MEM && !lsu_a_have_excp}} & {
@@ -1354,6 +1371,8 @@ module core (
       || ex2_excp_type == PPI
     );
   assign csr_vppn_wdata = ex2_excp_type == PIF ? ex2_excp_pc[31:13] : ex2_excp_addr[31:13];
+
+  assign idle = EX2_a_valid && EX2_a_is_idle;
 
   assign ex2_a_ok = !(EX2_a_optype == OP_DIV && !div_ok || EX2_a_optype == OP_MUL && !mul_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
   assign ex2_b_ok = !(EX2_b_optype == OP_DIV && !div_ok || EX2_b_optype == OP_MUL && !mul_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);

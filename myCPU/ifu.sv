@@ -31,6 +31,9 @@ module ifu (
     input            [31:0] excp_target,
     input                   replay,
     input            [31:0] replay_target,
+    input                   interrupt,
+    // from ex2
+    input                   idle,
     // from mmu
     output                  mmu_i_req,
     output           [31:0] mmu_i_addr,
@@ -66,6 +69,8 @@ module ifu (
 
   logic            ras_en;
 
+  logic            idle_state;
+
   always_ff @(posedge clk) begin
     br_mistaken_buf <= br_mistaken;
     br_type_buf <= br_type;
@@ -75,6 +80,16 @@ module ifu (
 
   always_ff @(posedge clk) begin
     ras_en <= mmu_i_req && mmu_i_addr_ok;
+  end
+
+  always @(posedge clk) begin
+    if (reset) begin
+      idle_state <= 1'b0;
+    end else if (idle) begin
+      idle_state <= 1'b1;
+    end else if (interrupt) begin
+      idle_state <= 1'b0;
+    end
   end
 
   always_comb begin
@@ -140,7 +155,7 @@ module ifu (
     end
   end
 
-  assign mmu_i_req = !reset && !have_excp_inner && ibuf_i_ready && (!pending_data || mmu_i_data_ok);
+  assign mmu_i_req = !reset && !idle_state && !have_excp_inner && ibuf_i_ready && (!pending_data || mmu_i_data_ok);
   assign mmu_i_addr = pc_start;
   assign output_size = have_excp                        ? 2'd1 :
                       !mmu_i_data_ok || cancel          ? 2'd0 :
