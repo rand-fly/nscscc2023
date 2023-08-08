@@ -644,5 +644,78 @@ end
 
 `endif
 
+`define ICACHE_CHECK
+
+`ifdef ICACHE_CHECK
+
+// icache check
+// `define ICACHE_REF_FILE "/home/lc/git/chiplab/sims/verilator/run_prog/obj/coremark_obj/obj/inst_ram.coe"
+`define ICACHE_REF_FILE "/home/lc/git/chiplab/sims/verilator/run_prog/obj/func/func_lab19_obj/obj/inst_ram.coe"
+integer icache_ref;
+integer icache_data_start;
+integer icache_code;
+reg [8*64-1:0] icache_ref_line_buf;
+initial begin
+    icache_ref = $fopen(`ICACHE_REF_FILE, "r");
+    if (icache_ref == 0) begin
+        $display("Error: Can't open file %s", `ICACHE_REF_FILE);
+        $finish;
+    end
+    icache_code = $fgets(icache_ref_line_buf,icache_ref);
+    // $display("icache_ref_line_buf = %s", icache_ref_line_buf);
+    icache_code = $fgets(icache_ref_line_buf,icache_ref);
+    // $display("icache_ref_line_buf = %s", icache_ref_line_buf);
+    icache_data_start = $ftell(icache_ref);
+    // $display("icache_data_start = %d", icache_data_start);
+end
+
+reg [31:0] icache_ref_rdata_l;
+reg [31:0] icache_ref_rdata_h;
+wire [31:0]  icache_addr;
+reg [31:0]  icache_addr_reg;
+wire [31:0] ram_addr;
+reg [31:0] ram_addr_reg;
+wire [31:0] icache_rdata_l;
+wire [31:0] icache_rdata_h;
+assign ram_addr = ((icache_addr[31:28] == 4'h0 ||
+                      icache_addr[31:28] == 4'h1 ||
+                      icache_addr[31:28] == 4'h7) ? icache_addr :
+                      {12'b0, 4'hf, icache_addr[31:28], icache_addr[11:0]}) >> 2 & 30'hfffff;
+assign icache_rdata_l = rdata_l;
+assign icache_rdata_h = rdata_h;
+assign icache_addr = {tag, index, offset};
+
+always @(posedge clk)
+begin
+    if (pipe_interface_latch) begin
+        icache_addr_reg <= icache_addr;
+        ram_addr_reg <= ram_addr;
+
+        icache_code = $fseek(icache_ref, icache_data_start + ram_addr*9, 0);
+        icache_code = $fscanf(icache_ref, "%h", icache_ref_rdata_l);
+        icache_code = $fscanf(icache_ref, "%h", icache_ref_rdata_h);
+    end
+end
+
+always @(posedge clk)
+begin
+    if (data_ok) begin
+        if (icache_ref_rdata_l != icache_rdata_l && icache_rdata_l != 0) begin
+            $display("--------------------------------------------------------------");
+            $display("[%t] icache Error!!!",$time);
+            $display("    Addr = 0x%8h, ram_addr = 0x%8h", icache_addr_reg, ram_addr_reg);
+            $display("    reference: icache_ref_rdata_l = 0x%8h, icache_ref_rdata_h = 0x%8h",
+                        icache_ref_rdata_l, icache_ref_rdata_h);
+            $display("    mycpu    : icache_rdata_l     = 0x%8h, icache_rdata_h     = 0x%8h",
+                        icache_rdata_l, icache_rdata_h);
+            $display("--------------------------------------------------------------");
+            // $finish;
+        end
+    end
+end
+
+
+`endif
+
 
 endmodule
