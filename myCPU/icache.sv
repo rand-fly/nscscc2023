@@ -271,7 +271,7 @@ assign refill = (main_state == MAIN_ST_REFILL);
 
 assign ret_valid_last = (ret_valid & ret_last);
 
-assign next_same_line = (index == index_reg) & (tag == tag_reg);
+assign next_same_line = 1'b0;//(index == index_reg) & (tag == tag_reg);
 
 assign pipe_interface_latch = valid & (cacop
     ? (!prefetching & (idle | (lookup & cache_hit_and_cached)))
