@@ -138,6 +138,8 @@ module core (
   logic             ro_a_br_condition;
   logic      [31:0] ro_a_br_target;
   logic             ro_a_br_taken;
+  logic             ro_a_have_excp_no_int;
+  excp_t            ro_a_excp_type_no_int;
   logic             ro_a_have_excp;
   excp_t            ro_a_excp_type;
   csr_addr_t        ro_a_csr_addr;
@@ -647,7 +649,6 @@ module core (
       .clk               (clk),
       .reset             (reset),
       .flush             (flush_ibuf),
-      .interrupt         (interrupt),
       .i_size            (ibuf_i_size),
       .i_ready           (ibuf_i_ready),
       .i_a_pc            (ID_a_pc),
@@ -709,8 +710,8 @@ module core (
       .o_a_br_condition  (ro_a_br_condition),
       .o_a_br_target     (ro_a_br_target),
       .o_a_br_taken      (ro_a_br_taken),
-      .o_a_have_excp     (ro_a_have_excp),
-      .o_a_excp_type     (ro_a_excp_type),
+      .o_a_have_excp     (ro_a_have_excp_no_int),
+      .o_a_excp_type     (ro_a_excp_type_no_int),
       .o_a_csr_addr      (ro_a_csr_addr),
       .o_a_csr_wr        (ro_a_csr_wr),
       .o_a_is_spec_op    (ro_a_is_spec_op),
@@ -738,6 +739,9 @@ module core (
       .o_b_r2            (ro_b_r2),
       .o_b_src2_is_imm   (ro_b_src2_is_imm)
   );
+
+  assign ro_a_have_excp = ro_a_have_excp_no_int || interrupt;
+  assign ro_a_excp_type = interrupt ? INT : ro_a_excp_type_no_int;
 
   regfile u_regfile (
       .clk   (clk),

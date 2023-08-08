@@ -4,7 +4,6 @@ module ibuf (
     input                    clk,
     input                    reset,
     input                    flush,
-    input                    interrupt,
     // input
     input             [ 1:0] i_size,
     output                   i_ready,
@@ -180,8 +179,8 @@ module ibuf (
     i_a_br_condition,
     i_a_br_target,
     i_a_br_taken,
-    i_a_have_excp || interrupt,
-    interrupt ? INT : i_a_excp_type,
+    i_a_have_excp,
+    i_a_excp_type,
     i_a_csr_addr,
     i_a_csr_wr,
     i_a_is_spec_op,
