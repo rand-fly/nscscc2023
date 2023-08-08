@@ -23,6 +23,7 @@ module decoder (
     output csr_addr_t        csr_addr,
     output                   csr_wr,
     output                   is_spec_op,
+    output                   is_idle,
     // to forward pred
     output            [ 4:0] r1,
     output            [ 4:0] r2,
@@ -102,7 +103,7 @@ module decoder (
   wire inst_tlbwr     = op_31_10 == 22'b0000011001001000001100;
   wire inst_tlbfill   = op_31_10 == 22'b0000011001001000001101;
   wire inst_ertn      = inst == 32'b00000110010010000011100000000000;
-  // IDLE
+  wire inst_idle      = op_31_15 == 17'b00000110010010001;
   wire inst_invtlb    = op_31_15 == 17'b00000110010010011;
   // FMADD.S - FSEL
   wire inst_lu12i_w   = op_31_25 == 7'b0001010;
@@ -198,7 +199,8 @@ assign           {valid_inst, optype, opcode,                r1,    r2, src2_is_
 {59{inst_tlbwr    }} & {1'b1, OP_TLB, TLB_TLBWR,            `R0,   `R0,   1'b0,  32'd0,  `R0  } |
 {59{inst_tlbfill  }} & {1'b1, OP_TLB, TLB_TLBFILL,          `R0,   `R0,   1'b0,  32'd0,  `R0  } |
 {59{inst_invtlb   }} & {1'b1, OP_TLB, TLB_INVTLB,            rj,    rk,   1'b0,{27'd0,rd},`R0 } |
-{59{inst_ertn     }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } ;
+{59{inst_ertn     }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{59{inst_idle     }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } ;
 
 assign csr_addr = inst_rdcntid_w ? 14'h40 : inst[23:10];
 assign csr_wr   = rj == `R1;
@@ -229,6 +231,7 @@ assign               {have_excp, excp_type} =
 {16{inst_break  }} & {1'b1,      BRK      } |
 {16{ine         }} & {1'b1,      INE      } ;
 
-assign is_spec_op = optype == OP_TLB || optype == OP_CSR || optype == OP_CACHE;
+assign is_spec_op = optype == OP_TLB || optype == OP_CSR || optype == OP_CACHE || inst_idle;
+assign is_idle = inst_idle;
 
 endmodule
