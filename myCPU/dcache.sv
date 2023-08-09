@@ -61,6 +61,7 @@ wire [`INDEX_WIDTH-1:0] data_addr;
 
 wire cache_rdy;
 reg [2:0] op_reg;
+wire cacop;
 wire cacop_reg;
 wire [1:0] cacop_id_reg;
 wire cacop_iiw_reg;
@@ -302,7 +303,7 @@ wire [`LINE_WIDTH-1:0] p1_cache_write_data_strobe;
 wire next_same_line;
 wire [3:0] p1_wstrb_valid;
 
-
+assign cacop = op[2];
 assign cacop_reg = op_reg[2];
 assign cacop_id_reg = op_reg[1:0];
 assign cacop_iiw_reg = cacop_reg & (cacop_id_reg[0] ^ cacop_id_reg[1]);
@@ -369,7 +370,7 @@ always @(posedge clk) begin
             p0_offset_reg <= p0_offset;
             p1_offset_reg <= p1_offset;
             p_offset_w_last_reg <= p1_valid ? p1_offset[`OFFSET_WIDTH-1:2] : p0_offset[`OFFSET_WIDTH-1:2];
-            uncached_reg <= uncached;
+            uncached_reg <= uncached & !cacop;
             p0_size_reg <= p0_size;
             p0_wstrb_reg <= p0_wstrb;
             p1_wstrb_reg <= p1_wstrb_valid;
