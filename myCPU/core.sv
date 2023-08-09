@@ -649,9 +649,34 @@ module core (
 
 `ifdef DIFFTEST_EN
   assign id_a_difftest.instr = ID_a_inst;
+  assign id_a_difftest.store_valid = {
+    4'b0, 1'b0, u_decoder_a.inst_st_w, u_decoder_a.inst_st_h, u_decoder_a.inst_st_b
+  };
+  assign id_a_difftest.load_valid = {
+    2'b0,
+    1'b0,
+    u_decoder_a.inst_ld_w,
+    u_decoder_a.inst_ld_hu,
+    u_decoder_a.inst_ld_h,
+    u_decoder_a.inst_ld_bu,
+    u_decoder_a.inst_ld_b
+  };
   assign id_a_difftest.is_CNTinst = u_decoder_a.inst_rdcntid_w|u_decoder_a.inst_rdcntvl_w|u_decoder_a.inst_rdcntvh_w;
   assign id_a_difftest.timer_64_value = counter;
+
   assign id_b_difftest.instr = ID_b_inst;
+  assign id_b_difftest.store_valid = {
+    4'b0, 1'b0, u_decoder_b.inst_st_w, u_decoder_b.inst_st_h, u_decoder_b.inst_st_b
+  };
+  assign id_b_difftest.load_valid = {
+    2'b0,
+    1'b0,
+    u_decoder_b.inst_ld_w,
+    u_decoder_b.inst_ld_hu,
+    u_decoder_b.inst_ld_h,
+    u_decoder_b.inst_ld_bu,
+    u_decoder_b.inst_ld_b
+  };
   assign id_b_difftest.is_CNTinst = u_decoder_b.inst_rdcntid_w|u_decoder_b.inst_rdcntvl_w|u_decoder_b.inst_rdcntvh_w;
   assign id_b_difftest.timer_64_value = counter;
 `endif
@@ -1263,28 +1288,16 @@ module core (
       EX2_a_is_idle <= EX1_a_is_idle;
 `ifdef DIFFTEST_EN
       EX2_a_difftest <= EX1_a_difftest;
-      EX2_a_difftest.store_valid <= {8{EX1_a_optype == OP_MEM && !lsu_a_have_excp}} & {
-        4'b0, 1'b0,
-        opcode.store && opcode.size_word,
-        opcode.store && opcode.size_half,
-        opcode.store && opcode.size_byte
-      };
-      if (!EX1_a_difftest.added_paddr)
+      if (!EX1_a_difftest.added_paddr) begin
         EX2_a_difftest.storePAddr <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
+      end
       EX2_a_difftest.storeVAddr <= u_lsu_a.addr;
       EX2_a_difftest.storeData <= opcode.size_byte ? ex1_a_src2[7:0] << (u_lsu_a.addr[1:0]*8) :
                                   opcode.size_half ? ex1_a_src2[15:0] << (u_lsu_a.addr[1]*16) :
                                   ex1_a_src2;
-      EX2_a_difftest.load_valid <= {8{EX1_a_optype == OP_MEM && !lsu_a_have_excp}} & {
-        2'b0, 1'b0,
-        opcode.load && opcode.size_word,
-        opcode.load && opcode.size_half && !opcode.load_sign,
-        opcode.load && opcode.size_half && opcode.load_sign,
-        opcode.load && opcode.size_byte && !opcode.load_sign,
-        opcode.load && opcode.size_byte && opcode.load_sign
-      };
-      if (!EX1_a_difftest.added_paddr)
+      if (!EX1_a_difftest.added_paddr) begin
         EX2_a_difftest.loadPAddr <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
+      end
       EX2_a_difftest.loadVAddr <= u_lsu_a.addr;
       EX2_a_difftest.csr_rstat <= EX1_a_optype == OP_CSR && EX1_a_csr_addr == 14'h5;
       EX2_a_difftest.csr_data  <= u_csr.ESTAT;
@@ -1314,28 +1327,16 @@ module core (
 `ifdef DIFFTEST_EN
       EX2_b_difftest <= EX1_b_difftest;
       EX2_b_difftest.csr_rstat <= 1'b0;
-      EX2_b_difftest.store_valid <= {8{EX1_b_optype == OP_MEM && !lsu_b_have_excp && !lsu_a_have_excp}} & {
-        4'b0, 1'b0,
-        opcode.store && opcode.size_word,
-        opcode.store && opcode.size_half,
-        opcode.store && opcode.size_byte
-      };
-      if (!EX1_b_difftest.added_paddr)
+      if (!EX1_b_difftest.added_paddr) begin
         EX2_b_difftest.storePAddr <= {u_mmu.d_ptag, u_lsu_b.addr[31-`TAG_WIDTH:0]};
+      end
       EX2_b_difftest.storeVAddr <= u_lsu_b.addr;
       EX2_b_difftest.storeData <= opcode.size_byte ? ex1_b_src2[7:0] << (u_lsu_b.addr[1:0]*8) :
                                   opcode.size_half ? ex1_b_src2[15:0] << (u_lsu_b.addr[1]*16) :
                                   ex1_b_src2;
-      EX2_b_difftest.load_valid <= {8{EX1_b_optype == OP_MEM && !lsu_b_have_excp && !lsu_a_have_excp}} & {
-        2'b0, 1'b0,
-        opcode.load && opcode.size_word,
-        opcode.load && opcode.size_half && !opcode.load_sign,
-        opcode.load && opcode.size_half && opcode.load_sign,
-        opcode.load && opcode.size_byte && !opcode.load_sign,
-        opcode.load && opcode.size_byte && opcode.load_sign
-      };
-      if (!EX1_b_difftest.added_paddr)
+      if (!EX1_b_difftest.added_paddr) begin
         EX2_b_difftest.loadPAddr <= {u_mmu.d_ptag, u_lsu_b.addr[31-`TAG_WIDTH:0]};
+      end
       EX2_b_difftest.loadVAddr <= u_lsu_b.addr;
 `endif
     end
