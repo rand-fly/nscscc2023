@@ -376,6 +376,7 @@ module core (
   logic             have_excp;
   logic             icacop_en;
   logic             dcacop_en;
+  logic             invalid_cacop;
   logic      [ 1:0] cacop_op;
   logic             cacop_ok;
   logic             cacop_have_excp;
@@ -1128,7 +1129,7 @@ module core (
     end
   end
 
-  assign ex1_ready = lsu_a_ready && lsu_b_ready && !(EX1_a_valid && EX1_a_optype == OP_CACHE && !cacop_ok);
+  assign ex1_ready = lsu_a_ready && lsu_b_ready && !(EX1_a_valid && EX1_a_optype == OP_CACHE && !cacop_ok && !invalid_cacop);
   assign ex1_stall =  /*(EX1_a_valid || EX1_b_valid) &&*/ (!ex1_ready || ex2_stall);
 
   alu u_alu_a (
@@ -1291,6 +1292,7 @@ module core (
 
   assign icacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 0;
   assign dcacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 1;
+  assign invalid_cacop = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] != 0 && EX1_a_opcode[2:0] != 1;
   assign cacop_op = EX1_a_opcode[4:3];
 
   always_ff @(posedge clk) begin
