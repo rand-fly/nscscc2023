@@ -1418,7 +1418,7 @@ module core (
 
   assign idle = EX2_a_valid && EX2_a_is_idle;
 
-  assign csr_llbit_we = EX2_a_is_ll || EX2_a_is_sc;
+  assign csr_llbit_we = EX2_a_valid && !EX2_a_have_excp && (EX2_a_is_ll || EX2_a_is_sc);
   assign csr_llbit_wdata = EX2_a_is_ll;
 
   assign ex2_a_ok = !(EX2_a_optype == OP_DIV && !div_ok || EX2_a_optype == OP_MUL && !mul_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
