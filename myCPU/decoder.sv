@@ -124,7 +124,10 @@ module decoder (
   wire inst_st_w      = op_31_22 == 10'b0010100110;
   wire inst_ld_bu     = op_31_22 == 10'b0010101000;
   wire inst_ld_hu     = op_31_22 == 10'b0010101001;
-  // PRELD - BCNEZ
+  // PRELD - FST.D
+  wire inst_dbar      = op_31_15 == 17'b00111000011100100;
+  wire inst_ibar      = op_31_15 == 17'b00111000011100101;
+  // BCEQZ - BCNEZ
   wire inst_jirl      = op_31_26 == 6'b010011;
   wire inst_b         = op_31_26 == 6'b010100;
   wire inst_bl        = op_31_26 == 6'b010101;
@@ -198,6 +201,8 @@ assign           {valid_inst, optype, opcode,        r1,    r2, src2_is_imm,imm,
 {58{inst_st_w     }} & {1'b1, OP_MEM, mem_opcode,    rj,    rd,   1'b0,  si12,   `R0  } |
 {58{inst_ll_w     }} & {1'b1, OP_MEM, mem_opcode,    rj,   `R0,   1'b0,  si14,    rd  } |
 {58{inst_sc_w     }} & {1'b1, sc_optype,mem_opcode,  rj,    rd,   1'b0,  si14,    rd  } |
+{58{inst_dbar     }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_ibar     }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
 {58{inst_syscall  }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
 {58{inst_break    }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
 {58{inst_rdcntvl_w}} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b1,counter[31: 0],rd} |
@@ -242,7 +247,7 @@ assign               {have_excp, excp_type} =
 {16{inst_break  }} & {1'b1,      BRK      } |
 {16{ine         }} & {1'b1,      INE      } ;
 
-assign is_spec_op = optype == OP_TLB || optype == OP_CSR || optype == OP_CACHE || inst_idle || inst_ll_w || inst_sc_w;
+assign is_spec_op = optype == OP_TLB || optype == OP_CSR || optype == OP_CACHE || inst_idle || inst_ll_w || inst_sc_w || inst_ibar;
 assign is_idle = inst_idle;
 assign is_ll = inst_ll_w;
 assign is_sc = inst_sc_w;
