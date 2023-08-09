@@ -124,7 +124,8 @@ module decoder (
   wire inst_st_w      = op_31_22 == 10'b0010100110;
   wire inst_ld_bu     = op_31_22 == 10'b0010101000;
   wire inst_ld_hu     = op_31_22 == 10'b0010101001;
-  // PRELD - FST.D
+  wire inst_preld     = op_31_22 == 10'b0010101011;
+  // FLD.S - FST.D
   wire inst_dbar      = op_31_15 == 17'b00111000011100100;
   wire inst_ibar      = op_31_15 == 17'b00111000011100101;
   // BCEQZ - BCNEZ
@@ -199,6 +200,7 @@ assign           {valid_inst, optype, opcode,        r1,    r2, src2_is_imm,imm,
 {58{inst_st_b     }} & {1'b1, OP_MEM, mem_opcode,    rj,    rd,   1'b0,  si12,   `R0  } |
 {58{inst_st_h     }} & {1'b1, OP_MEM, mem_opcode,    rj,    rd,   1'b0,  si12,   `R0  } |
 {58{inst_st_w     }} & {1'b1, OP_MEM, mem_opcode,    rj,    rd,   1'b0,  si12,   `R0  } |
+{58{inst_preld    }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
 {58{inst_ll_w     }} & {1'b1, OP_MEM, mem_opcode,    rj,   `R0,   1'b0,  si14,    rd  } |
 {58{inst_sc_w     }} & {1'b1, sc_optype,mem_opcode,  rj,    rd,   1'b0,  si14,    rd  } |
 {58{inst_dbar     }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
