@@ -483,7 +483,7 @@ module mycpu_top (
       .tcfg     (csr_difftest.TCFG),
       .tval     (csr_difftest.TVAL),
       .ticlr    (0),
-      .llbctl   (0),
+      .llbctl   (csr_difftest.LLBCTL),
       .tlbrentry(csr_difftest.TLBRENTRY),
       .dmw0     (csr_difftest.DMW0),
       .dmw1     (csr_difftest.DMW1)

@@ -1,22 +1,22 @@
 `include "definitions.svh"
 
 module csr (
-    input                clk,
-    input                reset,
-    input  csr_addr_t    addr,
-    output logic  [31:0] rdata,
-    input                we,
-    input         [31:0] mask,
-    input         [31:0] wdata,
-    input                raise_excp,
-    input  excp_t        excp_type,
-    input         [31:0] pc_in,
-    output        [31:0] pc_out,
-    output               interrupt,
-    input                badv_we,
-    input         [31:0] badv_data,
-    input                vppn_we,
-    input         [18:0] vppn_data,
+    input                    clk,
+    input                    reset,
+    input  csr_addr_t        addr,
+    output logic      [31:0] rdata,
+    input                    we,
+    input             [31:0] mask,
+    input             [31:0] wdata,
+    input                    raise_excp,
+    input  excp_t            excp_type,
+    input             [31:0] pc_in,
+    output            [31:0] pc_out,
+    output                   interrupt,
+    input                    badv_we,
+    input             [31:0] badv_data,
+    input                    vppn_we,
+    input             [18:0] vppn_data,
 
     input                csr_tlbsrch_we,
     input                csr_tlbsrch_found,
@@ -33,10 +33,14 @@ module csr (
     output       [         1:0] csr_datm,
     output       [         1:0] csr_plv,
     output dmw_t                csr_dmw0,
-    output dmw_t                csr_dmw1
+    output dmw_t                csr_dmw1,
+
+    input  csr_llbit_we,
+    input  csr_llbit_wdata,
+    output csr_llbit
 );
 
-// verilog_lint: waive-start typedef-structs-unions
+  // verilog_lint: waive-start typedef-structs-unions
   struct packed {
     logic [22:0] Z;
     logic [1:0]  DATM;
@@ -116,6 +120,13 @@ module csr (
   } SAVE0, SAVE1, SAVE2, SAVE3;
 
   struct packed {
+    logic [28:0] Z;
+    logic KLO;
+    logic WBLLB;
+    logic ROLLB;
+  } LLBCTL;
+
+  struct packed {
     logic [31:0] TID;
   } TID;
 
@@ -131,7 +142,7 @@ module csr (
 
   struct packed {
     logic [25:0] PA;
-    logic [5:0] Z;
+    logic [5:0]  Z;
   } TLBRENTRY;
 
   struct packed {
@@ -144,6 +155,7 @@ module csr (
     logic [1:0]  Z1;
     logic        PLV0;
   } DMW0, DMW1;
+
   // verilog_lint: waive-stop typedef-structs-unions
 
   wire [31:0] wdata_m = (rdata & ~mask) | (wdata & mask);
@@ -178,6 +190,7 @@ module csr (
       14'h41:  rdata = TCFG;
       14'h42:  rdata = TVAL;
       14'h44:  rdata = 32'h0;  // TICLR
+      14'h60:  rdata = LLBCTL;
       14'h88:  rdata = TLBRENTRY;
       14'h180: rdata = DMW0;
       14'h181: rdata = DMW1;
@@ -217,7 +230,7 @@ module csr (
   assign csr_dmw1.mat = DMW1.MAT;
   assign csr_dmw1.pseg = DMW1.PSEG;
   assign csr_dmw1.vseg = DMW1.VSEG;
-
+  assign csr_llbit = LLBCTL.ROLLB;
 
   always_ff @(posedge clk) begin
     if (reset) begin
@@ -257,6 +270,10 @@ module csr (
 
       TVAL <= 0;
 
+      LLBCTL.Z <= 0;
+      LLBCTL.WBLLB <= 0;
+      LLBCTL.KLO <= 0;
+
       TLBRENTRY.Z <= 0;
 
       DMW0 <= 0;
@@ -280,6 +297,8 @@ module csr (
           CRMD.DA <= 1'b0;
           CRMD.PG <= 1'b1;
         end
+        if (!LLBCTL.KLO) LLBCTL.ROLLB <= 1'b0;
+        else LLBCTL.KLO <= 1'b0;
       end
     end else if (csr_tlbsrch_we) begin
       if (csr_tlbsrch_found) begin
@@ -354,6 +373,10 @@ module csr (
         end
         14'h42: ;  // TVAL
         14'h44: if (wdata_m[0]) ESTAT.IS[11] <= 1'h0;  // TICLR
+        14'h60: begin
+          if (wdata_m[1]) LLBCTL.ROLLB <= 1'b0;
+          LLBCTL.KLO <= wdata_m[2];
+        end
         14'h88: TLBRENTRY[31:6] <= wdata_m[31:6];
         14'h180:
         {DMW0[0], DMW0[5:3], DMW0[27:25], DMW0[31:29]} <= {
@@ -366,6 +389,8 @@ module csr (
         default: ;
       endcase
     end
+
+    if (csr_llbit_we) LLBCTL.ROLLB <= csr_llbit_wdata;
 
     if (badv_we) BADV.VAddr <= badv_data;
 

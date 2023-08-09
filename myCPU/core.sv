@@ -94,6 +94,8 @@ module core (
   logic             id_a_csr_wr;
   logic             id_a_is_spec_op;
   logic             id_a_is_idle;
+  logic             id_a_is_ll;
+  logic             id_a_is_sc;
   logic      [ 4:0] id_a_r1;
   logic      [ 4:0] id_a_r2;
   logic             id_a_src2_is_imm;
@@ -112,6 +114,8 @@ module core (
   logic             id_b_csr_wr;
   logic             id_b_is_spec_op;
   logic             id_b_is_idle;
+  logic             id_b_is_ll;
+  logic             id_b_is_sc;
   logic      [ 4:0] id_b_r1;
   logic      [ 4:0] id_b_r2;
   logic             id_b_src2_is_imm;
@@ -148,6 +152,8 @@ module core (
   logic             ro_a_csr_wr;
   logic             ro_a_is_spec_op;
   logic             ro_a_is_idle;
+  logic             ro_a_is_ll;
+  logic             ro_a_is_sc;
   logic      [ 4:0] ro_a_r1;
   logic      [ 4:0] ro_a_r2;
   logic             ro_a_src2_is_imm;
@@ -170,6 +176,8 @@ module core (
   logic             ro_b_csr_wr;
   logic             ro_b_is_spec_op;
   logic             ro_b_is_idle;
+  logic             ro_b_is_ll;
+  logic             ro_b_is_sc;
   logic      [ 4:0] ro_b_r1;
   logic      [ 4:0] ro_b_r2;
   logic             ro_b_src2_is_imm;
@@ -227,6 +235,9 @@ module core (
   logic       [        31:0] csr_badv_wdata;
   logic                      csr_vppn_we;
   logic       [        18:0] csr_vppn_wdata;
+  logic                      csr_llbit;
+  logic                      csr_llbit_we;
+  logic                      csr_llbit_wdata;
 
   //from branch ctrl
   logic                      br_mistaken;
@@ -321,6 +332,8 @@ module core (
   logic                      EX1_a_csr_wr;
   logic                      EX1_a_is_spec_op;
   logic                      EX1_a_is_idle;
+  logic                      EX1_a_is_ll;
+  logic                      EX1_a_is_sc;
   logic                      EX1_b_valid;
   logic       [        31:0] EX1_b_pc;
   logic                      EX1_b_delayed;
@@ -387,6 +400,8 @@ module core (
   logic             EX2_a_csr_wr;
   logic             EX2_a_is_spec_op;
   logic             EX2_a_is_idle;
+  logic             EX2_a_is_ll;
+  logic             EX2_a_is_sc;
   logic             EX2_b_valid;
   logic      [31:0] EX2_b_pc;
   logic             EX2_b_delayed;
@@ -551,6 +566,7 @@ module core (
       .pred_br_taken (ID_a_pred_br_taken),
       .pred_br_target(ID_a_pred_br_target),
       .counter       (counter),
+      .llbit         (csr_llbit),
       .optype        (id_a_optype),
       .opcode        (id_a_opcode),
       .dest          (id_a_dest),
@@ -564,6 +580,8 @@ module core (
       .csr_wr        (id_a_csr_wr),
       .is_spec_op    (id_a_is_spec_op),
       .is_idle       (id_a_is_idle),
+      .is_ll         (id_a_is_ll),
+      .is_sc         (id_a_is_sc),
       .r1            (id_a_r1),
       .r2            (id_a_r2),
       .src2_is_imm   (id_a_src2_is_imm),
@@ -577,6 +595,7 @@ module core (
       .pred_br_taken (ID_b_pred_br_taken),
       .pred_br_target(ID_b_pred_br_target),
       .counter       (counter),
+      .llbit         (csr_llbit),
       .optype        (id_b_optype),
       .opcode        (id_b_opcode),
       .dest          (id_b_dest),
@@ -590,6 +609,8 @@ module core (
       .csr_wr        (id_b_csr_wr),
       .is_spec_op    (id_b_is_spec_op),
       .is_idle       (id_b_is_idle),
+      .is_ll         (id_b_is_ll),
+      .is_sc         (id_b_is_sc),
       .r1            (id_b_r1),
       .r2            (id_b_r2),
       .src2_is_imm   (id_b_src2_is_imm),
@@ -650,11 +671,15 @@ module core (
 `ifdef DIFFTEST_EN
   assign id_a_difftest.instr = ID_a_inst;
   assign id_a_difftest.store_valid = {
-    4'b0, 1'b0, u_decoder_a.inst_st_w, u_decoder_a.inst_st_h, u_decoder_a.inst_st_b
+    4'b0,
+    u_decoder_a.inst_sc_w & csr_llbit,
+    u_decoder_a.inst_st_w,
+    u_decoder_a.inst_st_h,
+    u_decoder_a.inst_st_b
   };
   assign id_a_difftest.load_valid = {
     2'b0,
-    1'b0,
+    u_decoder_a.inst_ll_w,
     u_decoder_a.inst_ld_w,
     u_decoder_a.inst_ld_hu,
     u_decoder_a.inst_ld_h,
@@ -666,11 +691,15 @@ module core (
 
   assign id_b_difftest.instr = ID_b_inst;
   assign id_b_difftest.store_valid = {
-    4'b0, 1'b0, u_decoder_b.inst_st_w, u_decoder_b.inst_st_h, u_decoder_b.inst_st_b
+    4'b0,
+    u_decoder_b.inst_sc_w & csr_llbit,
+    u_decoder_b.inst_st_w,
+    u_decoder_b.inst_st_h,
+    u_decoder_b.inst_st_b
   };
   assign id_b_difftest.load_valid = {
     2'b0,
-    1'b0,
+    u_decoder_b.inst_ll_w,
     u_decoder_b.inst_ld_w,
     u_decoder_b.inst_ld_hu,
     u_decoder_b.inst_ld_h,
@@ -704,6 +733,8 @@ module core (
       .i_a_csr_wr        (id_a_csr_wr),
       .i_a_is_spec_op    (id_a_is_spec_op),
       .i_a_is_idle       (id_a_is_idle),
+      .i_a_is_ll         (id_a_is_ll),
+      .i_a_is_sc         (id_a_is_sc),
       .i_a_r1            (id_a_r1),
       .i_a_r2            (id_a_r2),
       .i_a_src2_is_imm   (id_a_src2_is_imm),
@@ -724,6 +755,8 @@ module core (
       .i_b_csr_wr        (id_b_csr_wr),
       .i_b_is_spec_op    (id_b_is_spec_op),
       .i_b_is_idle       (id_b_is_idle),
+      .i_b_is_ll         (id_b_is_ll),
+      .i_b_is_sc         (id_b_is_sc),
       .i_b_r1            (id_b_r1),
       .i_b_r2            (id_b_r2),
       .i_b_src2_is_imm   (id_b_src2_is_imm),
@@ -754,6 +787,8 @@ module core (
       .o_a_csr_wr        (ro_a_csr_wr),
       .o_a_is_spec_op    (ro_a_is_spec_op),
       .o_a_is_idle       (ro_a_is_idle),
+      .o_a_is_ll         (ro_a_is_ll),
+      .o_a_is_sc         (ro_a_is_sc),
       .o_a_r1            (ro_a_r1),
       .o_a_r2            (ro_a_r2),
       .o_a_src2_is_imm   (ro_a_src2_is_imm),
@@ -775,6 +810,8 @@ module core (
       .o_b_csr_wr        (ro_b_csr_wr),
       .o_b_is_spec_op    (ro_b_is_spec_op),
       .o_b_is_idle       (ro_b_is_idle),
+      .o_b_is_ll         (ro_b_is_ll),
+      .o_b_is_sc         (ro_b_is_sc),
       .o_b_r1            (ro_b_r1),
       .o_b_r2            (ro_b_r2),
       .o_b_src2_is_imm   (ro_b_src2_is_imm)
@@ -989,6 +1026,8 @@ module core (
       EX1_a_csr_wr         <= ro_a_csr_wr;
       EX1_a_is_spec_op     <= ro_a_is_spec_op;
       EX1_a_is_idle        <= ro_a_is_idle;
+      EX1_a_is_ll          <= ro_a_is_ll;
+      EX1_a_is_sc          <= ro_a_is_sc;
 `ifdef DIFFTEST_EN
       EX1_a_difftest <= ro_a_difftest;
       EX1_a_difftest.is_TLBFILL <= ro_a_optype == OP_TLB || ro_a_opcode == TLB_TLBFILL;
@@ -1286,6 +1325,8 @@ module core (
       EX2_a_csr_wr <= EX1_a_csr_wr;
       EX2_a_is_spec_op <= EX1_a_is_spec_op;
       EX2_a_is_idle <= EX1_a_is_idle;
+      EX2_a_is_ll <= EX1_a_is_ll;
+      EX2_a_is_sc <= EX1_a_is_sc;
 `ifdef DIFFTEST_EN
       EX2_a_difftest <= EX1_a_difftest;
       if (!EX1_a_difftest.added_paddr) begin
@@ -1375,6 +1416,9 @@ module core (
 
   assign idle = EX2_a_valid && EX2_a_is_idle;
 
+  assign csr_llbit_we = EX2_a_is_ll || EX2_a_is_sc;
+  assign csr_llbit_wdata = EX2_a_is_ll;
+
   assign ex2_a_ok = !(EX2_a_optype == OP_DIV && !div_ok || EX2_a_optype == OP_MUL && !mul_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
   assign ex2_b_ok = !(EX2_b_optype == OP_DIV && !div_ok || EX2_b_optype == OP_MUL && !mul_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);
   assign ex2_stall  = /*(EX2_a_valid || EX2_b_valid) &&*/ (EX2_a_valid && !ex2_a_ok && !WB_a_ok || EX2_b_valid && !ex2_b_ok && !WB_b_ok);
@@ -1434,10 +1478,10 @@ module core (
       if (ex2_a_ok && !WB_a_ok) begin
         if (ex2_stall) WB_a_ok <= 1'b1;
         unique case (EX2_a_optype)
-          OP_ALU:  WB_a_result <= EX2_a_alu_result;
+          OP_ALU:  WB_a_result <= EX2_a_is_sc ? 32'd0 : EX2_a_alu_result;
           OP_MUL:  WB_a_result <= mul_a_result;
           OP_DIV:  WB_a_result <= div_result;
-          OP_MEM:  WB_a_result <= lsu_a_result;
+          OP_MEM:  WB_a_result <= EX2_a_is_sc ? 32'd1 : lsu_a_result;
           OP_CSR:  WB_a_result <= csr_rdata;
           default: WB_a_result <= 32'd0;
         endcase
@@ -1512,6 +1556,7 @@ module core (
     csr_difftest.SAVE1 <= u_csr.SAVE1;
     csr_difftest.SAVE2 <= u_csr.SAVE2;
     csr_difftest.SAVE3 <= u_csr.SAVE3;
+    csr_difftest.LLBCTL <= u_csr.LLBCTL;
     csr_difftest.TID <= u_csr.TID;
     csr_difftest.TCFG <= u_csr.TCFG;
     csr_difftest.TVAL <= u_csr.TVAL;
@@ -1551,7 +1596,10 @@ module core (
       .csr_datm(csr_datm),
       .csr_plv(csr_plv),
       .csr_dmw0(csr_dmw0),
-      .csr_dmw1(csr_dmw1)
+      .csr_dmw1(csr_dmw1),
+      .csr_llbit(csr_llbit),
+      .csr_llbit_we(csr_llbit_we),
+      .csr_llbit_wdata(csr_llbit_wdata)
   );
 
 

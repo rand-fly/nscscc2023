@@ -25,6 +25,8 @@ module ibuf (
     input                    i_a_csr_wr,
     input                    i_a_is_spec_op,
     input                    i_a_is_idle,
+    input                    i_a_is_ll,
+    input                    i_a_is_sc,
     input             [ 4:0] i_a_r1,
     input             [ 4:0] i_a_r2,
     input                    i_a_src2_is_imm,
@@ -46,6 +48,8 @@ module ibuf (
     input                    i_b_csr_wr,
     input                    i_b_is_spec_op,
     input                    i_b_is_idle,
+    input                    i_b_is_ll,
+    input                    i_b_is_sc,
     input             [ 4:0] i_b_r1,
     input             [ 4:0] i_b_r2,
     input                    i_b_src2_is_imm,
@@ -57,7 +61,7 @@ module ibuf (
     output difftest_t o_b_difftest,
 `endif
 
-    //output
+    // output
     input             [ 1:0] o_size,
     // output port 0
     output            [31:0] o_a_pc,
@@ -78,6 +82,8 @@ module ibuf (
     output                   o_a_csr_wr,
     output                   o_a_is_spec_op,
     output                   o_a_is_idle,
+    output                   o_a_is_ll,
+    output                   o_a_is_sc,
     output            [ 4:0] o_a_r1,
     output            [ 4:0] o_a_r2,
     output                   o_a_src2_is_imm,
@@ -100,13 +106,15 @@ module ibuf (
     output                   o_b_csr_wr,
     output                   o_b_is_spec_op,
     output                   o_b_is_idle,
+    output                   o_b_is_ll,
+    output                   o_b_is_sc,
     output            [ 4:0] o_b_r1,
     output            [ 4:0] o_b_r2,
     output                   o_b_src2_is_imm
 );
 
-  logic [191:0] data_way0[8];
-  logic [191:0] data_way1[8];
+  logic [193:0] data_way0[8];
+  logic [193:0] data_way1[8];
 
 `ifdef DIFFTEST_EN
   difftest_t difftest_way0[8];
@@ -121,8 +129,8 @@ module ibuf (
   logic         tail_way;
   logic [  4:0] length;
 
-  logic [191:0] input_data0;
-  logic [191:0] input_data1;
+  logic [193:0] input_data0;
+  logic [193:0] input_data1;
 
   assign i_ready = length <= 5'd10; // 本周期最多可能进来两条，ID阶段可能有两条，同时最多可能发起两条请求，16-6=10
 
@@ -144,6 +152,8 @@ module ibuf (
          o_a_csr_wr,
          o_a_is_spec_op,
          o_a_is_idle,
+         o_a_is_ll,
+         o_a_is_sc,
          o_a_r1,
          o_a_r2,
          o_a_src2_is_imm
@@ -167,6 +177,8 @@ module ibuf (
          o_b_csr_wr,
          o_b_is_spec_op,
          o_b_is_idle,
+         o_b_is_ll,
+         o_b_is_sc,
          o_b_r1,
          o_b_r2,
          o_b_src2_is_imm
@@ -191,6 +203,8 @@ module ibuf (
     i_a_csr_wr,
     i_a_is_spec_op,
     i_a_is_idle,
+    i_a_is_ll,
+    i_a_is_sc,
     i_a_r1,
     i_a_r2,
     i_a_src2_is_imm
@@ -214,6 +228,8 @@ module ibuf (
     i_b_csr_wr,
     i_b_is_spec_op,
     i_b_is_idle,
+    i_b_is_ll,
+    i_b_is_sc,
     i_b_r1,
     i_b_r2,
     i_b_src2_is_imm

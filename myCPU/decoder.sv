@@ -10,6 +10,8 @@ module decoder (
     input             [31:0] pred_br_target,
     // from ???
     input             [63:0] counter,
+    // from csr
+    input                    llbit,
     // to EX1
     output optype_t          optype,
     output opcode_t          opcode,
@@ -24,6 +26,8 @@ module decoder (
     output                   csr_wr,
     output                   is_spec_op,
     output                   is_idle,
+    output                   is_ll,
+    output                   is_sc,
     // to forward pred
     output            [ 4:0] r1,
     output            [ 4:0] r2,
@@ -140,68 +144,74 @@ module decoder (
   assign mem_opcode.size_half = inst_ld_h | inst_ld_hu | inst_st_h;
   assign mem_opcode.size_byte = inst_ld_b | inst_ld_bu | inst_st_b;
 
+  optype_t sc_optype;
+
+  assign sc_optype = llbit ? OP_MEM : OP_ALU;
+
 // base table
-assign           {valid_inst, optype, opcode,                r1,    r2, src2_is_imm,imm,  dest} =
-{58{inst_add_w    }} & {1'b1, OP_ALU, ALU_ADD,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_sub_w    }} & {1'b1, OP_ALU, ALU_SUB,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_addi_w   }} & {1'b1, OP_ALU, ALU_ADD,               rj,   `R0,   1'b1,  si12,    rd  } |
-{58{inst_lu12i_w  }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b1,  si20,    rd  } |
-{58{inst_slt      }} & {1'b1, OP_ALU, ALU_SLT,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_sltu     }} & {1'b1, OP_ALU, ALU_SLTU,              rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_slti     }} & {1'b1, OP_ALU, ALU_SLT,               rj,   `R0,   1'b1,  si12,    rd  } |
-{58{inst_sltui    }} & {1'b1, OP_ALU, ALU_SLTU,              rj,   `R0,   1'b1,  si12,    rd  } |
-{58{inst_pcaddu12i}} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b1,  pc+si20, rd  } |
-{58{inst_and      }} & {1'b1, OP_ALU, ALU_AND,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_or       }} & {1'b1, OP_ALU, ALU_OR,                rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_nor      }} & {1'b1, OP_ALU, ALU_NOR,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_xor      }} & {1'b1, OP_ALU, ALU_XOR,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_andi     }} & {1'b1, OP_ALU, ALU_AND,               rj,   `R0,   1'b1,  ui12,    rd  } |
-{58{inst_ori      }} & {1'b1, OP_ALU, ALU_OR,                rj,   `R0,   1'b1,  ui12,    rd  } |
-{58{inst_xori     }} & {1'b1, OP_ALU, ALU_XOR,               rj,   `R0,   1'b1,  ui12,    rd  } |
-{58{inst_mul_w    }} & {1'b1, OP_MUL, MUL_MUL,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_mulh_w   }} & {1'b1, OP_MUL, MUL_MULH,              rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_mulh_wu  }} & {1'b1, OP_MUL, MUL_MULHU,             rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_div_w    }} & {1'b1, OP_DIV, DIV_DIV,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_div_wu   }} & {1'b1, OP_DIV, DIV_DIVU,              rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_mod_w    }} & {1'b1, OP_DIV, DIV_MOD,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_mod_wu   }} & {1'b1, OP_DIV, DIV_MODU,              rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_sll_w    }} & {1'b1, OP_ALU, ALU_SLL,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_srl_w    }} & {1'b1, OP_ALU, ALU_SRL,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_sra_w    }} & {1'b1, OP_ALU, ALU_SRA,               rj,    rk,   1'b0,  32'd0,   rd  } |
-{58{inst_slli_w   }} & {1'b1, OP_ALU, ALU_SLL,               rj,   `R0,   1'b1,  ui5,     rd  } |
-{58{inst_srli_w   }} & {1'b1, OP_ALU, ALU_SRL,               rj,   `R0,   1'b1,  ui5,     rd  } |
-{58{inst_srai_w   }} & {1'b1, OP_ALU, ALU_SRA,               rj,   `R0,   1'b1,  ui5,     rd  } |
-{58{inst_beq      }} & {1'b1, OP_ALU, ALU_EQU,               rj,    rd,   1'b0,  32'd0,  `R0  } |
-{58{inst_bne      }} & {1'b1, OP_ALU, ALU_EQU,               rj,    rd,   1'b0,  32'd0,  `R0  } |
-{58{inst_blt      }} & {1'b1, OP_ALU, ALU_SLT,               rj,    rd,   1'b0,  32'd0,  `R0  } |
-{58{inst_bltu     }} & {1'b1, OP_ALU, ALU_SLTU,              rj,    rd,   1'b0,  32'd0,  `R0  } |
-{58{inst_bge      }} & {1'b1, OP_ALU, ALU_SLT,               rj,    rd,   1'b0,  32'd0,  `R0  } |
-{58{inst_bgeu     }} & {1'b1, OP_ALU, ALU_SLTU,              rj,    rd,   1'b0,  32'd0,  `R0  } |
-{58{inst_b        }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } |
-{58{inst_bl       }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b1, pc+32'd4,`R1  } |
-{58{inst_jirl     }} & {1'b1, OP_ALU, ALU_OUT2,              rj,   `R0,   1'b1, pc+32'd4, rd  } |
-{58{inst_ld_b     }} & {1'b1, OP_MEM, mem_opcode,            rj,   `R0,   1'b1,  si12,    rd  } |
-{58{inst_ld_h     }} & {1'b1, OP_MEM, mem_opcode,            rj,   `R0,   1'b0,  si12,    rd  } |
-{58{inst_ld_w     }} & {1'b1, OP_MEM, mem_opcode,            rj,   `R0,   1'b0,  si12,    rd  } |
-{58{inst_ld_bu    }} & {1'b1, OP_MEM, mem_opcode,            rj,   `R0,   1'b0,  si12,    rd  } |
-{58{inst_ld_hu    }} & {1'b1, OP_MEM, mem_opcode,            rj,   `R0,   1'b0,  si12,    rd  } |
-{58{inst_st_b     }} & {1'b1, OP_MEM, mem_opcode,            rj,    rd,   1'b0,  si12,   `R0  } |
-{58{inst_st_h     }} & {1'b1, OP_MEM, mem_opcode,            rj,    rd,   1'b0,  si12,   `R0  } |
-{58{inst_st_w     }} & {1'b1, OP_MEM, mem_opcode,            rj,    rd,   1'b0,  si12,   `R0  } |
-{58{inst_syscall  }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } |
-{58{inst_break    }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } |
-{58{inst_rdcntvl_w}} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b1,counter[31: 0],rd} |
-{58{inst_rdcntvh_w}} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b1,counter[63:32],rd} |
-{58{inst_rdcntid_w}} & {1'b1, OP_CSR, 6'd0,                 `R0,   `R0,   1'b0,  32'd0,   rj  } |
-{58{inst_csrx     }} & {1'b1, OP_CSR, 6'd0,                  rj,    rd,   1'b0,  32'd0,   rd  } |
-{58{inst_cacop    }} & {1'b1, OP_CACHE, {1'd0,rd},           rj,   `R0,   1'b1,  si12,   `R0  } |
-{58{inst_tlbsrch  }} & {1'b1, OP_TLB, TLB_TLBSRCH,          `R0,   `R0,   1'b0,  32'd0,  `R0  } |
-{58{inst_tlbrd    }} & {1'b1, OP_TLB, TLB_TLBRD,            `R0,   `R0,   1'b0,  32'd0,  `R0  } |
-{58{inst_tlbwr    }} & {1'b1, OP_TLB, TLB_TLBWR,            `R0,   `R0,   1'b0,  32'd0,  `R0  } |
-{58{inst_tlbfill  }} & {1'b1, OP_TLB, TLB_TLBFILL,          `R0,   `R0,   1'b0,  32'd0,  `R0  } |
-{58{inst_invtlb   }} & {1'b1, OP_TLB, TLB_INVTLB,            rj,    rk,   1'b0,{27'd0,rd},`R0 } |
-{58{inst_ertn     }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } |
-{58{inst_idle     }} & {1'b1, OP_ALU, ALU_OUT2,             `R0,   `R0,   1'b0,  32'd0,  `R0  } ;
+assign           {valid_inst, optype, opcode,        r1,    r2, src2_is_imm,imm,  dest} =
+{58{inst_add_w    }} & {1'b1, OP_ALU, ALU_ADD,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_sub_w    }} & {1'b1, OP_ALU, ALU_SUB,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_addi_w   }} & {1'b1, OP_ALU, ALU_ADD,       rj,   `R0,   1'b1,  si12,    rd  } |
+{58{inst_lu12i_w  }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b1,  si20,    rd  } |
+{58{inst_slt      }} & {1'b1, OP_ALU, ALU_SLT,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_sltu     }} & {1'b1, OP_ALU, ALU_SLTU,      rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_slti     }} & {1'b1, OP_ALU, ALU_SLT,       rj,   `R0,   1'b1,  si12,    rd  } |
+{58{inst_sltui    }} & {1'b1, OP_ALU, ALU_SLTU,      rj,   `R0,   1'b1,  si12,    rd  } |
+{58{inst_pcaddu12i}} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b1,  pc+si20, rd  } |
+{58{inst_and      }} & {1'b1, OP_ALU, ALU_AND,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_or       }} & {1'b1, OP_ALU, ALU_OR,        rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_nor      }} & {1'b1, OP_ALU, ALU_NOR,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_xor      }} & {1'b1, OP_ALU, ALU_XOR,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_andi     }} & {1'b1, OP_ALU, ALU_AND,       rj,   `R0,   1'b1,  ui12,    rd  } |
+{58{inst_ori      }} & {1'b1, OP_ALU, ALU_OR,        rj,   `R0,   1'b1,  ui12,    rd  } |
+{58{inst_xori     }} & {1'b1, OP_ALU, ALU_XOR,       rj,   `R0,   1'b1,  ui12,    rd  } |
+{58{inst_mul_w    }} & {1'b1, OP_MUL, MUL_MUL,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_mulh_w   }} & {1'b1, OP_MUL, MUL_MULH,      rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_mulh_wu  }} & {1'b1, OP_MUL, MUL_MULHU,     rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_div_w    }} & {1'b1, OP_DIV, DIV_DIV,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_div_wu   }} & {1'b1, OP_DIV, DIV_DIVU,      rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_mod_w    }} & {1'b1, OP_DIV, DIV_MOD,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_mod_wu   }} & {1'b1, OP_DIV, DIV_MODU,      rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_sll_w    }} & {1'b1, OP_ALU, ALU_SLL,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_srl_w    }} & {1'b1, OP_ALU, ALU_SRL,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_sra_w    }} & {1'b1, OP_ALU, ALU_SRA,       rj,    rk,   1'b0,  32'd0,   rd  } |
+{58{inst_slli_w   }} & {1'b1, OP_ALU, ALU_SLL,       rj,   `R0,   1'b1,  ui5,     rd  } |
+{58{inst_srli_w   }} & {1'b1, OP_ALU, ALU_SRL,       rj,   `R0,   1'b1,  ui5,     rd  } |
+{58{inst_srai_w   }} & {1'b1, OP_ALU, ALU_SRA,       rj,   `R0,   1'b1,  ui5,     rd  } |
+{58{inst_beq      }} & {1'b1, OP_ALU, ALU_EQU,       rj,    rd,   1'b0,  32'd0,  `R0  } |
+{58{inst_bne      }} & {1'b1, OP_ALU, ALU_EQU,       rj,    rd,   1'b0,  32'd0,  `R0  } |
+{58{inst_blt      }} & {1'b1, OP_ALU, ALU_SLT,       rj,    rd,   1'b0,  32'd0,  `R0  } |
+{58{inst_bltu     }} & {1'b1, OP_ALU, ALU_SLTU,      rj,    rd,   1'b0,  32'd0,  `R0  } |
+{58{inst_bge      }} & {1'b1, OP_ALU, ALU_SLT,       rj,    rd,   1'b0,  32'd0,  `R0  } |
+{58{inst_bgeu     }} & {1'b1, OP_ALU, ALU_SLTU,      rj,    rd,   1'b0,  32'd0,  `R0  } |
+{58{inst_b        }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_bl       }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b1, pc+32'd4,`R1  } |
+{58{inst_jirl     }} & {1'b1, OP_ALU, ALU_OUT2,      rj,   `R0,   1'b1, pc+32'd4, rd  } |
+{58{inst_ld_b     }} & {1'b1, OP_MEM, mem_opcode,    rj,   `R0,   1'b1,  si12,    rd  } |
+{58{inst_ld_h     }} & {1'b1, OP_MEM, mem_opcode,    rj,   `R0,   1'b0,  si12,    rd  } |
+{58{inst_ld_w     }} & {1'b1, OP_MEM, mem_opcode,    rj,   `R0,   1'b0,  si12,    rd  } |
+{58{inst_ld_bu    }} & {1'b1, OP_MEM, mem_opcode,    rj,   `R0,   1'b0,  si12,    rd  } |
+{58{inst_ld_hu    }} & {1'b1, OP_MEM, mem_opcode,    rj,   `R0,   1'b0,  si12,    rd  } |
+{58{inst_st_b     }} & {1'b1, OP_MEM, mem_opcode,    rj,    rd,   1'b0,  si12,   `R0  } |
+{58{inst_st_h     }} & {1'b1, OP_MEM, mem_opcode,    rj,    rd,   1'b0,  si12,   `R0  } |
+{58{inst_st_w     }} & {1'b1, OP_MEM, mem_opcode,    rj,    rd,   1'b0,  si12,   `R0  } |
+{58{inst_ll_w     }} & {1'b1, OP_MEM, mem_opcode,    rj,   `R0,   1'b0,  si14,    rd  } |
+{58{inst_sc_w     }} & {1'b1, sc_optype,mem_opcode,  rj,    rd,   1'b0,  si14,    rd  } |
+{58{inst_syscall  }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_break    }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_rdcntvl_w}} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b1,counter[31: 0],rd} |
+{58{inst_rdcntvh_w}} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b1,counter[63:32],rd} |
+{58{inst_rdcntid_w}} & {1'b1, OP_CSR, 6'd0,         `R0,   `R0,   1'b0,  32'd0,   rj  } |
+{58{inst_csrx     }} & {1'b1, OP_CSR, 6'd0,          rj,    rd,   1'b0,  32'd0,   rd  } |
+{58{inst_cacop    }} & {1'b1, OP_CACHE, {1'd0,rd},   rj,   `R0,   1'b1,  si12,   `R0  } |
+{58{inst_tlbsrch  }} & {1'b1, OP_TLB, TLB_TLBSRCH,  `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_tlbrd    }} & {1'b1, OP_TLB, TLB_TLBRD,    `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_tlbwr    }} & {1'b1, OP_TLB, TLB_TLBWR,    `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_tlbfill  }} & {1'b1, OP_TLB, TLB_TLBFILL,  `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_invtlb   }} & {1'b1, OP_TLB, TLB_INVTLB,    rj,    rk,   1'b0,{27'd0,rd},`R0 } |
+{58{inst_ertn     }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } |
+{58{inst_idle     }} & {1'b1, OP_ALU, ALU_OUT2,     `R0,   `R0,   1'b0,  32'd0,  `R0  } ;
 
 assign csr_addr = inst_rdcntid_w ? 14'h40 : inst[23:10];
 assign csr_wr   = rj == `R1;
@@ -232,7 +242,9 @@ assign               {have_excp, excp_type} =
 {16{inst_break  }} & {1'b1,      BRK      } |
 {16{ine         }} & {1'b1,      INE      } ;
 
-assign is_spec_op = optype == OP_TLB || optype == OP_CSR || optype == OP_CACHE || inst_idle;
+assign is_spec_op = optype == OP_TLB || optype == OP_CSR || optype == OP_CACHE || inst_idle || inst_ll_w || inst_sc_w;
 assign is_idle = inst_idle;
+assign is_ll = inst_ll_w;
+assign is_sc = inst_sc_w;
 
 endmodule
