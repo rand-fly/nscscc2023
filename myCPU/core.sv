@@ -1289,8 +1289,8 @@ module core (
   assign tlbsrch_vppn = csr_tlb_rdata.vppn;
   assign csr_tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBRD && !flush_ex1;
 
-  assign icacop_en = EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 0;
-  assign dcacop_en = EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 1;
+  assign icacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 0;
+  assign dcacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 1;
   assign cacop_op = EX1_a_opcode[4:3];
 
   always_ff @(posedge clk) begin

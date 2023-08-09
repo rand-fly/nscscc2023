@@ -99,7 +99,7 @@ module lsu (
   assign mmu_size = opcode.size_byte ? 2'd0 : opcode.size_half ? 2'd1 : 2'd2;
 
   always_comb begin
-    unique if (opcode.size_byte) begin
+    if (opcode.size_byte) begin
       unique case (addr[1:0])
         2'b00: mmu_wstrb = 4'b0001;
         2'b01: mmu_wstrb = 4'b0010;
@@ -148,7 +148,7 @@ module lsu (
   end
 
   always_comb begin
-    unique if (opcode_buf.size_byte) begin
+    if (opcode_buf.size_byte) begin
       logic [7:0] load_b;
       unique case (addr_lowbit_buf)
         2'b00: load_b = mmu_rdata[7:0];
