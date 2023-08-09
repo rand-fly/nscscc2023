@@ -70,13 +70,9 @@ module csr (
     logic [12:0] IS;
   } ESTAT;
 
-  struct packed {
-    logic [31:0] PC;
-  } ERA;
+  struct packed {logic [31:0] PC;} ERA;
 
-  struct packed {
-    logic [31:0] VAddr;
-  } BADV;
+  struct packed {logic [31:0] VAddr;} BADV;
 
   struct packed {
     logic [25:0] VA;
@@ -106,7 +102,8 @@ module csr (
     logic [1:0]        PLV;
     logic              D;
     logic              V;
-  } TLBELO0, TLBELO1;
+  }
+      TLBELO0, TLBELO1;
 
   struct packed {
     logic [7:0] Z1;
@@ -115,9 +112,7 @@ module csr (
     logic [9:0] ASID;
   } ASID;
 
-  struct packed {
-    logic [31:0] Data;
-  } SAVE0, SAVE1, SAVE2, SAVE3;
+  struct packed {logic [31:0] Data;} SAVE0, SAVE1, SAVE2, SAVE3;
 
   struct packed {
     logic [28:0] Z;
@@ -126,9 +121,7 @@ module csr (
     logic ROLLB;
   } LLBCTL;
 
-  struct packed {
-    logic [31:0] TID;
-  } TID;
+  struct packed {logic [31:0] TID;} TID;
 
   struct packed {
     logic [31:2] InitVal;
@@ -136,9 +129,7 @@ module csr (
     logic En;
   } TCFG;
 
-  struct packed {
-    logic [31:0] TimeVal;
-  } TVAL;
+  struct packed {logic [31:0] TimeVal;} TVAL;
 
   struct packed {
     logic [25:0] PA;
@@ -154,13 +145,14 @@ module csr (
     logic        PLV3;
     logic [1:0]  Z1;
     logic        PLV0;
-  } DMW0, DMW1;
+  }
+      DMW0, DMW1;
 
   // verilog_lint: waive-stop typedef-structs-unions
 
   wire [31:0] wdata_m = (rdata & ~mask) | (wdata & mask);
 
-  assign pc_out = excp_type == ERTN ? ERA : excp_type == TLBR ? TLBRENTRY : EENTRY;
+  assign pc_out = excp_type == ERTN ? ERA : (excp_type == I_TLBR || excp_type == D_TLBR) ? TLBRENTRY : EENTRY;
 
   wire [12:0] int_vec = ESTAT.IS & ECFG.LIE;
 
@@ -285,10 +277,12 @@ module csr (
         CRMD.PLV  <= 2'h0;
         CRMD.IE   <= 1'h0;
         ERA.PC    <= pc_in;
-        {ESTAT.Ecode,ESTAT.EsubCode} <= excp_type;
-        if (excp_type == TLBR) begin
+        if (excp_type == I_TLBR || excp_type == D_TLBR) begin
           CRMD.DA <= 1'b1;
           CRMD.PG <= 1'b0;
+          {ESTAT.Ecode, ESTAT.EsubCode} <= TLBR;
+        end else begin
+          {ESTAT.Ecode, ESTAT.EsubCode} <= excp_type;
         end
       end else begin
         CRMD.PLV <= PRMD.PPLV;

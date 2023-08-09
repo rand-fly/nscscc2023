@@ -128,7 +128,7 @@ module lsu (
       excp_type = ALE;
     end else if (mmu_tlbr) begin
       have_excp = 1'b1;
-      excp_type = TLBR;
+      excp_type = D_TLBR;
     end else if (mmu_pil) begin
       have_excp = 1'b1;
       excp_type = PIL;

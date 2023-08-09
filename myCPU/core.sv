@@ -1392,7 +1392,8 @@ module core (
 
   assign raise_excp = ex2_have_excp && !EX2_stalling;
   assign csr_badv_we = raise_excp && (
-         ex2_excp_type == TLBR
+         ex2_excp_type == I_TLBR
+      || ex2_excp_type == D_TLBR
       || ex2_excp_type == ADEF
       || ex2_excp_type == ALE
       || ex2_excp_type == PIL
@@ -1404,17 +1405,18 @@ module core (
 
   //TODO: PPI?
 
-  assign csr_badv_wdata = (ex2_excp_type == ADEF || ex2_excp_type == PIF)? ex2_excp_pc : ex2_excp_addr;
+  assign csr_badv_wdata = (ex2_excp_type == ADEF || ex2_excp_type == PIF || ex2_excp_type == I_TLBR) ? ex2_excp_pc : ex2_excp_addr;
 
   assign csr_vppn_we = raise_excp && (
-         ex2_excp_type == TLBR
+         ex2_excp_type == I_TLBR
+      || ex2_excp_type == D_TLBR
       || ex2_excp_type == PIL
       || ex2_excp_type == PIS
       || ex2_excp_type == PIF
       || ex2_excp_type == PME
       || ex2_excp_type == PPI
     );
-  assign csr_vppn_wdata = ex2_excp_type == PIF ? ex2_excp_pc[31:13] : ex2_excp_addr[31:13];
+  assign csr_vppn_wdata = (ex2_excp_type == PIF || ex2_excp_type == I_TLBR) ? ex2_excp_pc[31:13] : ex2_excp_addr[31:13];
 
   assign idle = EX2_a_valid && EX2_a_is_idle;
 

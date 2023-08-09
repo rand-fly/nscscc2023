@@ -141,7 +141,9 @@ typedef enum logic [14:0] {
   FPE  = {6'h12, 9'h0},
   TLBR = {6'h3f, 9'h0},
 
-  ERTN = {6'h3c, 9'h3c}
+  I_TLBR = {6'h3d, 9'h0},
+  D_TLBR = {6'h3e, 9'h0},
+  ERTN  = {6'h3c, 9'h3c}
 } excp_t;
 
 typedef struct packed {

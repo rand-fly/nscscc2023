@@ -286,6 +286,6 @@ module mmu (
 
   assign cacop_ok = (icacop_en && icache_addr_ok) || (dcacop_en && dcache_addr_ok);
   assign cacop_have_excp = (icacop_en || dcacop_en) && cacop_op == 2 && (d_page_fault || d_page_invalid);
-  assign cacop_excp_type = d_page_fault ? TLBR : PIL;
+  assign cacop_excp_type = d_page_fault ? D_TLBR : PIL;
 
 endmodule

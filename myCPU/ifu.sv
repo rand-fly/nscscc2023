@@ -168,7 +168,7 @@ module ifu (
       excp_type_inner = ADEF;
     end else if (mmu_i_tlbr) begin
       have_excp_inner = 1'b1;
-      excp_type_inner = TLBR;
+      excp_type_inner = I_TLBR;
     end else if (mmu_i_pif) begin
       have_excp_inner = 1'b1;
       excp_type_inner = PIF;
