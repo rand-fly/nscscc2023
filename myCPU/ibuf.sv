@@ -105,8 +105,8 @@ module ibuf (
     output                   o_b_src2_is_imm
 );
 
-  logic [192:0] data_way0[8];
-  logic [192:0] data_way1[8];
+  logic [191:0] data_way0[8];
+  logic [191:0] data_way1[8];
 
 `ifdef DIFFTEST_EN
   difftest_t difftest_way0[8];
@@ -121,8 +121,8 @@ module ibuf (
   logic         tail_way;
   logic [  4:0] length;
 
-  logic [192:0] input_data0;
-  logic [192:0] input_data1;
+  logic [191:0] input_data0;
+  logic [191:0] input_data1;
 
   assign i_ready = length <= 5'd10; // 本周期最多可能进来两条，ID阶段可能有两条，同时最多可能发起两条请求，16-6=10
 
