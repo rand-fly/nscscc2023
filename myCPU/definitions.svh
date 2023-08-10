@@ -224,6 +224,8 @@ typedef struct packed {
   logic [31:0] TLBELO0;
   logic [31:0] TLBELO1;
   logic [31:0] ASID;
+  logic [31:0] PGDL;
+  logic [31:0] PGDH;
   logic [31:0] SAVE0;
   logic [31:0] SAVE1;
   logic [31:0] SAVE2;

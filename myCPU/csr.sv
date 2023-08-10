@@ -112,6 +112,12 @@ module csr (
     logic [9:0] ASID;
   } ASID;
 
+  struct packed {
+    logic [19:0] Base;
+    logic [11:0] Z;
+  }
+      PGDL, PGDH;
+
   struct packed {logic [31:0] Data;} SAVE0, SAVE1, SAVE2, SAVE3;
 
   struct packed {
@@ -174,6 +180,9 @@ module csr (
       14'h12:  rdata = TLBELO0;
       14'h13:  rdata = TLBELO1;
       14'h18:  rdata = ASID;
+      14'h19:  rdata = PGDL;
+      14'h1a:  rdata = PGDH;
+      14'h1b:  rdata = BADV[31] ? PGDH : PGDL;
       14'h30:  rdata = SAVE0;
       14'h31:  rdata = SAVE1;
       14'h32:  rdata = SAVE2;
@@ -257,6 +266,9 @@ module csr (
       ASID.Z1 <= 0;
       ASID.ASIDBITS <= 10;
       ASID.Z2 <= 0;
+
+      PGDL.Z <= 0;
+      PGDH.Z <= 0;
 
       TCFG.En <= 0;
 
@@ -353,6 +365,9 @@ module csr (
           TLBELO1.Z2 <= 0;
         end
         14'h18: ASID[9:0] <= wdata_m[9:0];
+        14'h19: PGDL[31:12] <= wdata_m[31:12];
+        14'h1a: PGDH[31:12] <= wdata_m[31:12];
+        14'h1b: ;  // PGD
         14'h30: SAVE0[31:0] <= wdata_m[31:0];
         14'h31: SAVE1[31:0] <= wdata_m[31:0];
         14'h32: SAVE2[31:0] <= wdata_m[31:0];

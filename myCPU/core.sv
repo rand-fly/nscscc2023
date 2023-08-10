@@ -1602,6 +1602,8 @@ module core (
     csr_difftest.TLBELO0 <= u_csr.TLBELO0;
     csr_difftest.TLBELO1 <= u_csr.TLBELO1;
     csr_difftest.ASID <= u_csr.ASID;
+    csr_difftest.PGDL <= u_csr.PGDL;
+    csr_difftest.PGDH <= u_csr.PGDH;
     csr_difftest.SAVE0 <= u_csr.SAVE0;
     csr_difftest.SAVE1 <= u_csr.SAVE1;
     csr_difftest.SAVE2 <= u_csr.SAVE2;
