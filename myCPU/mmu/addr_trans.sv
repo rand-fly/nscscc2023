@@ -1,25 +1,25 @@
 `include "../definitions.svh"
 
 module addr_trans (
-    input wire             direct_access,
-    input wire       [1:0] direct_access_mat,
-    input wire       [1:0] plv,
-    input wire       [9:0] asid,
-    input wire dmw_t       dmw0,
-    input wire dmw_t       dmw1,
+    input             direct_access,
+    input       [1:0] direct_access_mat,
+    input       [1:0] plv,
+    input       [9:0] asid,
+    input dmw_t       dmw0,
+    input dmw_t       dmw1,
 
-    output logic             [18:0] tlb_s_vppn,
-    output logic                    tlb_s_va_bit12,
-    output logic             [ 9:0] tlb_s_asid,
-    input  wire tlb_result_t        tlb_s_result,
+    output              [18:0] tlb_s_vppn,
+    output                     tlb_s_va_bit12,
+    output              [ 9:0] tlb_s_asid,
+    input  tlb_result_t        tlb_s_result,
 
-    input  wire  [19:0] vtag,
+    input        [19:0] vtag,
     output logic [19:0] ptag,
     output logic [ 1:0] mat,
-    output logic        page_fault,
-    output logic        page_invalid,
-    output logic        page_dirty,
-    output logic        plv_fault
+    output              page_fault,
+    output              page_invalid,
+    output              page_dirty,
+    output              plv_fault
 );
 
   logic use_tlb;
@@ -38,8 +38,11 @@ module addr_trans (
       mat = dmw1.mat;
       use_tlb = 1'b0;
     end else begin
-      // only 4KB
-      ptag = tlb_s_result.ppn;
+      if (tlb_s_result.ps == 12) begin
+        ptag = tlb_s_result.ppn;
+      end else begin
+        ptag = {tlb_s_result.ppn[19:9], vtag[8:0]};
+      end
       mat = tlb_s_result.mat;
       use_tlb = 1'b1;
     end

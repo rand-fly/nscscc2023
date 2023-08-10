@@ -17,15 +17,12 @@ module div_gen_0 (
   logic [31:0] dividend;
 
   always_ff @(posedge aclk) begin
-    if (valid) begin
-      if (counter == 5'd0) begin
-        valid <= 1'b0;
-        m_axis_dout_tvalid <= 1'b1;
-        m_axis_dout_tdata <= {dividend / divisor, dividend % divisor};
-      end else begin
-        counter <= counter - 5'd1;
-      end
+    if (valid && counter == 5'd0) begin
+      valid <= 1'b0;
+      m_axis_dout_tvalid <= 1'b1;
+      m_axis_dout_tdata <= {dividend / divisor, dividend % divisor};
     end else begin
+      if (counter != 5'd0) counter <= counter - 5'd1;
       m_axis_dout_tvalid <= 1'b0;
     end
     if (s_axis_divisor_tvalid && s_axis_dividend_tvalid) begin

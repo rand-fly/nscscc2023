@@ -91,7 +91,9 @@ reg [31:0] p1_wdata_reg;
 // wire [31:0] wdata_actually;
 // reg [31:0] wdata_actually_reg;
 reg wdata_ok_reg;
-
+// initial begin
+//     $monitor("tag_way0=%x, tag_way1=%x",tag_way0[86], tag_way1[86]);
+// end
 reg [`TAG_WIDTH-1:0] tag_way0 [0:`LINE_NUM-1];
 reg [`TAG_WIDTH-1:0] tag_way1 [0:`LINE_NUM-1];
 (* keep = "true" *) reg [`TAG_WIDTH-1:0] preload_tag_way0;
@@ -685,9 +687,9 @@ blk_mem_gen_cache_32 dcache_way1_ram(
 );
 
 
-`define DBG_TAG 20'h1c012
-`define DBG_INDEX 7'h3c
-// `define DCACHE_DBG
+`define DBG_TAG 20'h0006
+`define DBG_INDEX 7'h56
+`define DCACHE_DBG
 
 `ifdef DCACHE_DBG
 always @(posedge clk) begin

@@ -185,7 +185,7 @@ module core (
   difftest_t ro_a_difftest;
   difftest_t ro_b_difftest;
 `endif
-  // forward prediction
+  // forward planning
   source_t                   ro_a_src1_source;
   logic       [        31:0] ro_a_src1_passed;
   logic                      ro_a_src1_ok;
@@ -845,7 +845,7 @@ module core (
     if (ro_a_r1 == 5'd0) begin
       ro_a_src1_ok = 1'b1;
       ro_a_src1_source = SRC_ZERO;
-    end else if (EX1_b_valid && EX1_b_dest == ro_a_r1) begin
+    end else if (EX1_b_valid && EX1_b_dest == ro_a_r1 && !ex1_a_br_mistaken_long) begin
       ro_a_src1_ok = EX1_b_optype == OP_ALU && !EX1_b_delayed;
       ro_a_src1_source = SRC_EX2_B;
     end else if (EX1_a_valid && EX1_a_dest == ro_a_r1) begin
@@ -880,7 +880,7 @@ module core (
     end else if (ro_a_r2 == 5'd0) begin
       ro_a_src2_ok = 1'b1;
       ro_a_src2_source = SRC_ZERO;
-    end else if (EX1_b_valid && EX1_b_dest == ro_a_r2) begin
+    end else if (EX1_b_valid && EX1_b_dest == ro_a_r2 && !ex1_a_br_mistaken_long) begin
       ro_a_src2_ok = EX1_b_optype == OP_ALU && !EX1_b_delayed;
       ro_a_src2_source = SRC_EX2_B;
     end else if (EX1_a_valid && EX1_a_dest == ro_a_r2) begin
@@ -915,7 +915,7 @@ module core (
     end else if (ro_a_dest == ro_b_r1) begin
       ro_b_src1_ok = ro_b_delayed;
       ro_b_src1_source = SRC_DELAYED;
-    end else if (EX1_b_valid && EX1_b_dest == ro_b_r1) begin
+    end else if (EX1_b_valid && EX1_b_dest == ro_b_r1 && !ex1_a_br_mistaken_long) begin
       ro_b_src1_ok = EX1_b_optype == OP_ALU && !EX1_b_delayed;
       ro_b_src1_source = SRC_EX2_B;
     end else if (EX1_a_valid && EX1_a_dest == ro_b_r1) begin
@@ -953,7 +953,7 @@ module core (
     end else if (ro_a_dest == ro_b_r2) begin
       ro_b_src2_ok = ro_b_delayed;
       ro_b_src2_source = SRC_DELAYED;
-    end else if (EX1_b_valid && EX1_b_dest == ro_b_r2) begin
+    end else if (EX1_b_valid && EX1_b_dest == ro_b_r2 && !ex1_a_br_mistaken_long) begin
       ro_b_src2_ok = EX1_b_optype == OP_ALU && !EX1_b_delayed;
       ro_b_src2_source = SRC_EX2_B;
     end else if (EX1_a_valid && EX1_a_dest == ro_b_r2) begin
@@ -992,7 +992,7 @@ module core (
                       && !ro_a_is_spec_op && !ro_b_is_spec_op
                       && !(ro_a_optype == OP_DIV && ro_b_optype == OP_DIV)
                       && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU || b_will_br))
-                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && ro_a_opcode[5:4] != ro_b_opcode[5:4]);
+                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM/* && ro_a_opcode[5:4] != ro_b_opcode[5:4]*/);
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
@@ -1034,6 +1034,9 @@ module core (
       EX1_a_difftest.is_TLBFILL <= ro_a_optype == OP_TLB || ro_a_opcode == TLB_TLBFILL;
       EX1_a_difftest.TLBFILL_index <= csr_tlbidx;
 `endif
+    end else if (ex1_stall && lsu_a_have_excp) begin
+      EX1_a_have_excp <= lsu_a_have_excp;
+      EX1_a_excp_type <= lsu_a_excp_type;
     end
 
     if (!ex1_stall && allow_issue_b) begin
@@ -1060,7 +1063,11 @@ module core (
       EX1_b_difftest.is_TLBFILL <= id_b_optype == OP_TLB || id_b_opcode == TLB_TLBFILL;
       EX1_b_difftest.TLBFILL_index <= csr_tlbidx;
 `endif
+    end else if (ex1_stall && lsu_b_have_excp) begin
+      EX1_b_have_excp <= lsu_b_have_excp;
+      EX1_b_excp_type <= lsu_b_excp_type;
     end
+
 `ifdef DIFFTEST_EN
     if (ex1_stall && mmu_d0_addr_ok) begin
       EX1_a_difftest.storePAddr  <= {u_mmu.d_ptag, u_lsu_a.addr[31-`TAG_WIDTH:0]};
@@ -1129,7 +1136,22 @@ module core (
     end
   end
 
-  assign ex1_ready = lsu_a_ready && lsu_b_ready && !(EX1_a_valid && EX1_a_optype == OP_CACHE && !cacop_ok && !invalid_cacop);
+  logic cacop_ok_reg;
+  logic cacop_have_excp_reg;
+  excp_t cacop_excp_type_reg;
+
+  always_ff @(posedge clk) begin
+    if (reset || !ex1_stall) begin
+      cacop_ok_reg <= 1'b0;
+      cacop_have_excp_reg <= 1'b0;
+    end else if (cacop_ok) begin
+      cacop_ok_reg <= 1'b1;
+      cacop_have_excp_reg <= 1'b0;
+    end else if (cacop_have_excp) begin
+    end
+  end
+
+  assign ex1_ready = lsu_a_ready && lsu_b_ready && !(EX1_a_valid && EX1_a_optype == OP_CACHE && !cacop_ok && !cacop_ok_reg && !invalid_cacop);
   assign ex1_stall =  /*(EX1_a_valid || EX1_b_valid) &&*/ (!ex1_ready || ex2_stall);
 
   alu u_alu_a (
@@ -1181,7 +1203,7 @@ module core (
 
   mul u_mul_a (
       .clk   (clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_MUL && !ex1_stall),
+      .valid (EX1_a_valid && EX1_a_optype == OP_MUL && !ex1_stall && !flush_ex1),
       .opcode(mul_opcode_t'(EX1_a_opcode)),
       .src1  (ex1_a_src1),
       .src2  (ex1_a_src2),
@@ -1191,7 +1213,7 @@ module core (
 
   mul u_mul_b (
       .clk(clk),
-      .valid (EX1_b_valid && EX1_b_optype == OP_MUL && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp),
+      .valid (EX1_b_valid && EX1_b_optype == OP_MUL && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp && !flush_ex1),
       .opcode(mul_opcode_t'(EX1_b_opcode)),
       .src1(ex1_b_src1),
       .src2(ex1_b_src2),
@@ -1201,7 +1223,7 @@ module core (
 
   div u_div (
       .clk(clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !ex1_stall || EX1_b_valid && EX1_b_optype == OP_DIV && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp),
+      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !ex1_stall || EX1_b_valid && EX1_b_optype == OP_DIV && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp && !flush_ex1),
       .opcode(EX1_a_optype == OP_DIV ? div_opcode_t'(EX1_a_opcode) : div_opcode_t'(EX1_b_opcode)),
       .src1(EX1_a_optype == OP_DIV ? ex1_a_src1 : ex1_b_src1),
       .src2(EX1_a_optype == OP_DIV ? ex1_a_src2 : ex1_b_src2),
@@ -1220,8 +1242,7 @@ module core (
       .reset(reset),
       .cancel(mem_cancel),
       .ready(lsu_a_ready),
-      .valid(EX1_a_valid && EX1_a_optype == OP_MEM),
-      .start(EX1_a_valid && EX1_a_optype == OP_MEM && !EX1_stalling),
+      .valid(EX1_a_valid && EX1_a_optype == OP_MEM && !EX1_stalling),
       .addr(ex1_a_src1 + EX1_a_imm),
       .opcode(EX1_a_opcode),
       .st_data(ex1_a_src2),
@@ -1251,8 +1272,7 @@ module core (
       .reset(reset),
       .cancel(mem_cancel || mem_d1_cancel),
       .ready(lsu_b_ready),
-      .valid(EX1_b_valid && EX1_b_optype == OP_MEM),
-      .start(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling),
+      .valid(EX1_b_valid && EX1_b_optype == OP_MEM && !EX1_stalling),
       .addr(ex1_b_src1 + EX1_b_imm),
       .opcode(EX1_b_opcode),
       .st_data(ex1_b_src2),
@@ -1290,8 +1310,8 @@ module core (
   assign tlbsrch_vppn = csr_tlb_rdata.vppn;
   assign csr_tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBRD && !flush_ex1;
 
-  assign icacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 0;
-  assign dcacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 1;
+  assign icacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 0 && !cacop_ok_reg;
+  assign dcacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 1 && !cacop_ok_reg;
   assign invalid_cacop = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] != 0 && EX1_a_opcode[2:0] != 1;
   assign cacop_op = EX1_a_opcode[4:3];
 
@@ -1301,7 +1321,7 @@ module core (
       EX2_b_valid <= 1'b0;
     end else if (!ex2_stall) begin
       EX2_a_valid <= ex1_ready && EX1_a_valid && !flush_ex1;
-      EX2_b_valid <= ex1_ready && EX1_b_valid && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1;
+      EX2_b_valid <= ex1_ready && EX1_b_valid && !ex1_a_br_mistaken_long && !EX1_a_have_excp && !lsu_a_have_excp && !flush_ex1;
     end
 
     EX2_stalling <= ex2_stall;

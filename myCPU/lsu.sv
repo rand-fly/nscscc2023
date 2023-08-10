@@ -7,8 +7,7 @@ module lsu (
     // to ex1
     output ready,
     // from ex1
-    input valid,
-    input start,  // 仅发出请求的第一个周期置为1，但要保证下面的输入不变
+    input valid,  // 仅发出请求的第一个周期置为1，但要保证下面的输入不变
     input [31:0] addr,
     input mem_opcode_t opcode,
     input [31:0] st_data,
@@ -47,14 +46,14 @@ module lsu (
 
   logic               stage2_allowin;
 
-  assign ready = (!wait_for_addr_ok || mmu_addr_ok && stage2_allowin) && !(start && !mmu_addr_ok);
+  assign ready = (!wait_for_addr_ok || mmu_addr_ok && stage2_allowin) && !(valid && !mmu_addr_ok);
   assign stage2_allowin = !ok_not_accepted && (!wait_for_data_ok || mmu_data_ok);
 
   always_ff @(posedge clk) begin
     if (reset) begin
       wait_for_addr_ok <= 1'b0;
     end else begin
-      if (start && !mmu_addr_ok && !cancel) begin
+      if (valid && !mmu_addr_ok && !cancel) begin
         wait_for_addr_ok <= 1'b1;
       end
       if (mmu_addr_ok) begin
@@ -93,7 +92,7 @@ module lsu (
     end
   end
 
-  assign mmu_req  = start || wait_for_addr_ok;
+  assign mmu_req  = valid || wait_for_addr_ok;
   assign mmu_addr = addr;
   assign mmu_we   = opcode.store;
   assign mmu_size = opcode.size_byte ? 2'd0 : opcode.size_half ? 2'd1 : 2'd2;

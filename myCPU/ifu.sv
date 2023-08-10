@@ -157,7 +157,7 @@ module ifu (
 
   assign mmu_i_req = !reset && !idle_state && !have_excp_inner && ibuf_i_ready && (!pending_data || mmu_i_data_ok);
   assign mmu_i_addr = pc_start;
-  assign output_size = have_excp                        ? 2'd1 :
+  assign output_size = have_excp                        ? {1'b0, ibuf_i_ready} :
                       !mmu_i_data_ok || cancel          ? 2'd0 :
                       is_sent_double && !pred_br_taken0 ? 2'd2 :
                                                           2'd1 ;
