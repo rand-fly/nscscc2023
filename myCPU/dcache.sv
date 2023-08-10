@@ -469,6 +469,9 @@ always @(posedge clk) begin
                         main_state <= MAIN_ST_REPLACE;
                     end
                 end
+                else if (cacop_iiw_reg) begin
+                    main_state <= MAIN_ST_CACOP12;
+                end
                 else begin
                     main_state <= MAIN_ST_REFILL;
                 end
