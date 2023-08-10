@@ -692,7 +692,7 @@ blk_mem_gen_cache_32 dcache_way1_ram(
 
 `define DBG_TAG 20'h0006
 `define DBG_INDEX 7'h56
-`define DCACHE_DBG
+// `define DCACHE_DBG
 
 `ifdef DCACHE_DBG
 always @(posedge clk) begin

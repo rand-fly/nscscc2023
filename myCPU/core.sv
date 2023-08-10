@@ -1136,18 +1136,18 @@ module core (
     end
   end
 
-  logic cacop_ok_reg;
-  logic cacop_have_excp_reg;
+  logic  cacop_ok_reg;
+  logic  cacop_have_excp_reg;
   excp_t cacop_excp_type_reg;
 
   always_ff @(posedge clk) begin
     if (reset || !ex1_stall) begin
       cacop_ok_reg <= 1'b0;
       cacop_have_excp_reg <= 1'b0;
-    end else if (cacop_ok) begin
+    end else if (cacop_ok || cacop_have_excp) begin
       cacop_ok_reg <= 1'b1;
-      cacop_have_excp_reg <= 1'b0;
-    end else if (cacop_have_excp) begin
+      cacop_have_excp_reg <= cacop_have_excp;
+      cacop_excp_type_reg <= cacop_excp_type;
     end
   end
 
@@ -1213,7 +1213,7 @@ module core (
 
   mul u_mul_b (
       .clk(clk),
-      .valid (EX1_b_valid && EX1_b_optype == OP_MUL && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp && !flush_ex1),
+      .valid (EX1_b_valid && EX1_b_optype == OP_MUL && !ex1_stall && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1),
       .opcode(mul_opcode_t'(EX1_b_opcode)),
       .src1(ex1_b_src1),
       .src2(ex1_b_src2),
@@ -1223,7 +1223,7 @@ module core (
 
   div u_div (
       .clk(clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !ex1_stall || EX1_b_valid && EX1_b_optype == OP_DIV && !ex1_stall && !ex1_a_br_mistaken && !lsu_a_have_excp && !flush_ex1),
+      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !ex1_stall || EX1_b_valid && EX1_b_optype == OP_DIV && !ex1_stall && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1),
       .opcode(EX1_a_optype == OP_DIV ? div_opcode_t'(EX1_a_opcode) : div_opcode_t'(EX1_b_opcode)),
       .src1(EX1_a_optype == OP_DIV ? ex1_a_src1 : ex1_b_src1),
       .src2(EX1_a_optype == OP_DIV ? ex1_a_src2 : ex1_b_src2),
@@ -1297,6 +1297,31 @@ module core (
       .mmu_pme(mmu_d1_pme)
   );
 
+  logic tlbsrch_valid_reg;
+  logic tlbsrch_found_reg;
+  logic [3:0] tlbsrch_index_reg;
+  logic csr_tlb_we_reg;
+  tlb_entry_t csr_tlb_wdata_reg;
+
+  always_ff @(posedge clk) begin
+    if (reset || !tlbsrch_valid) begin
+      tlbsrch_valid_reg <= 1'b0;
+    end else if (!ex1_stall) begin
+      tlbsrch_valid_reg <= tlbsrch_valid;
+      tlbsrch_found_reg <= tlbsrch_found;
+      tlbsrch_index_reg <= tlbsrch_index;
+    end
+  end
+
+  always_ff @(posedge clk) begin
+    if (reset || !csr_tlb_we) begin
+      csr_tlb_we_reg <= 1'b0;
+    end else if (!ex1_stall) begin
+      csr_tlb_we_reg <= csr_tlb_we;
+      csr_tlb_wdata_reg <= csr_tlb_wdata;
+    end
+  end
+
   assign invtlb_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_INVTLB && !flush_ex1;
   assign invtlb_op = EX1_a_imm[4:0];
   assign invtlb_asid = ex1_a_src1[9:0];
@@ -1306,9 +1331,9 @@ module core (
   assign tlb_w_entry = csr_tlb_rdata;
   assign tlb_r_index = csr_tlbidx;
   assign csr_tlb_wdata = tlb_r_entry;
-  assign tlbsrch_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBSRCH && !flush_ex1;
+  assign tlbsrch_valid = EX1_a_valid && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBSRCH && !flush_ex1;
   assign tlbsrch_vppn = csr_tlb_rdata.vppn;
-  assign csr_tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBRD && !flush_ex1;
+  assign csr_tlb_we = EX1_a_valid && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBRD && !flush_ex1;
 
   assign icacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 0 && !cacop_ok_reg;
   assign dcacop_en = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 1 && !cacop_ok_reg;
@@ -1338,8 +1363,9 @@ module core (
       EX2_a_alu_result <= alu_a_result;
       EX2_a_br_type <= EX1_a_br_type;
       EX2_a_br_taken <= ex1_a_br_taken || EX1_a_br_taken;
-      EX2_a_have_excp <= EX1_a_have_excp || lsu_a_have_excp || cacop_have_excp;
+      EX2_a_have_excp <= EX1_a_have_excp || lsu_a_have_excp || cacop_have_excp || cacop_have_excp_reg;
       EX2_a_excp_type <= lsu_a_have_excp ? lsu_a_excp_type :
+                         cacop_have_excp_reg ? cacop_excp_type_reg:
                          cacop_have_excp ? cacop_excp_type :
                                            EX1_a_excp_type;
       EX2_a_excp_addr <= u_lsu_a.addr;
@@ -1607,11 +1633,11 @@ module core (
       .badv_data(csr_badv_wdata),
       .vppn_we(csr_vppn_we),
       .vppn_data(csr_vppn_wdata),
-      .csr_tlbsrch_we(tlbsrch_valid),
-      .csr_tlbsrch_found(tlbsrch_found),
-      .csr_tlbsrch_index(tlbsrch_index),
-      .csr_tlb_we(csr_tlb_we),
-      .csr_tlb_wdata(csr_tlb_wdata),
+      .csr_tlbsrch_we(tlbsrch_valid_reg),
+      .csr_tlbsrch_found(tlbsrch_found_reg),
+      .csr_tlbsrch_index(tlbsrch_index_reg),
+      .csr_tlb_we(csr_tlb_we_reg),
+      .csr_tlb_wdata(csr_tlb_wdata_reg),
       .csr_tlb_rdata(csr_tlb_rdata),
       .csr_tlbidx(csr_tlbidx),
       .csr_asid(csr_asid),

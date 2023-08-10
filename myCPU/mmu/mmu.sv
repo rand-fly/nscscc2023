@@ -237,7 +237,7 @@ module mmu (
       .r_entry(tlb_r_entry)
   );
 
-  assign icache_req = i_req || icacop_en;
+  assign icache_req = i_req || icacop_en && !cacop_have_excp;
   assign icache_op = icacop_en ? {1'b1, cacop_op} : 3'd0;
   assign icache_addr = icacop_en ? d0_va : i_pa;
   assign icache_uncached = i_mat == 2'd0;
@@ -261,7 +261,7 @@ module mmu (
     end
   end
 
-  assign dcache_p0_valid = (d1_only ? d1_req : d0_req) && !d_cancel || dcacop_en;
+  assign dcache_p0_valid = (d1_only ? d1_req : d0_req) && !d_cancel || dcacop_en && !cacop_have_excp;
   assign dcache_p1_valid = (d1_req && !d1_only && !conflict) && !d_cancel && !d1_cancel;
   assign dcache_op = dcacop_en ? {1'b1, cacop_op} : d1_only ? {2'd0, d1_we} : {2'd0, d0_we};
   assign dcache_tag = d_ptag;
