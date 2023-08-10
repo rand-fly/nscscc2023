@@ -272,7 +272,7 @@ module mmu (
   assign dcache_p1_wstrb = d1_wstrb;
   assign dcache_p0_wdata = d1_only ? d1_wdata : d0_wdata;
   assign dcache_p1_wdata = d1_wdata;
-  assign dcache_uncached = 1'b1;//d_mat == 2'd0;
+  assign dcache_uncached = d_mat == 2'd0;
   assign dcache_p0_size = d1_only ? d1_size : d0_size;
   assign dcache_p1_size = d1_size;
 
