@@ -3,6 +3,7 @@
 module csr (
     input                    clk,
     input                    reset,
+    input             [ 7:0] ext_int,
     input  csr_addr_t        addr,
     output logic      [31:0] rdata,
     input                    we,
@@ -166,6 +167,10 @@ module csr (
 
   logic timer_en;
 
+  always_ff @(posedge clk) begin
+    ESTAT.IS[9:2] <= ext_int;
+  end
+
   always_comb begin
     unique case (addr)
       14'h00:  rdata = CRMD;
@@ -247,7 +252,9 @@ module csr (
 
       ECFG <= 0;
 
-      ESTAT <= 0;
+      ESTAT[31:10] <= 0;
+      ESTAT[1:0] <= 0;
+
 
       EENTRY.Z <= 0;
 

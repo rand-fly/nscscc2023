@@ -4,6 +4,8 @@ module core (
     input clk,
     input resetn,
 
+    input  [7:0] ext_int,
+
     output        icache_req,
     output [ 2:0] icache_op,
     output [31:0] icache_addr,
@@ -1621,6 +1623,7 @@ module core (
   csr u_csr (
       .clk(clk),
       .reset(reset),
+      .ext_int(ext_int),
       .addr(EX2_a_csr_addr),
       .rdata(csr_rdata),
       .we(EX2_a_valid && EX2_a_optype == OP_CSR),

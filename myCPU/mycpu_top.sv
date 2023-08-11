@@ -143,6 +143,7 @@ module mycpu_top (
   core core_0 (
       .clk(aclk),
       .resetn(aresetn),
+      .ext_int(intrpt),
 
       .icache_req(icache_req),
       .icache_op(icache_op),
