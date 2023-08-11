@@ -4,7 +4,7 @@ module core (
     input clk,
     input resetn,
 
-    input  [7:0] ext_int,
+    input [7:0] ext_int,
 
     output        icache_req,
     output [ 2:0] icache_op,
@@ -1033,8 +1033,6 @@ module core (
       EX1_a_is_sc          <= ro_a_is_sc;
 `ifdef DIFFTEST_EN
       EX1_a_difftest <= ro_a_difftest;
-      EX1_a_difftest.is_TLBFILL <= ro_a_optype == OP_TLB || ro_a_opcode == TLB_TLBFILL;
-      EX1_a_difftest.TLBFILL_index <= csr_tlbidx;
 `endif
     end else if (ex1_stall && lsu_a_have_excp) begin
       EX1_a_have_excp <= lsu_a_have_excp;
@@ -1062,8 +1060,6 @@ module core (
       EX1_b_excp_type      <= ro_b_excp_type;
 `ifdef DIFFTEST_EN
       EX1_b_difftest <= ro_b_difftest;
-      EX1_b_difftest.is_TLBFILL <= id_b_optype == OP_TLB || id_b_opcode == TLB_TLBFILL;
-      EX1_b_difftest.TLBFILL_index <= csr_tlbidx;
 `endif
     end else if (ex1_stall && lsu_b_have_excp) begin
       EX1_b_have_excp <= lsu_b_have_excp;
@@ -1324,12 +1320,20 @@ module core (
     end
   end
 
+  logic [TLBIDLEN-1:0] tlb_idx_reg;
+
+  always_ff @(posedge clk) begin
+    if (ex1_stall && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBFILL) begin
+      tlb_idx_reg <= counter[TLBIDLEN-1:0];
+    end
+  end
+
   assign invtlb_valid = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_INVTLB && !flush_ex1;
   assign invtlb_op = EX1_a_imm[4:0];
   assign invtlb_asid = ex1_a_src1[9:0];
   assign invtlb_va = ex1_a_src2;
   assign tlb_we = EX1_a_valid && !EX1_stalling && EX1_a_optype == OP_TLB && (EX1_a_opcode == TLB_TLBWR || EX1_a_opcode == TLB_TLBFILL) && !flush_ex1;
-  assign tlb_w_index = csr_tlbidx;
+  assign tlb_w_index = EX1_a_opcode == TLB_TLBWR ? csr_tlbidx : counter[TLBIDLEN-1:0];
   assign tlb_w_entry = csr_tlb_rdata;
   assign tlb_r_index = csr_tlbidx;
   assign csr_tlb_wdata = tlb_r_entry;
@@ -1391,7 +1395,9 @@ module core (
       end
       EX2_a_difftest.loadVAddr <= u_lsu_a.addr;
       EX2_a_difftest.csr_rstat <= EX1_a_optype == OP_CSR && EX1_a_csr_addr == 14'h5;
-      EX2_a_difftest.csr_data  <= u_csr.ESTAT;
+      EX2_a_difftest.csr_data <= u_csr.ESTAT;
+      EX2_a_difftest.is_TLBFILL <= EX1_a_optype == OP_TLB && EX1_a_opcode == TLB_TLBFILL;
+      EX2_a_difftest.TLBFILL_index <= EX1_stalling ? tlb_idx_reg : tlb_w_index;
 `endif
     end
 
