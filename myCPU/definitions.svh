@@ -42,6 +42,18 @@ parameter PALEN = 32;
 `define OFFSET_WIDTH 6
 `endif
 
+`define TCACHE_WAY_4
+
+`ifdef TCACHE_WAY_4
+  `define TCACHE_NUM 4
+  `define TCACHE_ID_LEN 2
+`endif
+
+`ifdef TCACHE_WAY_2
+  `define TCACHE_NUM 2
+  `define TCACHE_ID_LEN 1
+`endif
+
 typedef enum logic [2:0] {
   OP_ALU,
   OP_MUL,
