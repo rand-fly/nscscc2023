@@ -282,7 +282,7 @@ module mmu (
 
   assign d1_addr_ok = d1_req && !conflict && dcache_addr_ok;
   assign d1_data_ok = d1_req_reg && dcache_data_ok;
-  assign d1_rdata = d1_only_reg ? dcache_p0_rdata : dcache_p0_rdata;
+  assign d1_rdata = d1_only_reg ? dcache_p0_rdata : dcache_p1_rdata;
 
   assign cacop_ok = (icacop_en && icache_addr_ok) || (dcacop_en && dcache_addr_ok);
   assign cacop_have_excp = (icacop_en || dcacop_en) && cacop_op == 2 && (d_page_fault || d_page_invalid);

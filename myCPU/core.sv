@@ -994,7 +994,7 @@ module core (
                       && !ro_a_is_spec_op && !ro_b_is_spec_op
                       && !(ro_a_optype == OP_DIV && ro_b_optype == OP_DIV)
                       && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU || b_will_br))
-                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM/* && ro_a_opcode[5:4] != ro_b_opcode[5:4]*/);
+                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[5:4] != ro_b_opcode[5:4] || ro_a_r1 != ro_b_r1));
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
