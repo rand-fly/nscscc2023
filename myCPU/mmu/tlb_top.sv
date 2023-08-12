@@ -57,6 +57,12 @@ module tlb_top
     logic [TLBIDLEN-1:0] data_tlb_refill_index;
     tlb_entry_t inst_tlb_refill_data;
     tlb_entry_t data_tlb_refill_data;
+    reg inst_tlb_refill_valid_reg;
+    reg data_tlb_refill_valid_reg;
+    reg [TLBIDLEN-1:0] inst_tlb_refill_index_reg;
+    reg [TLBIDLEN-1:0] data_tlb_refill_index_reg;
+    tlb_entry_t  inst_tlb_refill_data_reg;
+    tlb_entry_t  data_tlb_refill_data_reg;
 
     //search port results
     tlb_entry_t l2_entry_0;
@@ -75,6 +81,20 @@ module tlb_top
     assign data_tlb_refill_index = l2_hit_index_1;
     assign inst_tlb_refill_data = l2_entry_0;
     assign data_tlb_refill_data = l2_entry_1;
+
+    always @(posedge clk) begin: refill_buff
+        if(reset) begin
+            inst_tlb_refill_valid_reg <= 0;
+            data_tlb_refill_valid_reg <= 0;
+        end else begin
+            inst_tlb_refill_valid_reg <= inst_tlb_refill_valid;
+            data_tlb_refill_valid_reg <= data_tlb_refill_valid;
+            inst_tlb_refill_index_reg <= inst_tlb_refill_index;
+            data_tlb_refill_index_reg <= data_tlb_refill_index;
+            inst_tlb_refill_data_reg <= inst_tlb_refill_data;
+            data_tlb_refill_data_reg <= data_tlb_refill_data;
+        end
+    end
 
 
     assign l2_result_0.found = l2_hit_0 ;
@@ -176,9 +196,9 @@ module tlb_top
         .invtlb_va(invtlb_va),
         .invtlb_asid(invtlb_asid),
 
-        .refill_valid(inst_tlb_refill_valid),
-        .refill_data(inst_tlb_refill_data),
-        .refill_index(inst_tlb_refill_index)
+        .refill_valid(inst_tlb_refill_valid_reg),
+        .refill_data(inst_tlb_refill_data_reg),
+        .refill_index(inst_tlb_refill_index_reg)
     );
 
     tcache data_tlb(
@@ -200,9 +220,9 @@ module tlb_top
         .invtlb_asid(invtlb_asid),
 
 
-        .refill_valid(data_tlb_refill_valid),
-        .refill_data(data_tlb_refill_data),
-        .refill_index(data_tlb_refill_index)
+        .refill_valid(data_tlb_refill_valid_reg),
+        .refill_data(data_tlb_refill_data_reg),
+        .refill_index(data_tlb_refill_index_reg)
     );
     
     tlb_L2 tlb_L2(
