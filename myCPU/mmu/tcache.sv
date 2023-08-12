@@ -8,7 +8,6 @@ module tcache (
     input               [18:0] s_vppn,
     input                      s_va_bit12,
     input               [ 9:0] s_asid,
-    output                     s_hit,
     output tlb_result_t        s_result,
 
     // invtlb opcode
@@ -19,7 +18,7 @@ module tcache (
 
     // write port
     input                            we,       //w(rite) e(nable)
-    input             [`TCACHE_ID_LEN-1:0] w_index,
+    input             [TLBIDLEN-1:0] w_index,
     input tlb_entry_t                w_entry,
 
     // read port
@@ -29,7 +28,7 @@ module tcache (
 
     //refill port
     input                             refill_valid,
-    input tlb_entry_t                refill_data
+    input tlb_entry_t                 refill_data,
     input           [   TLBIDLEN-1:0] refill_index
 
 );
@@ -61,10 +60,10 @@ module tcache (
   reg         [            4:0] lru_cnt   [`TCACHE_NUM];
 
 
-  `define write_data(index_, w_data_)(\
+  `define write_data(index_, w_data_)\
     data[index_].e <= w_data_.e;\
     data[index_].vppn <= w_data_.vppn;\
-    data[index_].ps4MB <= w_data_.ps == 12 ? 0 : 1;\  //21(else)->4MB, 12->4KB
+    data[index_].ps4MB <= w_data_.ps == 12 ? 0 : 1;\
     data[index_].asid <= w_data_.asid;\
     data[index_].g <= w_data_.g;\
     data[index_].ppn0 <= w_data_.ppn0;\
@@ -77,18 +76,19 @@ module tcache (
     data[index_].mat1 <= w_data_.mat1;\
     data[index_].d1 <= w_data_.d1;\
     data[index_].v1 <= w_data_.v1\
-  )
+  
   logic       [  `TCACHE_NUM-1:0] match;
-  logic       [  `TCACHE_NUM-1:0] match_w;       
-
-  logic       [`TCACHE_ID_LEN-1:0] r_index;
+  logic       [  `TCACHE_NUM-1:0] match_w;
 
   logic       [`TCACHE_ID_LEN-1:0] match_id_sel[`TCACHE_NUM];
+  logic       [`TCACHE_ID_LEN-1:0] match_id_sel_w[`TCACHE_NUM];
   logic       [`TCACHE_ID_LEN-1:0] match_id;
+  logic       [`TCACHE_ID_LEN-1:0] match_id_w;
   logic       [`TCACHE_ID_LEN-1:0] r_index;
 
+  logic                            hit_w;
+
   tlb_store_t                result_sel  [`TCACHE_NUM];
-  tlb_store_t                result;
 
   //select tlb
   generate
@@ -97,7 +97,7 @@ module tcache (
       wire match_4k = s_vppn == data[i].vppn;
       wire match_vppn = data[i].ps4MB ? match_4m : match_4k;
       wire match_asid = s_asid == data[i].asid;
-      assign match[i] = data[i].valid && data[i].e && match_vppn && (match_asid || data[i].g);
+      assign match[i] = valid[i] && data[i].e && match_vppn && (match_asid || data[i].g);
       assign match_id_sel[i] = {`TCACHE_ID_LEN{match[i]}} & `TCACHE_ID_LEN'(i);
       assign result_sel[i] = {84{match[i]}} & data[i];
     end
@@ -105,32 +105,42 @@ module tcache (
 
   generate
     for (genvar i = 0; i < `TCACHE_NUM; i = i + 1) begin : gen_match_w
-      wire match_index = w_index == data[i].index;
-      assign match_w[i] = data[i].valid && tlb_index[i] == w_index;
+      assign match_w[i] = valid[i] && tlb_index[i] == w_index;
+      assign match_id_sel_w[i] = {`TCACHE_ID_LEN{match_w[i]}} & `TCACHE_ID_LEN'(i);
     end
   endgenerate
 
   `ifdef TCACHE_WAY_2
-  assign r_index = lru_cnt[0] > lru_cnt[1];
+  assign r_index = lru_cnt[0] < lru_cnt[1];
   `endif
   `ifdef TCACHE_WAY_4
-  assign r_index[0] = lru_cnt[0] > lru_cnt[1] || lru_cnt[2] > lru_cnt[3];
-  assign r_index[1] = lru_cnt[0] > lru_cnt[2] || lru_cnt[1] > lru_cnt[3];
+  always_comb begin
+    if(lru_cnt[0] >= lru_cnt[1] && lru_cnt[0] >= lru_cnt[2] && lru_cnt[0] >= lru_cnt[3])
+      r_index = 0;
+    else if(lru_cnt[1] >= lru_cnt[0] && lru_cnt[1] >= lru_cnt[2] && lru_cnt[1] >= lru_cnt[3])
+      r_index = 1;
+    else if(lru_cnt[2] >= lru_cnt[0] && lru_cnt[2] >= lru_cnt[1] && lru_cnt[2] >= lru_cnt[3])
+      r_index = 2;
+    else if(lru_cnt[3] >= lru_cnt[0] && lru_cnt[3] >= lru_cnt[1] && lru_cnt[3] >= lru_cnt[2])
+      r_index = 3;
+    else
+      r_index = 0;
+  end
   `endif
 
 
   always_comb begin
     match_id = 0;
-    result   = 0;
+    match_id_w = 0;
     for (int i = 0; i < `TCACHE_NUM; i = i + 1) begin
       match_id |= match_id_sel[i];
-      result |= result_sel[i];
+      match_id_w |= match_id_sel_w[i];
     end
   end
 
   assign s_result.index = tlb_index[match_id];
   assign s_result.found = |match;
-
+  assign hit_w = | match_w;
   always_comb begin
     logic [`TCACHE_ID_LEN-1:0] i;
     i = match_id;
@@ -164,7 +174,7 @@ module tcache (
 
   always_ff @(posedge clk) begin
     //lru increase
-    for(int i = 0; i < `TACHE_NUM; i = i + 1) begin
+    for(int i = 0; i < `TCACHE_NUM; i = i + 1) begin
       if (match[i] || (refill_valid && r_index == i)) begin
         lru_cnt[i] <= 0;
       end
@@ -174,7 +184,8 @@ module tcache (
     end
     if (reset) begin
       for (int i = 0; i < `TCACHE_NUM; i = i + 1) begin
-        data[i].valid <= 0;
+        lru_cnt[i] <= 0;
+        valid[i] <= 0;
       end
     end else if (invtlb_valid) begin
       for (int i = 0; i < `TCACHE_NUM; i = i + 1) begin
@@ -200,14 +211,16 @@ module tcache (
         end
       end
     end else if (refill_valid) begin
-      if (we && w_index == refill_index) begin //refill data to be writen
-        write_data(w_index, w_entry);
+      valid[r_index] <= 1;
+      tlb_index[r_index] <= refill_index;
+      if (we && hit_w && w_index == refill_index) begin //refill data to be writen
+        `write_data(match_id_w, w_entry);
       end else begin
-        write_data(r_index, refill_data);
+        `write_data(r_index, refill_data);
       end
   
-    end else if (we) begin
-      write_data(w_index, w_entry);
+    end else if (we && hit_w) begin
+      `write_data(match_id_w, w_entry);
     end
   end
 endmodule

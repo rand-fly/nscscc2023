@@ -9,14 +9,14 @@ module tlb_L2 (
     input               [ 9:0] s0_asid,
     output tlb_entry_t         s0_result,
     output                     s0_found,
-    output                     s0_index,
+    output      [TLBIDLEN-1:0] s0_index,
 
     // search port 1 (for load/store)
     input               [18:0] s1_vppn,
     input               [ 9:0] s1_asid,
     output tlb_entry_t         s1_result,
-    output                     s0_found,
-    output                     s0_index,
+    output                     s1_found,
+    output      [TLBIDLEN-1:0] s1_index,
 
     // invtlb opcode
     input        invtlb_valid,
@@ -58,7 +58,8 @@ module tlb_L2 (
   logic       [  TLBNUM-1:0] match1;
   reg         [  TLBNUM-1:0] match0_reg;
   reg         [  TLBNUM-1:0] match1_reg;
-  reg
+
+  
   logic       [TLBIDLEN-1:0] match_id_sel0[TLBNUM];
   logic       [TLBIDLEN-1:0] match_id_sel1[TLBNUM];
   logic       [TLBIDLEN-1:0] match_id0;
@@ -114,8 +115,26 @@ module tlb_L2 (
   assign s0_found = |match0;
   assign s1_found = |match1;
 
-  assign s0_result = result0;
-  assign s1_result = result1;
+  `define tlb_store_to_tlb_entry(store_, entry_)\
+  assign entry_.e    = store_.e;\
+  assign entry_.ps = store_.ps4MB ? 21 : 12;\
+  assign entry_.vppn = store_.vppn;\
+  assign entry_.asid = store_.asid;\
+  assign entry_.g    = store_.g;\
+  assign entry_.ppn0 = store_.ppn0;\
+  assign entry_.plv0 = store_.plv0;\
+  assign entry_.mat0 = store_.mat0;\
+  assign entry_.d0   = store_.d0;\
+  assign entry_.v0   = store_.v0;\
+  assign entry_.ppn1 = store_.ppn1;\
+  assign entry_.plv1 = store_.plv1;\
+  assign entry_.mat1 = store_.mat1;\
+  assign entry_.d1   = store_.d1;\
+  assign entry_.v1   = store_.v1
+  
+  `tlb_store_to_tlb_entry(result0, s0_result);
+  `tlb_store_to_tlb_entry(result1, s1_result);
+
   
   //end select tlb
 

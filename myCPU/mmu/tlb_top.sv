@@ -10,6 +10,7 @@ module tlb_top
         input               [18:0] s0_vppn,
         input                      s0_va_bit12,
         input               [ 9:0] s0_asid,
+        input wire                 s0_valid,
         output tlb_result_t        s0_result,
         output                     s0_ok,
 
@@ -17,6 +18,7 @@ module tlb_top
         input               [18:0] s1_vppn,
         input                      s1_va_bit12,
         input               [ 9:0] s1_asid,
+        input wire                 s1_valid,
         output tlb_result_t        s1_result,
         output                     s1_ok,
 
@@ -36,11 +38,15 @@ module tlb_top
         output tlb_entry_t                r_entry
     );
 
+    //state register
+    reg inst_tlb_state;
+    reg data_tlb_state;
+
     // hit signal
     logic l2_hit_0;
     logic l2_hit_1;
-    logic inst_tlb_hit = inst_tlb_result.found;
-    logic data_tlb_hit = data_tlb_result.found;
+    logic inst_tlb_hit;
+    logic data_tlb_hit;
 
     //refill signal
     logic inst_tlb_refill_valid;
@@ -52,13 +58,6 @@ module tlb_top
     tlb_entry_t inst_tlb_refill_data;
     tlb_entry_t data_tlb_refill_data;
 
-    assign inst_tlb_refill_valid = l2_hit_0 & inst_tlb_state;
-    assign data_tlb_refill_valid = l2_hit_1 & data_tlb_state;
-    assign inst_tlb_refill_index = l2_hit_index_0;
-    assign data_tlb_refill_index = l2_hit_index_1;
-    assign inst_tlb_refill_data = l2_entry_0;
-    assign data_tlb_refill_data = l2_entry_1;
-
     //search port results
     tlb_entry_t l2_entry_0;
     tlb_entry_t l2_entry_1;
@@ -67,59 +66,91 @@ module tlb_top
     tlb_result_t inst_tlb_result;
     tlb_result_t data_tlb_result;
 
+    assign inst_tlb_hit = inst_tlb_result.found;
+    assign data_tlb_hit = data_tlb_result.found;
+
+    assign inst_tlb_refill_valid = l2_hit_0 & inst_tlb_state;
+    assign data_tlb_refill_valid = l2_hit_1 & data_tlb_state;
+    assign inst_tlb_refill_index = l2_hit_index_0;
+    assign data_tlb_refill_index = l2_hit_index_1;
+    assign inst_tlb_refill_data = l2_entry_0;
+    assign data_tlb_refill_data = l2_entry_1;
+
+
     assign l2_result_0.found = l2_hit_0 ;
     assign l2_result_1.found = l2_hit_1;
-    assign s0_index = l2_hit_index_0;
-    assign s1_index = l2_hit_index_1;
+    assign l2_result_0.index = l2_hit_index_0;
+    assign l2_result_1.index = l2_hit_index_1;
 
-    assign s0_result = (l2_result_0 & 64{inst_tlb_state}) | (inst_tlb_hit & 64{~inst_tlb_state});
-    assign s1_result = (l2_result_1 & 64{data_tlb_state}) | (data_tlb_hit & 64{~data_tlb_state});
+    assign s0_result = inst_tlb_state ? l2_result_0 : inst_tlb_result;
+    assign s1_result = data_tlb_state ? l2_result_1 : data_tlb_result;
     
     //tcache hit / lookup L2 -> valid result
     assign s0_ok = (inst_tlb_hit & ~inst_tlb_state) | inst_tlb_state;
     assign s1_ok = (data_tlb_hit & ~data_tlb_state) | data_tlb_state;
     
-    //state register
-    reg inst_tlb_state;
-    reg data_tlb_state;
+    reg test0;
+    reg test1;
+    reg test2;
     always @(posedge clk) begin: state_transition
         if(reset) begin
             inst_tlb_state <= `TLB_STATE_CACHE;
             data_tlb_state <= `TLB_STATE_CACHE;
         end else begin
-            inst_tlb_state <= ~(inst_tlb_hit | inst_tlb_state);
-            data_tlb_state <= ~(data_tlb_hit | data_tlb_state);
+            case(inst_tlb_state)
+                0: begin
+                    test0 <= s0_valid;
+                    test1 <= !inst_tlb_hit;
+                    test2 <= s0_valid && (!inst_tlb_hit);
+                    if(s0_valid && (!inst_tlb_hit)) begin
+                        inst_tlb_state <= 1;
+                    end
+                end
+                1: begin
+                    inst_tlb_state <= 0;
+                end
+            endcase
+            case(data_tlb_state)
+                `TLB_STATE_CACHE: begin
+                    if(s1_valid && (!data_tlb_hit)) begin
+                        data_tlb_state <= `TLB_STATE_L2;
+                    end
+                end
+                `TLB_STATE_L2: begin
+                    data_tlb_state <= `TLB_STATE_CACHE;
+                end
+            endcase
         end
     end
 
 
     always_comb begin: l2_result_comb
         logic [TLBIDLEN-1:0] i;
-        if ((l2_entry_0.ps4MB == 0 && s0_va_bit12 == 0) || (l2_entry_0.ps4MB == 1 && s0_vppn[8] == 0)) begin
+        if ((l2_entry_0.ps == 12 && s0_va_bit12 == 0) || (l2_entry_0.ps == 21 && s0_vppn[8] == 0)) begin
             l2_result_0.ppn = l2_entry_0.ppn0;
-            l2_result_0.ps  = l2_entry_0.ps4MB ? 21 : 12;
+            l2_result_0.ps  = l2_entry_0.ps;
             l2_result_0.plv = l2_entry_0.plv0;
             l2_result_0.mat = l2_entry_0.mat0;
             l2_result_0.d   = l2_entry_0.d0;
             l2_result_0.v   = l2_entry_0.v0;
         end else begin
             l2_result_0.ppn = l2_entry_0.ppn1;
-            l2_result_0.ps  = l2_entry_0.ps4MB ? 21 : 12;
+            l2_result_0.ps  = l2_entry_0.ps;
             l2_result_0.plv = l2_entry_0.plv1;
             l2_result_0.mat = l2_entry_0.mat1;
             l2_result_0.d   = l2_entry_0.d1;
             l2_result_0.v   = l2_entry_0.v1;
         end
-        if ((l2_entry_1.ps4MB == 0 && s1_va_bit12 == 0) || (l2_entry_1.ps4MB == 1 && s1_vppn[8] == 0)) begin
+        if ((l2_entry_1.ps == 12 && s1_va_bit12 == 0) || (l2_entry_1.ps == 21 && s1_vppn[8] == 0)) begin
             l2_result_1.ppn = l2_entry_1.ppn0;
-            l2_result_1.ps  = l2_entry_1.ps4MB ? 21 : 12;
+            l2_result_1.ps  = l2_entry_1.ps;
             l2_result_1.plv = l2_entry_1.plv0;
             l2_result_1.mat = l2_entry_1.mat0;
             l2_result_1.d   = l2_entry_1.d0;
             l2_result_1.v   = l2_entry_1.v0;
         end else begin
             l2_result_1.ppn = l2_entry_1.ppn1;
-            l2_result_1.ps  = l2_entry_1.ps4MB ? 21 : 12;
+            l2_result_1.ps  = l2_entry_1.ps;
             l2_result_1.plv = l2_entry_1.plv1;
             l2_result_1.mat = l2_entry_1.mat1;
             l2_result_1.d   = l2_entry_1.d1;
@@ -140,6 +171,11 @@ module tlb_top
         .w_index(w_index),
         .w_entry(w_entry),
 
+        .invtlb_valid(invtlb_valid),
+        .invtlb_op(invtlb_op),
+        .invtlb_va(invtlb_va),
+        .invtlb_asid(invtlb_asid),
+
         .refill_valid(inst_tlb_refill_valid),
         .refill_data(inst_tlb_refill_data),
         .refill_index(inst_tlb_refill_index)
@@ -157,6 +193,12 @@ module tlb_top
         .we(we),
         .w_index(w_index),
         .w_entry(w_entry),
+
+        .invtlb_valid(invtlb_valid),
+        .invtlb_op(invtlb_op),
+        .invtlb_va(invtlb_va),
+        .invtlb_asid(invtlb_asid),
+
 
         .refill_valid(data_tlb_refill_valid),
         .refill_data(data_tlb_refill_data),
