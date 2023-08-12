@@ -82,10 +82,10 @@ module pred #(
   assign pc_frag_o = retire_pc[BHRLEN+1 : 2];
   assign pc_frag_w = wrong_pc[BHRLEN+1 : 2];
 
-  assign hashed_index_0 = bht_val_0 ^ pc_frag_0;
-  assign hashed_index_1 = bht_val_1 ^ pc_frag_1;
-  assign hashed_index_o = bht_val_o ^ pc_frag_o;
-  assign hashed_index_w = bht_val_w ^ pc_frag_w;
+  assign hashed_index_0 = /*bht_val_0 ^ */ pc_frag_0;
+  assign hashed_index_1 = /*bht_val_1 ^ */ pc_frag_1;
+  assign hashed_index_o = /*bht_val_o ^ */ pc_frag_o;
+  assign hashed_index_w = /*bht_val_w ^ */ pc_frag_w;
   //reset & update BHT
   integer i;
   always @(posedge clk) begin
