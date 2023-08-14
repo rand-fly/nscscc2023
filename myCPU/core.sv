@@ -691,6 +691,7 @@ module core (
   };
   assign id_a_difftest.is_CNTinst = u_decoder_a.inst_rdcntid_w|u_decoder_a.inst_rdcntvl_w|u_decoder_a.inst_rdcntvh_w;
   assign id_a_difftest.timer_64_value = counter;
+  assign id_a_difftest.added_paddr = 1'b0;
 
   assign id_b_difftest.instr = ID_b_inst;
   assign id_b_difftest.store_valid = {
@@ -711,6 +712,7 @@ module core (
   };
   assign id_b_difftest.is_CNTinst = u_decoder_b.inst_rdcntid_w|u_decoder_b.inst_rdcntvl_w|u_decoder_b.inst_rdcntvh_w;
   assign id_b_difftest.timer_64_value = counter;
+  assign id_b_difftest.added_paddr = 1'b0;
 `endif
 
   ibuf u_ibuf (
