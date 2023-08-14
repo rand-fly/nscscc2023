@@ -994,7 +994,7 @@ module core (
                       && !ro_a_is_spec_op && !ro_b_is_spec_op
                       && !(ro_a_optype == OP_DIV && ro_b_optype == OP_DIV)
                       && !(related && (ro_a_optype != OP_ALU || ro_b_optype != OP_ALU || b_will_br))
-                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM && (ro_a_opcode[5:4] != ro_b_opcode[5:4] || ro_a_r1 != ro_b_r1));
+                      && !(ro_a_optype == OP_MEM && ro_b_optype == OP_MEM /*&& (ro_a_opcode[5:4] != ro_b_opcode[5:4] || ro_a_r1 != ro_b_r1)*/);
 
   assign ibuf_o_size = ex1_stall ? 2'd0 : allow_issue_b ? 2'd2 : allow_issue_a ? 2'd1 : 2'd0;
 
@@ -1221,7 +1221,7 @@ module core (
 
   div u_div (
       .clk(clk),
-      .valid (EX1_a_valid && EX1_a_optype == OP_DIV && !ex1_stall || EX1_b_valid && EX1_b_optype == OP_DIV && !ex1_stall && !ex1_a_br_mistaken_long && !lsu_a_have_excp && !flush_ex1),
+      .valid ((EX1_a_valid && EX1_a_optype == OP_DIV && !ex1_stall || EX1_b_valid && EX1_b_optype == OP_DIV && !ex1_stall && !ex1_a_br_mistaken_long && !lsu_a_have_excp) && !flush_ex1),
       .opcode(EX1_a_optype == OP_DIV ? div_opcode_t'(EX1_a_opcode) : div_opcode_t'(EX1_b_opcode)),
       .src1(EX1_a_optype == OP_DIV ? ex1_a_src1 : ex1_b_src1),
       .src2(EX1_a_optype == OP_DIV ? ex1_a_src2 : ex1_b_src2),
@@ -1297,7 +1297,7 @@ module core (
 
   logic tlbsrch_valid_reg;
   logic tlbsrch_found_reg;
-  logic [3:0] tlbsrch_index_reg;
+  logic [TLBIDLEN-1:0] tlbsrch_index_reg;
   logic csr_tlb_we_reg;
   tlb_entry_t csr_tlb_wdata_reg;
 

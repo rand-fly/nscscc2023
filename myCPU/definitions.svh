@@ -1,12 +1,7 @@
 `ifndef DEFINITIONS_SVH_
 `define DEFINITIONS_SVH_ 
 
-`ifdef DIFFTEST_EN
 parameter TLBNUM = 32;
-`else
-parameter TLBNUM = 16;
-`endif
-
 parameter TLBIDLEN = $clog2(TLBNUM);
 parameter PALEN = 32;
 
@@ -40,6 +35,18 @@ parameter PALEN = 32;
 `define INDEX_WIDTH 6
 `define LINE_NUM 64
 `define OFFSET_WIDTH 6
+`endif
+
+`define TCACHE_WAY_4
+
+`ifdef TCACHE_WAY_4
+  `define TCACHE_NUM 4
+  `define TCACHE_ID_LEN 2
+`endif
+
+`ifdef TCACHE_WAY_2
+  `define TCACHE_NUM 2
+  `define TCACHE_ID_LEN 1
 `endif
 
 typedef enum logic [2:0] {

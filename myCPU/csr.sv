@@ -289,6 +289,8 @@ module csr (
 
       DMW0 <= 0;
       DMW1 <= 0;
+
+      timer_en <= 0;
     end else if (raise_excp) begin
       if (excp_type != ERTN) begin
         PRMD.PPLV <= CRMD.PLV;
