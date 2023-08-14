@@ -482,13 +482,11 @@ always @(posedge clk) begin
                         main_state <= MAIN_ST_IDLE;
                     end
                 end
-                else if (rd_rdy) begin
-                    if (cacop_iiw_reg) begin
+                else if (cacop_iiw_reg) begin
                         main_state <= MAIN_ST_CACOP12;
-                    end
-                    else begin
-                        main_state <= MAIN_ST_REFILL;
-                    end
+                end
+                else if (rd_rdy) begin
+                    main_state <= MAIN_ST_REFILL;
                 end
             end
             MAIN_ST_REFILL: begin
