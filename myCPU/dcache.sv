@@ -735,7 +735,13 @@ reg [31:0] last_print_time;
 
 reg [31:0] access_count;
 reg [31:0] hit_count;
+reg [31:0] miss_count;
 reg [31:0] uncached_count;
+
+reg [31:0] last_access_count;
+reg [31:0] last_hit_count;
+reg [31:0] last_miss_count;
+reg [31:0] last_uncached_count;
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -743,6 +749,7 @@ always @(posedge clk) begin
 
         access_count <= 0;
         hit_count <= 0;
+        miss_count <= 0;
         uncached_count <= 0;
     end
     else begin
@@ -755,16 +762,25 @@ always @(posedge clk) begin
                 if (cache_hit) begin
                     hit_count <= hit_count + 1;
                 end
+                else begin
+                    miss_count <= miss_count + 1;
+                end
             end
         end
     end
 
-    if (last_print_time + 10000 < $time) begin
+    if (last_print_time + 1000000 < $time) begin
         last_print_time <= $time;
 
-        $display("[%t] dcache1_2 access_count  : %d", $time, access_count);
-        $display("[%t] dcache1_2 hit_count     : %d", $time, hit_count);
-        $display("[%t] dcache1_2 uncached_count: %d", $time, uncached_count);
+        $display("[%t] dcache1_2 access_count  : %d +%d", $time, access_count, access_count - last_access_count);
+        $display("[%t] dcache1_2 hit_count     : %d +%d", $time, hit_count, hit_count - last_hit_count);
+        $display("[%t] dcache1_2 miss_count    : %d +%d", $time, miss_count, miss_count - last_miss_count);
+        $display("[%t] dcache1_2 uncached_count: %d +%d", $time, uncached_count, uncached_count - last_uncached_count);
+
+        last_access_count <= access_count;
+        last_hit_count <= hit_count;
+        last_miss_count <= miss_count;
+        last_uncached_count <= uncached_count;
     end
 end
 
