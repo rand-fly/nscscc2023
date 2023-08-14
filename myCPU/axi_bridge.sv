@@ -159,7 +159,7 @@ assign data_ret_data  = rdata;
 
 // assign data_wr_rdy = (write_state == WR_ST_REQ_IDLE);
 
-assign write_buffer_last = write_countdown_reg == 1;
+assign write_buffer_last = write_countdown_reg == 0;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -290,7 +290,7 @@ assign awsize   = write_queue_size[write_queue_head];
 assign awlen    = write_queue_len[write_queue_head];
 
 assign awvalid  = !write_queue_empty & (write_state == WR_ST_TX_WAIT);
-assign wlast    = wtype != 3'b100 | write_buffer_last;
+assign wlast    = write_buffer_last & (write_state == WR_ST_TX);
 
 always @(posedge clk) begin
     if (reset) begin
@@ -316,7 +316,7 @@ always @(posedge clk) begin
                 if (wlast) begin
                     write_state <= WR_ST_WAIT_B;
                     wvalid <= 1'b0;
-        	    bready <= 1'b1;
+        	        bready <= 1'b1;
                 end
                 else begin
                     write_state <= WR_ST_TX;
