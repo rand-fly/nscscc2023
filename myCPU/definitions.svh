@@ -1,6 +1,6 @@
 `ifndef DEFINITIONS_SVH_
 `define DEFINITIONS_SVH_ 
-
+`define DIFFTEST_EN
 `ifdef DIFFTEST_EN
 parameter TLBNUM = 32;
 `else

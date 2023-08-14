@@ -118,16 +118,16 @@ module tlb_top
             data_tlb_state <= `TLB_STATE_CACHE;
         end else begin
             case(inst_tlb_state)
-                0: begin
+                `TLB_STATE_CACHE: begin
                     test0 <= s0_valid;
                     test1 <= !inst_tlb_hit;
                     test2 <= s0_valid && (!inst_tlb_hit);
                     if(s0_valid && (!inst_tlb_hit)) begin
-                        inst_tlb_state <= 1;
+                        inst_tlb_state <= `TLB_STATE_L2;
                     end
                 end
-                1: begin
-                    inst_tlb_state <= 0;
+                `TLB_STATE_L2: begin
+                    inst_tlb_state <= `TLB_STATE_CACHE;
                 end
             endcase
             case(data_tlb_state)
