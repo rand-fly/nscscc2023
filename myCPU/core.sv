@@ -158,7 +158,13 @@ module core (
   logic             ro_a_is_sc;
   logic      [ 4:0] ro_a_r1;
   logic      [ 4:0] ro_a_r2;
+  logic      [31:0] ro_a_src1_passed;
+  logic             ro_a_src1_from_wba;
+  logic             ro_a_src1_ok;
+  logic      [31:0] ro_a_src2_passed;
   logic             ro_a_src2_is_imm;
+  logic             ro_a_src2_from_wba;
+  logic             ro_a_src2_ok;
 
   logic             ro_b_valid;
   logic      [31:0] ro_b_pc;
@@ -182,25 +188,22 @@ module core (
   logic             ro_b_is_sc;
   logic      [ 4:0] ro_b_r1;
   logic      [ 4:0] ro_b_r2;
+  logic      [31:0] ro_b_src1_passed;
+  logic             ro_b_src1_from_wba;
+  logic             ro_b_src1_ok;
+  logic      [31:0] ro_b_src2_passed;
   logic             ro_b_src2_is_imm;
+  logic             ro_b_src2_from_wba;
+  logic             ro_b_src2_ok;
+  logic             ro_b_delayed;
+  logic             ro_b_src1_delayed;
+  logic             ro_b_src2_delayed;
+
 `ifdef DIFFTEST_EN
   difftest_t ro_a_difftest;
   difftest_t ro_b_difftest;
 `endif
-  // forward planning
-  source_t                   ro_a_src1_source;
-  logic       [        31:0] ro_a_src1_passed;
-  logic                      ro_a_src1_ok;
-  source_t                   ro_a_src2_source;
-  logic       [        31:0] ro_a_src2_passed;
-  logic                      ro_a_src2_ok;
-  source_t                   ro_b_src1_source;
-  logic       [        31:0] ro_b_src1_passed;
-  logic                      ro_b_src1_ok;
-  source_t                   ro_b_src2_source;
-  logic       [        31:0] ro_b_src2_passed;
-  logic                      ro_b_src2_ok;
-  logic                      ro_b_delayed;
+
   // from regfile
   logic       [        31:0] rf_rdata1;
   logic       [        31:0] rf_rdata2;
@@ -315,11 +318,11 @@ module core (
   optype_t                   EX1_a_optype;
   opcode_t                   EX1_a_opcode;
   logic       [         4:0] EX1_a_dest;
-  source_t                   EX1_a_src1_source;
   logic       [        31:0] EX1_a_src1_passed;
+  logic                      EX1_a_src1_from_wba;
   logic       [        31:0] EX1_a_src1_stalled;
-  source_t                   EX1_a_src2_source;
   logic       [        31:0] EX1_a_src2_passed;
+  logic                      EX1_a_src2_from_wba;
   logic       [        31:0] EX1_a_src2_stalled;
   logic       [        31:0] EX1_a_imm;
   br_type_t                  EX1_a_br_type;
@@ -336,19 +339,22 @@ module core (
   logic                      EX1_a_is_idle;
   logic                      EX1_a_is_ll;
   logic                      EX1_a_is_sc;
+
   logic                      EX1_b_valid;
   logic       [        31:0] EX1_b_pc;
-  logic                      EX1_b_delayed;
   optype_t                   EX1_b_optype;
   opcode_t                   EX1_b_opcode;
   logic       [         4:0] EX1_b_dest;
-  source_t                   EX1_b_src1_source;
   logic       [        31:0] EX1_b_src1_passed;
+  logic                      EX1_b_src1_from_wba;
   logic       [        31:0] EX1_b_src1_stalled;
-  source_t                   EX1_b_src2_source;
   logic       [        31:0] EX1_b_src2_passed;
+  logic                      EX1_b_src2_from_wba;
   logic       [        31:0] EX1_b_src2_stalled;
   logic       [        31:0] EX1_b_imm;
+  logic                      EX1_b_delayed;
+  logic                      EX1_b_src1_delayed;
+  logic                      EX1_b_src2_delayed;
   br_type_t                  EX1_b_br_type;
   logic                      EX1_b_br_condition;
   logic       [        31:0] EX1_b_br_target;
@@ -412,9 +418,7 @@ module core (
   opcode_t          EX2_b_opcode;
   logic      [ 4:0] EX2_b_dest;
   logic      [31:0] EX2_b_src1;
-  logic             EX2_b_src1_delayed;
   logic      [31:0] EX2_b_src2;
-  logic             EX2_b_src2_delayed;
   logic      [31:0] EX2_b_alu_result;
   logic      [31:0] EX2_b_imm;
   br_type_t         EX2_b_br_type;
@@ -430,8 +434,6 @@ module core (
   logic            ex2_a_ok;
   logic            ex2_b_ok;
   logic            ex2_stall;
-  logic     [31:0] ex2_b_src1;
-  logic     [31:0] ex2_b_src2;
   logic            ex2_have_excp;
   excp_t           ex2_excp_type;
   logic     [31:0] ex2_excp_pc;
@@ -843,152 +845,139 @@ module core (
       .wdata2(rf_wdata2)
   );
 
-  // forward planning
+  // forward
   always_comb begin
-    ro_a_src1_passed = 32'd0;
+    ro_a_src1_from_wba = 1'b0;
     if (ro_a_r1 == 5'd0) begin
       ro_a_src1_ok = 1'b1;
-      ro_a_src1_source = SRC_ZERO;
+      ro_a_src1_passed = 32'd0;
     end else if (EX1_b_valid && EX1_b_dest == ro_a_r1 && !ex1_a_br_mistaken_long) begin
       ro_a_src1_ok = EX1_b_optype == OP_ALU && !EX1_b_delayed;
-      ro_a_src1_source = SRC_EX2_B;
+      ro_a_src1_passed = alu_b1_result;
     end else if (EX1_a_valid && EX1_a_dest == ro_a_r1) begin
       ro_a_src1_ok = EX1_a_optype == OP_ALU;
-      ro_a_src1_source = SRC_EX2_A;
+      ro_a_src1_passed = alu_a_result;
     end else if (EX2_b_valid && EX2_b_dest == ro_a_r1) begin
-      ro_a_src1_ok = ex2_b_ok || WB_b_ok;
-      ro_a_src1_source = SRC_WB_B;
+      ro_a_src1_ok = EX2_b_optype == OP_ALU;
+      ro_a_src1_passed = alu_b2_result;
     end else if (EX2_a_valid && EX2_a_dest == ro_a_r1) begin
-      ro_a_src1_ok = ex2_a_ok || WB_a_ok;
-      ro_a_src1_source = SRC_WB_A;
+      ro_a_src1_ok = EX2_a_optype == OP_ALU || EX2_a_optype == OP_MEM && lsu_a_ok;
+      ro_a_src1_from_wba = EX2_a_optype == OP_MEM && lsu_a_ok;
+      ro_a_src1_passed = EX2_a_alu_result;
     end else if (WB_b_valid && WB_b_dest == ro_a_r1) begin
       ro_a_src1_ok = 1'b1;
-      ro_a_src1_source = SRC_PASSED;
       ro_a_src1_passed = WB_b_result;
     end else if (WB_a_valid && WB_a_dest == ro_a_r1) begin
       ro_a_src1_ok = 1'b1;
-      ro_a_src1_source = SRC_PASSED;
       ro_a_src1_passed = WB_a_result;
     end else begin
       ro_a_src1_ok = 1'b1;
-      ro_a_src1_source = SRC_PASSED;
       ro_a_src1_passed = rf_rdata1;
     end
   end
 
   always_comb begin
-    ro_a_src2_passed = 32'd0;
+    ro_a_src2_from_wba = 1'b0;
     if (ro_a_src2_is_imm) begin
       ro_a_src2_ok = 1'b1;
-      ro_a_src2_source = SRC_IMM;
+      ro_a_src2_passed = ro_a_imm;
     end else if (ro_a_r2 == 5'd0) begin
       ro_a_src2_ok = 1'b1;
-      ro_a_src2_source = SRC_ZERO;
+      ro_a_src2_passed = 32'd0;
     end else if (EX1_b_valid && EX1_b_dest == ro_a_r2 && !ex1_a_br_mistaken_long) begin
       ro_a_src2_ok = EX1_b_optype == OP_ALU && !EX1_b_delayed;
-      ro_a_src2_source = SRC_EX2_B;
+      ro_a_src2_passed = alu_b1_result;
     end else if (EX1_a_valid && EX1_a_dest == ro_a_r2) begin
       ro_a_src2_ok = EX1_a_optype == OP_ALU;
-      ro_a_src2_source = SRC_EX2_A;
+      ro_a_src2_passed = alu_a_result;
     end else if (EX2_b_valid && EX2_b_dest == ro_a_r2) begin
-      ro_a_src2_ok = ex2_b_ok || WB_b_ok;
-      ro_a_src2_source = SRC_WB_B;
+      ro_a_src2_ok = EX2_b_optype == OP_ALU;
+      ro_a_src2_passed = alu_b2_result;
     end else if (EX2_a_valid && EX2_a_dest == ro_a_r2) begin
-      ro_a_src2_ok = ex2_a_ok || WB_a_ok;
-      ro_a_src2_source = SRC_WB_A;
+      ro_a_src2_ok = EX2_a_optype == OP_ALU || EX2_a_optype == OP_MEM && lsu_a_ok;
+      ro_a_src2_from_wba = EX2_a_optype == OP_MEM && lsu_a_ok;
+      ro_a_src2_passed = EX2_a_alu_result;
     end else if (WB_b_valid && WB_b_dest == ro_a_r2) begin
       ro_a_src2_ok = 1'b1;
-      ro_a_src2_source = SRC_PASSED;
       ro_a_src2_passed = WB_b_result;
     end else if (WB_a_valid && WB_a_dest == ro_a_r2) begin
       ro_a_src2_ok = 1'b1;
-      ro_a_src2_source = SRC_PASSED;
       ro_a_src2_passed = WB_a_result;
     end else begin
       ro_a_src2_ok = 1'b1;
-      ro_a_src2_source = SRC_PASSED;
       ro_a_src2_passed = rf_rdata2;
     end
   end
 
   always_comb begin
-    ro_b_src1_passed = 32'd0;
-    if (ro_b_r1 == 5'd0) begin
+    ro_b_src1_from_wba = 1'b0;
+    if (ro_b_r1 == 5'd0 || ro_b_src1_delayed) begin
       ro_b_src1_ok = 1'b1;
-      ro_b_src1_source = SRC_ZERO;
-    end else if (ro_a_dest == ro_b_r1) begin
-      ro_b_src1_ok = ro_b_delayed;
-      ro_b_src1_source = SRC_DELAYED;
+      ro_b_src1_passed = 32'd0;
     end else if (EX1_b_valid && EX1_b_dest == ro_b_r1 && !ex1_a_br_mistaken_long) begin
       ro_b_src1_ok = EX1_b_optype == OP_ALU && !EX1_b_delayed;
-      ro_b_src1_source = SRC_EX2_B;
+      ro_b_src1_passed = alu_b1_result;
     end else if (EX1_a_valid && EX1_a_dest == ro_b_r1) begin
       ro_b_src1_ok = EX1_a_optype == OP_ALU;
-      ro_b_src1_source = SRC_EX2_A;
+      ro_b_src1_passed = alu_a_result;
     end else if (EX2_b_valid && EX2_b_dest == ro_b_r1) begin
-      ro_b_src1_ok = ex2_b_ok || WB_b_ok;
-      ro_b_src1_source = SRC_WB_B;
+      ro_b_src1_ok = EX2_b_optype == OP_ALU;
+      ro_b_src1_passed = alu_b2_result;
     end else if (EX2_a_valid && EX2_a_dest == ro_b_r1) begin
-      ro_b_src1_ok = ex2_a_ok || WB_a_ok;
-      ro_b_src1_source = SRC_WB_A;
+      ro_b_src1_ok = EX2_a_optype == OP_ALU || EX2_a_optype == OP_MEM && lsu_a_ok;
+      ro_b_src1_from_wba = EX2_a_optype == OP_MEM && lsu_a_ok;
+      ro_b_src1_passed = EX2_a_alu_result;
     end else if (WB_b_valid && WB_b_dest == ro_b_r1) begin
       ro_b_src1_ok = 1'b1;
-      ro_b_src1_source = SRC_PASSED;
       ro_b_src1_passed = WB_b_result;
     end else if (WB_a_valid && WB_a_dest == ro_b_r1) begin
       ro_b_src1_ok = 1'b1;
-      ro_b_src1_source = SRC_PASSED;
       ro_b_src1_passed = WB_a_result;
     end else begin
       ro_b_src1_ok = 1'b1;
-      ro_b_src1_source = SRC_PASSED;
       ro_b_src1_passed = rf_rdata3;
     end
   end
 
   always_comb begin
-    ro_b_src2_passed = 32'd0;
+    ro_b_src2_from_wba = 1'b0;
     if (ro_b_src2_is_imm) begin
       ro_b_src2_ok = 1'b1;
-      ro_b_src2_source = SRC_IMM;
-    end else if (ro_b_r2 == 5'd0) begin
+      ro_b_src2_passed = ro_b_imm;
+    end else if (ro_b_r2 == 5'd0 || ro_b_src2_delayed) begin
       ro_b_src2_ok = 1'b1;
-      ro_b_src2_source = SRC_ZERO;
-    end else if (ro_a_dest == ro_b_r2) begin
-      ro_b_src2_ok = ro_b_delayed;
-      ro_b_src2_source = SRC_DELAYED;
+      ro_b_src2_passed = 32'd0;
     end else if (EX1_b_valid && EX1_b_dest == ro_b_r2 && !ex1_a_br_mistaken_long) begin
       ro_b_src2_ok = EX1_b_optype == OP_ALU && !EX1_b_delayed;
-      ro_b_src2_source = SRC_EX2_B;
+      ro_b_src2_passed = alu_b1_result;
     end else if (EX1_a_valid && EX1_a_dest == ro_b_r2) begin
       ro_b_src2_ok = EX1_a_optype == OP_ALU;
-      ro_b_src2_source = SRC_EX2_A;
+      ro_b_src2_passed = alu_a_result;
     end else if (EX2_b_valid && EX2_b_dest == ro_b_r2) begin
-      ro_b_src2_ok = ex2_b_ok || WB_b_ok;
-      ro_b_src2_source = SRC_WB_B;
+      ro_b_src2_ok = EX2_b_optype == OP_ALU;
+      ro_b_src2_passed = alu_b2_result;
     end else if (EX2_a_valid && EX2_a_dest == ro_b_r2) begin
-      ro_b_src2_ok = ex2_a_ok || WB_a_ok;
-      ro_b_src2_source = SRC_WB_A;
+      ro_b_src2_ok = EX2_a_optype == OP_ALU || EX2_a_optype == OP_MEM && lsu_a_ok;
+      ro_b_src2_from_wba = EX2_a_optype == OP_MEM && lsu_a_ok;
+      ro_b_src2_passed = EX2_a_alu_result;
     end else if (WB_b_valid && WB_b_dest == ro_b_r2) begin
       ro_b_src2_ok = 1'b1;
-      ro_b_src2_source = SRC_PASSED;
       ro_b_src2_passed = WB_b_result;
     end else if (WB_a_valid && WB_a_dest == ro_b_r2) begin
       ro_b_src2_ok = 1'b1;
-      ro_b_src2_source = SRC_PASSED;
       ro_b_src2_passed = WB_a_result;
     end else begin
       ro_b_src2_ok = 1'b1;
-      ro_b_src2_source = SRC_PASSED;
       ro_b_src2_passed = rf_rdata4;
     end
   end
-
 
   wire related = (ro_a_dest == ro_b_r1 || ro_a_dest == ro_b_r2) && ro_a_dest != 5'd0;
   wire b_will_br = ro_b_br_type == BR_COND || ro_b_br_type == BR_INDIR || ro_b_br_type == BR_RET;
 
   assign ro_b_delayed = ro_a_optype == OP_ALU && ro_b_optype == OP_ALU && related;
+  assign ro_b_src1_delayed = ro_b_delayed && ro_a_dest == ro_b_r1;
+  assign ro_b_src2_delayed = ro_b_delayed && ro_a_dest == ro_b_r2;
 
   assign allow_issue_a = !ibuf_no_out && ro_a_valid && ro_a_src1_ok && ro_a_src2_ok;
   assign allow_issue_b = !ibuf_no_out && allow_issue_a && !ro_a_have_excp
@@ -1014,10 +1003,10 @@ module core (
       EX1_a_optype         <= ro_a_optype;
       EX1_a_opcode         <= ro_a_opcode;
       EX1_a_dest           <= ro_a_dest;
-      EX1_a_src1_source    <= ro_a_src1_source;
       EX1_a_src1_passed    <= ro_a_src1_passed;
-      EX1_a_src2_source    <= ro_a_src2_source;
+      EX1_a_src1_from_wba  <= ro_a_src1_from_wba;
       EX1_a_src2_passed    <= ro_a_src2_passed;
+      EX1_a_src2_from_wba  <= ro_a_src2_from_wba;
       EX1_a_imm            <= ro_a_imm;
       EX1_a_br_type        <= ro_a_br_type;
       EX1_a_br_condition   <= ro_a_br_condition;
@@ -1043,15 +1032,17 @@ module core (
 
     if (!ex1_stall && allow_issue_b) begin
       EX1_b_pc             <= ro_b_pc;
-      EX1_b_delayed        <= ro_b_delayed;
       EX1_b_optype         <= ro_b_optype;
       EX1_b_opcode         <= ro_b_opcode;
       EX1_b_dest           <= ro_b_dest;
-      EX1_b_src1_source    <= ro_b_src1_source;
       EX1_b_src1_passed    <= ro_b_src1_passed;
-      EX1_b_src2_source    <= ro_b_src2_source;
+      EX1_b_src1_from_wba  <= ro_b_src1_from_wba;
       EX1_b_src2_passed    <= ro_b_src2_passed;
+      EX1_b_src2_from_wba  <= ro_b_src2_from_wba;
       EX1_b_imm            <= ro_b_imm;
+      EX1_b_delayed        <= ro_b_delayed;
+      EX1_b_src1_delayed   <= ro_b_src1_delayed;
+      EX1_b_src2_delayed   <= ro_b_src2_delayed;
       EX1_b_br_type        <= ro_b_br_type;
       EX1_b_br_condition   <= ro_b_br_condition;
       EX1_b_br_target      <= ro_b_br_target;
@@ -1092,49 +1083,17 @@ module core (
     end
   end
 
-  always_comb begin
-    if (EX1_stalling) begin
-      ex1_a_src1 = EX1_a_src1_stalled;
-      ex1_a_src2 = EX1_a_src2_stalled;
-      ex1_b_src1 = EX1_b_src1_stalled;
-      ex1_b_src2 = EX1_b_src2_stalled;
-    end else begin
-      unique case (EX1_a_src1_source)
-        SRC_PASSED: ex1_a_src1 = EX1_a_src1_passed;
-        SRC_EX2_A:  ex1_a_src1 = EX2_a_alu_result;
-        SRC_EX2_B:  ex1_a_src1 = EX2_b_alu_result;
-        SRC_WB_A:   ex1_a_src1 = WB_a_result;
-        SRC_WB_B:   ex1_a_src1 = WB_b_result;
-        default:    ex1_a_src1 = 32'd0;
-      endcase
-      unique case (EX1_a_src2_source)
-        SRC_PASSED: ex1_a_src2 = EX1_a_src2_passed;
-        SRC_IMM:    ex1_a_src2 = EX1_a_imm;
-        SRC_EX2_A:  ex1_a_src2 = EX2_a_alu_result;
-        SRC_EX2_B:  ex1_a_src2 = EX2_b_alu_result;
-        SRC_WB_A:   ex1_a_src2 = WB_a_result;
-        SRC_WB_B:   ex1_a_src2 = WB_b_result;
-        default:    ex1_a_src2 = 32'd0;
-      endcase
-      unique case (EX1_b_src1_source)
-        SRC_PASSED: ex1_b_src1 = EX1_b_src1_passed;
-        SRC_EX2_A:  ex1_b_src1 = EX2_a_alu_result;
-        SRC_EX2_B:  ex1_b_src1 = EX2_b_alu_result;
-        SRC_WB_A:   ex1_b_src1 = WB_a_result;
-        SRC_WB_B:   ex1_b_src1 = WB_b_result;
-        default:    ex1_b_src1 = 32'd0;
-      endcase
-      unique case (EX1_b_src2_source)
-        SRC_PASSED: ex1_b_src2 = EX1_b_src2_passed;
-        SRC_IMM:    ex1_b_src2 = EX1_b_imm;
-        SRC_EX2_A:  ex1_b_src2 = EX2_a_alu_result;
-        SRC_EX2_B:  ex1_b_src2 = EX2_b_alu_result;
-        SRC_WB_A:   ex1_b_src2 = WB_a_result;
-        SRC_WB_B:   ex1_b_src2 = WB_b_result;
-        default:    ex1_b_src2 = 32'd0;
-      endcase
-    end
-  end
+  assign ex1_a_src1 = EX1_stalling ? EX1_a_src1_stalled :
+               EX1_a_src1_from_wba ? WB_a_result : EX1_a_src1_passed;
+
+  assign ex1_a_src2 = EX1_stalling ? EX1_a_src2_stalled :
+               EX1_a_src2_from_wba ? WB_a_result : EX1_a_src2_passed;
+
+  assign ex1_b_src1 = EX1_stalling ? EX1_b_src1_stalled :
+               EX1_b_src1_from_wba ? WB_a_result : EX1_b_src1_passed;
+
+  assign ex1_b_src2 = EX1_stalling ? EX1_b_src2_stalled :
+               EX1_b_src2_from_wba ? WB_a_result : EX1_b_src2_passed;
 
   logic  cacop_ok_reg;
   logic  cacop_have_excp_reg;
@@ -1412,10 +1371,8 @@ module core (
       EX2_b_optype <= EX1_b_optype;
       EX2_b_opcode <= EX1_b_opcode;
       EX2_b_dest <= EX1_b_dest;
-      EX2_b_src1 <= ex1_b_src1;
-      EX2_b_src1_delayed <= EX1_b_src1_source == SRC_DELAYED;
-      EX2_b_src2 <= ex1_b_src2;
-      EX2_b_src2_delayed <= EX1_b_src2_source == SRC_DELAYED;
+      EX2_b_src1 <= EX1_b_src1_delayed ? alu_a_result : ex1_b_src1;
+      EX2_b_src2 <= EX1_b_src2_delayed ? alu_a_result : ex1_b_src2;
       EX2_b_alu_result <= alu_b1_result;
       EX2_b_imm <= EX1_b_imm;
       EX2_b_br_type <= EX1_b_br_type;
@@ -1482,13 +1439,11 @@ module core (
   assign ex2_a_ok = !(EX2_a_optype == OP_DIV && !div_ok || EX2_a_optype == OP_MUL && !mul_a_ok || EX2_a_optype == OP_MEM && !lsu_a_ok && !EX2_a_have_excp);
   assign ex2_b_ok = !(EX2_b_optype == OP_DIV && !div_ok || EX2_b_optype == OP_MUL && !mul_b_ok || EX2_b_optype == OP_MEM && !lsu_b_ok && !EX2_b_have_excp);
   assign ex2_stall  = /*(EX2_a_valid || EX2_b_valid) &&*/ (EX2_a_valid && !ex2_a_ok && !WB_a_ok || EX2_b_valid && !ex2_b_ok && !WB_b_ok);
-  assign ex2_b_src1 = EX2_b_src1_delayed ? EX2_a_alu_result : EX2_b_src1;
-  assign ex2_b_src2 = EX2_b_src2_delayed ? EX2_a_alu_result : EX2_b_src2;
 
   alu u_alu_b2 (
       .opcode(alu_opcode_t'(EX2_b_opcode)),
-      .src1  (ex2_b_src1),
-      .src2  (ex2_b_src2),
+      .src1  (EX2_b_src1),
+      .src2  (EX2_b_src2),
       .result(alu_b2_result)
   );
 
