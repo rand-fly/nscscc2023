@@ -177,19 +177,23 @@ module tlb_top
         end
     end
 
-    
     always @(posedge clk) begin
         if(reset) begin
             s0_vppn_reg <= 0;
-            s1_vppn_reg <= 0;
             s0_asid_reg <= 0;
-            s1_asid_reg <= 0;
             s0_va_bit12_reg <= 0;
-            s1_va_bit12_reg <= 0;
         end else if (inst_tlb_state == `TLB_STATE_CACHE)begin
             s0_vppn_reg <= s0_vppn;
             s0_asid_reg <= s0_asid;
             s0_va_bit12_reg <= s0_va_bit12;
+        end
+    end
+
+    always @(posedge clk) begin
+        if(reset) begin
+            s1_vppn_reg <= 0;
+            s1_asid_reg <= 0;
+            s1_va_bit12_reg <= 0;
         end else if (data_tlb_state == `TLB_STATE_CACHE)begin
             s1_vppn_reg <= s1_vppn;
             s1_asid_reg <= s1_asid;
