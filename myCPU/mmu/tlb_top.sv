@@ -234,7 +234,7 @@ module tlb_top
         end
     end
 
-    
+
 
     tcache inst_tlb(
         .clk(clk),
@@ -245,14 +245,7 @@ module tlb_top
         .s_asid(s0_asid),
         .s_result(inst_tlb_result),
 
-        .we(we),
-        .w_index(w_index),
-        .w_entry(w_entry),
-
-        .invtlb_valid(invtlb_valid),
-        .invtlb_op(invtlb_op),
-        .invtlb_va(invtlb_va),
-        .invtlb_asid(invtlb_asid),
+        .invalid(we || invtlb_valid),
 
         .refill_valid(inst_tlb_refill_valid_reg & inst_tlb_state == `TLB_STATE_REFILL),
         .refill_data(inst_tlb_refill_data_reg),
@@ -268,21 +261,13 @@ module tlb_top
         .s_asid(s1_asid),
         .s_result(data_tlb_result),
 
-        .we(we),
-        .w_index(w_index),
-        .w_entry(w_entry),
-
-        .invtlb_valid(invtlb_valid),
-        .invtlb_op(invtlb_op),
-        .invtlb_va(invtlb_va),
-        .invtlb_asid(invtlb_asid),
-
+        .invalid(we || invtlb_valid),
 
         .refill_valid(data_tlb_refill_valid_reg & data_tlb_state == `TLB_STATE_REFILL),
         .refill_data(data_tlb_refill_data_reg),
         .refill_index(data_tlb_refill_index_reg)
     );
-    
+
     tlb_L2 tlb_L2(
         .clk(clk),
         .reset(reset),
@@ -311,7 +296,5 @@ module tlb_top
         .r_index(r_index),
         .r_entry(r_entry)
     );
-
-    
 
 endmodule

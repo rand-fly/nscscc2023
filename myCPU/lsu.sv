@@ -4,7 +4,6 @@ module lsu (
     input                                   clk,
     input                                   reset,
     // from ex1
-    input                                   prepare,
     input                                   valid,
     output                                  ready,
     input               [             31:0] addr,

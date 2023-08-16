@@ -1058,7 +1058,9 @@ module core (
   assign ex1_a_addr = ex1_a_src1 + EX1_a_imm;
   assign ex1_b_addr = ex1_b_src1 + EX1_b_imm;
 
-  assign ex1_ready = (!lsu_valid || lsu_ready) && (!is_tlbsrch || tlbsrch_ok) && (!cacop2_valid || cacop2_ok);
+  assign ex1_ready = (!lsu_valid || lsu_ready)
+            && (!is_tlbsrch || tlbsrch_ok)
+            && (!cacop2_valid || cacop2_ok_reg);
   assign ex1_stall =  /*(EX1_a_valid || EX1_b_valid) &&*/ (!ex1_ready || ex2_stall);
 
   alu u_alu_a (
@@ -1145,7 +1147,6 @@ module core (
   lsu u_lsu (
       .clk(clk),
       .reset(reset),
-      .prepare(is_mem_op),
       .valid(lsu_valid),
       .ready(lsu_ready),
       .addr((EX1_a_valid && (EX1_a_optype == OP_MEM || EX1_a_optype == OP_CACHE)) ? ex1_a_addr : ex1_b_addr),
@@ -1235,7 +1236,17 @@ module core (
 
   assign cacop_op = EX1_a_opcode[4:3];
   assign cacop2_valid = (EX1_a_valid && EX1_a_optype == OP_CACHE || EX1_a_valid && EX1_a_optype == OP_CACHE) && cacop_op == 2;
-  assign cacop_en = !ex2_stall && !flush_ex1 && (!cacop2_valid || cacop2_ok && !lsu_have_excp);
+  assign cacop_en = !ex2_stall && !flush_ex1 && (!cacop2_valid || cacop2_ok_reg && !lsu_have_excp);
+
+  logic cacop2_ok_reg;
+
+  always_ff @(posedge clk) begin
+    if (reset || !ex1_stall) begin
+      cacop2_ok_reg <= 1'b0;
+    end else if (cacop2_ok) begin
+      cacop2_ok_reg <= 1'b1;
+    end
+  end
 
   always_ff @(posedge clk) begin
     if (reset) begin
