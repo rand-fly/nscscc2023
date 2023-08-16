@@ -452,13 +452,11 @@ always @(posedge clk) begin
                         main_state <= MAIN_ST_IDLE;
                     end
                 end
-                else if (rd_rdy) begin
-                    if (cacop_iiw_reg) begin
+                else if (cacop_iiw_reg) begin
                         main_state <= MAIN_ST_CACOP12;
-                    end
-                    else begin
-                        main_state <= MAIN_ST_REFILL;
-                    end
+                end
+                else if (rd_rdy) begin
+                    main_state <= MAIN_ST_REFILL;
                 end
             end
             MAIN_ST_REFILL: begin
@@ -658,8 +656,8 @@ blk_mem_gen_cache_32 dcache_way1_ram(
 );
 
 
-`define DBG_TAG 20'h0006
-`define DBG_INDEX 7'h56
+`define DBG_TAG 20'h8bf
+`define DBG_INDEX 7'h76
 // `define DCACHE_DBG
 
 `ifdef DCACHE_DBG
