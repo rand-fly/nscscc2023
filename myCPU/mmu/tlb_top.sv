@@ -1,7 +1,8 @@
 `include "../definitions.svh"
 `define TLB_STATE_CACHE 0
-`define TLB_STATE_L2    1
-`define TLB_STATE_REFILL 2
+`define TLB_STATE_L2_LOOKUP 1
+`define TLB_STATE_L2_FETCH 2
+`define TLB_STATE_REFILL 3
 
 module tlb_top
     (
@@ -44,6 +45,14 @@ module tlb_top
     reg [1:0] inst_tlb_state;
     reg [1:0] data_tlb_state;
 
+    //l2 input register
+    reg [18:0] s0_vppn_reg;
+    reg [18:0] s1_vppn_reg;
+    reg [ 9:0] s0_asid_reg;
+    reg [ 9:0] s1_asid_reg;
+    reg        s0_va_bit12_reg;
+    reg        s1_va_bit12_reg;
+
     // hit signal
     logic l2_hit_0;
     logic l2_hit_1;
@@ -77,8 +86,8 @@ module tlb_top
     assign inst_tlb_hit = inst_tlb_result.found;
     assign data_tlb_hit = data_tlb_result.found;
 
-    assign inst_tlb_refill_valid = l2_hit_0 & inst_tlb_state == `TLB_STATE_L2;
-    assign data_tlb_refill_valid = l2_hit_1 & data_tlb_state == `TLB_STATE_L2;
+    assign inst_tlb_refill_valid = l2_hit_0 & inst_tlb_state == `TLB_STATE_L2_FETCH;
+    assign data_tlb_refill_valid = l2_hit_1 & data_tlb_state == `TLB_STATE_L2_FETCH;
     assign inst_tlb_refill_index = l2_hit_index_0;
     assign data_tlb_refill_index = l2_hit_index_1;
     assign inst_tlb_refill_data = l2_entry_0;
@@ -120,10 +129,17 @@ module tlb_top
             case(inst_tlb_state)
                 `TLB_STATE_CACHE: begin
                     if(s0_valid && (!inst_tlb_hit)) begin
-                        inst_tlb_state <= `TLB_STATE_L2;
+                        inst_tlb_state <= `TLB_STATE_L2_LOOKUP;
                     end
                 end
-                `TLB_STATE_L2: begin
+                `TLB_STATE_L2_LOOKUP: begin
+                    if(!s0_valid) begin
+                        inst_tlb_state <= `TLB_STATE_CACHE;
+                    end else begin
+                        inst_tlb_state <= `TLB_STATE_L2_FETCH;
+                    end
+                end
+                `TLB_STATE_L2_FETCH: begin
                     if(!s0_valid) begin
                         inst_tlb_state <= `TLB_STATE_CACHE;
                     end else begin
@@ -137,10 +153,17 @@ module tlb_top
             case(data_tlb_state)
                 `TLB_STATE_CACHE: begin
                     if(s1_valid && (!data_tlb_hit)) begin
-                        data_tlb_state <= `TLB_STATE_L2;
+                        data_tlb_state <= `TLB_STATE_L2_LOOKUP;
                     end
                 end
-                `TLB_STATE_L2: begin
+                `TLB_STATE_L2_LOOKUP: begin
+                    if(!s1_valid) begin
+                        data_tlb_state <= `TLB_STATE_CACHE;
+                    end else begin
+                        data_tlb_state <= `TLB_STATE_L2_FETCH;
+                    end
+                end
+                `TLB_STATE_L2_FETCH: begin
                     if(!s1_valid) begin
                         data_tlb_state <= `TLB_STATE_CACHE;
                     end else begin
@@ -154,9 +177,28 @@ module tlb_top
         end
     end
 
+    
+    always @(posedge clk) begin
+        if(reset) begin
+            s0_vppn_reg <= 0;
+            s1_vppn_reg <= 0;
+            s0_asid_reg <= 0;
+            s1_asid_reg <= 0;
+            s0_va_bit12_reg <= 0;
+            s1_va_bit12_reg <= 0;
+        end else if (inst_tlb_state == `TLB_STATE_CACHE)begin
+            s0_vppn_reg <= s0_vppn;
+            s0_asid_reg <= s0_asid;
+            s0_va_bit12_reg <= s0_va_bit12;
+        end else if (data_tlb_state == `TLB_STATE_CACHE)begin
+            s1_vppn_reg <= s1_vppn;
+            s1_asid_reg <= s1_asid;
+            s1_va_bit12_reg <= s1_va_bit12;
+        end
+    end
 
     always_comb begin: l2_result_comb
-        if ((l2_entry_0.ps == 12 && s0_va_bit12 == 0) || (l2_entry_0.ps == 21 && s0_vppn[8] == 0)) begin
+        if ((l2_entry_0.ps == 12 && s0_va_bit12_reg == 0) || (l2_entry_0.ps == 21 && s0_vppn_reg[8] == 0)) begin
             l2_result_0.ppn = l2_entry_0.ppn0;
             l2_result_0.ps  = l2_entry_0.ps;
             l2_result_0.plv = l2_entry_0.plv0;
@@ -171,7 +213,7 @@ module tlb_top
             l2_result_0.d   = l2_entry_0.d1;
             l2_result_0.v   = l2_entry_0.v1;
         end
-        if ((l2_entry_1.ps == 12 && s1_va_bit12 == 0) || (l2_entry_1.ps == 21 && s1_vppn[8] == 0)) begin
+        if ((l2_entry_1.ps == 12 && s1_va_bit12_reg == 0) || (l2_entry_1.ps == 21 && s1_vppn_reg[8] == 0)) begin
             l2_result_1.ppn = l2_entry_1.ppn0;
             l2_result_1.ps  = l2_entry_1.ps;
             l2_result_1.plv = l2_entry_1.plv0;
@@ -187,6 +229,8 @@ module tlb_top
             l2_result_1.v   = l2_entry_1.v1;
         end
     end
+
+    
 
     tcache inst_tlb(
         .clk(clk),
@@ -239,14 +283,14 @@ module tlb_top
         .clk(clk),
         .reset(reset),
 
-        .s0_vppn(s0_vppn),
-        .s0_asid(s0_asid),
+        .s0_vppn(s0_vppn_reg),
+        .s0_asid(s0_asid_reg),
         .s0_result(l2_entry_0),
         .s0_found(l2_hit_0),
         .s0_index(l2_hit_index_0),
 
-        .s1_vppn(s1_vppn),
-        .s1_asid(s1_asid),
+        .s1_vppn(s1_vppn_reg),
+        .s1_asid(s1_asid_reg),
         .s1_result(l2_entry_1),
         .s1_found(l2_hit_1),
         .s1_index(l2_hit_index_1),
