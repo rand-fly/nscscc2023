@@ -12,14 +12,9 @@ module tcache (
 
     // invtlb opcode
     input        invtlb_valid,
-    input [ 4:0] invtlb_op,
-    input [ 9:0] invtlb_asid,
-    input [31:0] invtlb_va,
 
     // write port
     input                            we,       //w(rite) e(nable)
-    input             [TLBIDLEN-1:0] w_index,
-    input tlb_entry_t                w_entry,
 
     // read port
     // input              [`TCACHE_ID_LEN-1:0] r_index,
@@ -78,15 +73,10 @@ module tcache (
     data[index_].v1 <= w_data_.v1\
   
   logic       [  `TCACHE_NUM-1:0] match;
-  logic       [  `TCACHE_NUM-1:0] match_w;
 
   logic       [`TCACHE_ID_LEN-1:0] match_id_sel[`TCACHE_NUM];
-  logic       [`TCACHE_ID_LEN-1:0] match_id_sel_w[`TCACHE_NUM];
   logic       [`TCACHE_ID_LEN-1:0] match_id;
-  logic       [`TCACHE_ID_LEN-1:0] match_id_w;
   logic       [`TCACHE_ID_LEN-1:0] r_index;
-
-  logic                            hit_w;
 
   tlb_store_t                result_sel  [`TCACHE_NUM];
 
@@ -103,13 +93,9 @@ module tcache (
     end
   endgenerate
 
-  generate
-    for (genvar i = 0; i < `TCACHE_NUM; i = i + 1) begin : gen_match_w
-      assign match_w[i] = valid[i] && tlb_index[i] == w_index;
-      assign match_id_sel_w[i] = {`TCACHE_ID_LEN{match_w[i]}} & `TCACHE_ID_LEN'(i);
-    end
-  endgenerate
-
+  `ifdef TCACHE_WAY_1
+  assign r_index = 0;
+  `endif
   `ifdef TCACHE_WAY_2
   assign r_index = lru_cnt[0] < lru_cnt[1];
   `endif
@@ -131,16 +117,13 @@ module tcache (
 
   always_comb begin
     match_id = 0;
-    match_id_w = 0;
     for (int i = 0; i < `TCACHE_NUM; i = i + 1) begin
       match_id |= match_id_sel[i];
-      match_id_w |= match_id_sel_w[i];
     end
   end
 
   assign s_result.index = tlb_index[match_id];
   assign s_result.found = |match;
-  assign hit_w = | match_w;
   always_comb begin
     logic [`TCACHE_ID_LEN-1:0] i;
     i = match_id;
@@ -163,15 +146,6 @@ module tcache (
   end
   //end select tlb
 
-  //invtlb
-  wire        tlb_clr = invtlb_op == 5'h0 || invtlb_op == 5'h1;
-  wire        tlb_clr_g1 = invtlb_op == 5'h2;
-  wire        tlb_clr_g0 = invtlb_op == 5'h3;
-  wire        tlb_clr_g0_asid = invtlb_op == 5'h4;
-  wire        tlb_clr_g0_asid_vpn = invtlb_op == 5'h5;
-  wire        tlb_clr_g1_asid_vpn = invtlb_op == 5'h6;
-  wire [18:0] invtlb_vppn = invtlb_va[31:13];
-
   always_ff @(posedge clk) begin
     //lru increase
     for(int i = 0; i < `TCACHE_NUM; i = i + 1) begin
@@ -182,45 +156,15 @@ module tcache (
         lru_cnt[i] <= lru_cnt[i] + |(lru_cnt[i] ^ 5'b11111);
       end
     end
-    if (reset) begin
+    if (reset || we || invtlb_valid) begin
       for (int i = 0; i < `TCACHE_NUM; i = i + 1) begin
         lru_cnt[i] <= 0;
         valid[i] <= 0;
       end
-    end else if (invtlb_valid) begin
-      for (int i = 0; i < `TCACHE_NUM; i = i + 1) begin
-        if (data[i].e) begin
-          if(
-                (tlb_clr) ||
-                (tlb_clr_g1 && data[i].g == 1)||
-                (tlb_clr_g0 && data[i].g == 0)||
-                (tlb_clr_g0_asid && data[i].g == 0 && data[i].asid == invtlb_asid)||
-                (
-                    tlb_clr_g0_asid_vpn &&
-                    data[i].g == 0 && data[i].asid == invtlb_asid &&
-                    (data[i].ps4MB ? invtlb_vppn[18:9] == data[i].vppn[18:9]: invtlb_vppn == data[i].vppn)
-                ) ||
-                (
-                    tlb_clr_g1_asid_vpn &&
-                    (data[i].g == 1 || data[i].asid == invtlb_asid) &&
-                    (data[i].ps4MB ? invtlb_vppn[18:9] == data[i].vppn[18:9]: invtlb_vppn == data[i].vppn)
-                )
-            ) begin
-            data[i].e <= 0;
-          end
-        end
-      end
-    end else if (refill_valid) begin
+    end  else if (refill_valid) begin
       valid[r_index] <= 1;
       tlb_index[r_index] <= refill_index;
-      if (we && hit_w && w_index == refill_index) begin //refill data to be writen
-        `write_data(match_id_w, w_entry);
-      end else begin
-        `write_data(r_index, refill_data);
-      end
-  
-    end else if (we && hit_w) begin
-      `write_data(match_id_w, w_entry);
+      `write_data(r_index, refill_data);
     end
   end
 endmodule

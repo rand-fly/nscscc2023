@@ -49,6 +49,11 @@ parameter PALEN = 32;
   `define TCACHE_ID_LEN 1
 `endif
 
+`ifdef TCACHE_WAY_1
+  `define TCACHE_NUM 1
+  `define TCACHE_ID_LEN 1
+`endif
+
 typedef enum logic [2:0] {
   OP_ALU,
   OP_MUL,
