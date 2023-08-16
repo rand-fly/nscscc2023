@@ -22,24 +22,18 @@ module lsu (
     output                                  ok,
     output logic        [             31:0] ld_data,
     // to/from dcache
-    output                                  dcache_p0_valid,
-    output                                  dcache_p1_valid,
+    output                                  dcache_valid,
     output              [              2:0] dcache_op,
     output              [   `TAG_WIDTH-1:0] dcache_tag,
     output              [ `INDEX_WIDTH-1:0] dcache_index,
-    output              [`OFFSET_WIDTH-1:0] dcache_p0_offset,
-    output              [`OFFSET_WIDTH-1:0] dcache_p1_offset,
-    output logic        [              3:0] dcache_p0_wstrb,
-    output              [              3:0] dcache_p1_wstrb,
-    output logic        [             31:0] dcache_p0_wdata,
-    output              [             31:0] dcache_p1_wdata,
+    output              [`OFFSET_WIDTH-1:0] dcache_offset,
+    output logic        [              3:0] dcache_wstrb,
+    output logic        [             31:0] dcache_wdata,
     output                                  dcache_uncached,
-    output              [              1:0] dcache_p0_size,
-    output              [              1:0] dcache_p1_size,
+    output              [              1:0] dcache_size,
     input                                   dcache_addr_ok,
     input                                   dcache_data_ok,
-    input               [             31:0] dcache_p0_rdata,
-    input               [             31:0] dcache_p1_rdata,
+    input               [             31:0] dcache_rdata,
     // to/from mmu
     output                                  mmu_valid,
     output              [   `TAG_WIDTH-1:0] mmu_vtag,
@@ -78,19 +72,13 @@ module lsu (
 
   assign ok = dcache_data_ok;
 
-  assign dcache_p0_valid = valid && !have_excp && (mmu_ok || mmu_ok_reg) || dcacop_valid;
+  assign dcache_valid = valid && !have_excp && (mmu_ok || mmu_ok_reg) || dcacop_valid;
   assign dcache_tag = mmu_ptag;
   assign dcache_index = addr[`OFFSET_WIDTH+`INDEX_WIDTH-1:`OFFSET_WIDTH];
-  assign dcache_p0_offset = addr[`OFFSET_WIDTH-1:0];
+  assign dcache_offset = addr[`OFFSET_WIDTH-1:0];
   assign dcache_op = dcacop_valid ? {1'b1, cacop_op} : {2'd0, opcode.store};
-  assign dcache_p0_size = opcode.size_byte ? 2'd0 : opcode.size_half ? 2'd1 : 2'd2;
+  assign dcache_size = opcode.size_byte ? 2'd0 : opcode.size_half ? 2'd1 : 2'd2;
   assign dcache_uncached = mmu_mat == 2'd0;
-
-  assign dcache_p1_valid = 1'b0;
-  assign dcache_p1_offset = 0;
-  assign dcache_p1_size = 0;
-  assign dcache_p1_wstrb = 0;
-  assign dcache_p1_wdata = 0;
 
   assign mmu_vtag = addr[31:31-`TAG_WIDTH+1];
   assign mmu_valid = valid && !mmu_ok_reg || cacop2_valid;
@@ -100,21 +88,21 @@ module lsu (
   always_comb begin
     if (opcode.size_byte) begin
       unique case (addr[1:0])
-        2'b00: dcache_p0_wstrb = 4'b0001;
-        2'b01: dcache_p0_wstrb = 4'b0010;
-        2'b10: dcache_p0_wstrb = 4'b0100;
-        2'b11: dcache_p0_wstrb = 4'b1000;
+        2'b00: dcache_wstrb = 4'b0001;
+        2'b01: dcache_wstrb = 4'b0010;
+        2'b10: dcache_wstrb = 4'b0100;
+        2'b11: dcache_wstrb = 4'b1000;
       endcase
-      dcache_p0_wdata = {4{st_data[7:0]}};
+      dcache_wdata = {4{st_data[7:0]}};
     end else if (opcode.size_half) begin
       unique case (addr[1])
-        1'b0: dcache_p0_wstrb = 4'b0011;
-        1'b1: dcache_p0_wstrb = 4'b1100;
+        1'b0: dcache_wstrb = 4'b0011;
+        1'b1: dcache_wstrb = 4'b1100;
       endcase
-      dcache_p0_wdata = {2{st_data[15:0]}};
+      dcache_wdata = {2{st_data[15:0]}};
     end else begin
-      dcache_p0_wstrb = 4'b1111;
-      dcache_p0_wdata = st_data;
+      dcache_wstrb = 4'b1111;
+      dcache_wdata = st_data;
     end
   end
 
@@ -158,21 +146,21 @@ module lsu (
     if (opcode_reg.size_byte) begin
       logic [7:0] load_b;
       unique case (addr_lowbit_reg[1:0])
-        2'b00: load_b = dcache_p0_rdata[7:0];
-        2'b01: load_b = dcache_p0_rdata[15:8];
-        2'b10: load_b = dcache_p0_rdata[23:16];
-        2'b11: load_b = dcache_p0_rdata[31:24];
+        2'b00: load_b = dcache_rdata[7:0];
+        2'b01: load_b = dcache_rdata[15:8];
+        2'b10: load_b = dcache_rdata[23:16];
+        2'b11: load_b = dcache_rdata[31:24];
       endcase
       ld_data = {{24{load_b[7] && opcode_reg.load_sign}}, load_b};
     end else if (opcode_reg.size_half) begin
       logic [15:0] load_h;
       unique case (addr_lowbit_reg[1])
-        1'b0: load_h = dcache_p0_rdata[15:0];
-        1'b1: load_h = dcache_p0_rdata[31:16];
+        1'b0: load_h = dcache_rdata[15:0];
+        1'b1: load_h = dcache_rdata[31:16];
       endcase
       ld_data = {{16{load_h[15] && opcode_reg.load_sign}}, load_h};
     end else begin
-      ld_data = dcache_p0_rdata;
+      ld_data = dcache_rdata;
     end
   end
 
