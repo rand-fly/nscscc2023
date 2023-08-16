@@ -1064,7 +1064,7 @@ module core (
   assign ex1_a_addr = ex1_a_src1 + EX1_a_imm;
   assign ex1_b_addr = ex1_b_src1 + EX1_b_imm;
 
-  assign ex1_ready = (!lsu_valid || lsu_ready) && (!is_tlbsrch || tlbsrch_ok);
+  assign ex1_ready = (!lsu_valid || lsu_ready) && (!is_tlbsrch || tlbsrch_ok) && (!cacop2_valid || cacop2_ok);
   assign ex1_stall =  /*(EX1_a_valid || EX1_b_valid) &&*/ (!ex1_ready || ex2_stall);
 
   alu u_alu_a (
@@ -1145,10 +1145,13 @@ module core (
   );
 
   wire mem_cancel = raise_excp || replay || ex1_a_br_mistaken_long;
-  wire lsu_valid = (EX1_a_valid && EX1_a_optype == OP_MEM || EX1_b_valid && EX1_b_optype == OP_MEM) && !ex2_stall && !mem_cancel;
+  wire is_mem_op = EX1_a_valid && EX1_a_optype == OP_MEM || EX1_b_valid && EX1_b_optype == OP_MEM;
+  wire lsu_valid = is_mem_op && !ex2_stall && !mem_cancel;
+
   lsu u_lsu (
       .clk(clk),
       .reset(reset),
+      .prepare(is_mem_op),
       .valid(lsu_valid),
       .ready(lsu_ready),
       .addr((EX1_a_valid && (EX1_a_optype == OP_MEM || EX1_a_optype == OP_CACHE)) ? ex1_a_addr : ex1_b_addr),
@@ -1241,10 +1244,10 @@ module core (
 
   assign icacop_valid = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 0 && cacop_en;
   assign dcacop_valid = EX1_a_valid && EX1_a_optype == OP_CACHE && EX1_a_opcode[2:0] == 1 && cacop_en;
-  // assign invalid_cacop = EX1_a_opcode[2:0] != 0 && EX1_a_opcode[2:0] != 1;
+
   assign cacop_op = EX1_a_opcode[4:3];
-  assign cacop2_valid = cacop_op == 2;
-  assign cacop_en = !ex1_stall && !flush_ex1 && (!cacop2_valid || cacop2_ok && !lsu_have_excp);
+  assign cacop2_valid = (EX1_a_valid && EX1_a_optype == OP_CACHE || EX1_a_valid && EX1_a_optype == OP_CACHE) && cacop_op == 2;
+  assign cacop_en = !ex2_stall && !flush_ex1 && (!cacop2_valid || cacop2_ok && !lsu_have_excp);
 
   always_ff @(posedge clk) begin
     if (reset) begin
@@ -1588,6 +1591,7 @@ module core (
       .tlb_w_entry   (tlb_w_entry),
       .tlb_r_index   (tlb_r_index),
       .tlb_r_entry   (tlb_r_entry),
+      .is_tlbsrch    (is_tlbsrch),
       .tlbsrch_valid (tlbsrch_valid),
       .tlbsrch_vppn  (tlbsrch_vppn),
       .tlbsrch_ok    (tlbsrch_ok),

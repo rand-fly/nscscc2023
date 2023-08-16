@@ -4,6 +4,7 @@ module lsu (
     input                                   clk,
     input                                   reset,
     // from ex1
+    input                                   prepare,
     input                                   valid,
     output                                  ready,
     input               [             31:0] addr,
@@ -50,15 +51,15 @@ module lsu (
     input                                   mmu_page_dirty,
     input                                   mmu_plv_fault
 );
-  logic               mmu_ok_reg;
-  logic        [ 1:0] addr_lowbit_reg;
-  mem_opcode_t        opcode_reg;
+  logic              mmu_ok_reg;
+  logic        [1:0] addr_lowbit_reg;
+  mem_opcode_t       opcode_reg;
 
   always_ff @(posedge clk) begin
     if (reset) begin
       mmu_ok_reg <= 1'b0;
     end else begin
-      if (valid && ready || have_excp) begin
+      if (valid && ready || cacop2_valid || have_excp) begin
         mmu_ok_reg <= 1'b0;
       end else if (mmu_ok) begin
         mmu_ok_reg <= 1'b1;
@@ -73,7 +74,7 @@ module lsu (
     end
   end
 
-  assign ready = have_excp || dcache_addr_ok && (!valid || mmu_ok || mmu_ok_reg);
+  assign ready = dcache_addr_ok && (mmu_ok || mmu_ok_reg);
 
   assign ok = dcache_data_ok;
 
@@ -92,7 +93,7 @@ module lsu (
   assign dcache_p1_wdata = 0;
 
   assign mmu_vtag = addr[31:31-`TAG_WIDTH+1];
-  assign mmu_valid = valid && !have_excp && !mmu_ok_reg || cacop2_valid;
+  assign mmu_valid = valid && !mmu_ok_reg || cacop2_valid;
 
   assign cacop2_ok = mmu_ok;
 
@@ -132,19 +133,19 @@ module lsu (
     end else if (opcode.size_half && addr[0] || opcode.size_word && addr[1:0] != 2'h0) begin
       have_excp = 1'b1;
       excp_type = ALE;
-    end else if (mmu_page_fault) begin
+    end else if (mmu_page_fault && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = D_TLBR;
-    end else if (mmu_page_invalid && opcode.load) begin
+    end else if (mmu_page_invalid && opcode.load && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = PIL;
-    end else if (mmu_page_invalid && opcode.store) begin
+    end else if (mmu_page_invalid && opcode.store && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = PIS;
-    end else if (mmu_plv_fault) begin
+    end else if (mmu_plv_fault && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = PPI;
-    end else if (mmu_page_dirty && opcode.store) begin
+    end else if (mmu_page_dirty && opcode.store && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = PME;
     end else begin

@@ -1,3 +1,4 @@
+`include "../definitions.svh"
 `define TLB_STATE_CACHE 0
 `define TLB_STATE_L2    1
 `define TLB_STATE_REFILL 2
@@ -40,8 +41,8 @@ module tlb_top
     );
 
     //state register
-    reg inst_tlb_state;
-    reg data_tlb_state;
+    reg [1:0] inst_tlb_state;
+    reg [1:0] data_tlb_state;
 
     // hit signal
     logic l2_hit_0;
@@ -123,7 +124,11 @@ module tlb_top
                     end
                 end
                 `TLB_STATE_L2: begin
-                    inst_tlb_state <= `TLB_STATE_REFILL;
+                    if(!s0_valid) begin
+                        inst_tlb_state <= `TLB_STATE_CACHE;
+                    end else begin
+                        inst_tlb_state <= `TLB_STATE_REFILL;
+                    end
                 end
                 `TLB_STATE_REFILL: begin
                     inst_tlb_state <= `TLB_STATE_CACHE;
@@ -136,7 +141,11 @@ module tlb_top
                     end
                 end
                 `TLB_STATE_L2: begin
-                    data_tlb_state <= `TLB_STATE_REFILL;
+                    if(!s1_valid) begin
+                        data_tlb_state <= `TLB_STATE_CACHE;
+                    end else begin
+                        data_tlb_state <= `TLB_STATE_REFILL;
+                    end
                 end
                 `TLB_STATE_REFILL: begin
                     data_tlb_state <= `TLB_STATE_CACHE;
@@ -147,7 +156,6 @@ module tlb_top
 
 
     always_comb begin: l2_result_comb
-        logic [TLBIDLEN-1:0] i;
         if ((l2_entry_0.ps == 12 && s0_va_bit12 == 0) || (l2_entry_0.ps == 21 && s0_vppn[8] == 0)) begin
             l2_result_0.ppn = l2_entry_0.ppn0;
             l2_result_0.ps  = l2_entry_0.ps;
@@ -198,7 +206,7 @@ module tlb_top
         .invtlb_va(invtlb_va),
         .invtlb_asid(invtlb_asid),
 
-        .refill_valid(inst_tlb_refill_valid_reg),
+        .refill_valid(inst_tlb_refill_valid_reg & inst_tlb_state == `TLB_STATE_REFILL),
         .refill_data(inst_tlb_refill_data_reg),
         .refill_index(inst_tlb_refill_index_reg)
     );
@@ -222,7 +230,7 @@ module tlb_top
         .invtlb_asid(invtlb_asid),
 
 
-        .refill_valid(data_tlb_refill_valid_reg),
+        .refill_valid(data_tlb_refill_valid_reg & data_tlb_state == `TLB_STATE_REFILL),
         .refill_data(data_tlb_refill_data_reg),
         .refill_index(data_tlb_refill_index_reg)
     );

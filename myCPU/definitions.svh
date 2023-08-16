@@ -37,7 +37,7 @@ parameter PALEN = 32;
 `define OFFSET_WIDTH 6
 `endif
 
-`define TCACHE_WAY_4
+`define TCACHE_WAY_2
 
 `ifdef TCACHE_WAY_4
   `define TCACHE_NUM 4

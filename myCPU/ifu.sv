@@ -91,16 +91,16 @@ module ifu (
 
   logic            addr_ok;
 
-  assign addr_ok   = icache_addr_ok && !icacop_valid && !pending_icacop;
+  assign addr_ok   = icache_addr_ok && !pending_icacop;
 
-  assign mmu_valid = !idle_state && !mmu_ok_reg;
+  assign mmu_valid = !idle_state && !mmu_ok_reg && !br_mistaken && !raise_excp && !replay;
   assign mmu_vtag  = pc_start[31:31-`TAG_WIDTH+1];
 
   always_ff @(posedge clk) begin
     if (reset) begin
       mmu_ok_reg <= 1'b0;
     end else begin
-      if (addr_ok) begin
+      if (addr_ok || br_mistaken || raise_excp || replay) begin
         mmu_ok_reg <= 1'b0;
       end else if (mmu_ok) begin
         mmu_ok_reg <= 1'b1;
@@ -192,33 +192,27 @@ module ifu (
   end
 
   assign icache_req = !idle_state && (mmu_ok || mmu_ok_reg) && !have_excp_inner &&
-                      ibuf_i_ready && (!pending_data || icache_data_ok)
-                      || icacop_valid || pending_icacop;
-  assign icache_op = (icacop_valid || pending_icacop) ?
-                    {1'b1, pending_icacop ? cacop_op_reg : cacop_op} :
-                    3'd0;
+                      ibuf_i_ready && (!pending_data || icache_data_ok) || pending_icacop;
+  assign icache_op = pending_icacop ? {1'b1, cacop_op_reg} : 3'd0;
   assign icache_uncached = mmu_mat == 2'd0;
-  assign icache_addr = (icacop_valid || pending_icacop) ?
-          (pending_icacop ? cacop_addr_reg : cacop_addr) :
-          {mmu_ptag, pc_start[31-`TAG_WIDTH:0]};
+  assign icache_addr = pending_icacop ? cacop_addr_reg : {mmu_ptag, pc_start[31-`TAG_WIDTH:0]};
   assign output_size = have_excp                    ? {1'b0, ibuf_i_ready} :
                        !icache_data_ok || cancel    ? 2'd0 :
                        sent_dual && !pred_br_taken0 ? 2'd2 :
                                                       2'd1 ;
-
 
   assign dual = mmu_mat == 2'd1 && pc_start[`OFFSET_WIDTH-1:2] != {(`OFFSET_WIDTH - 2) {1'b1}};
   always_comb begin
     if (pc_start[1:0] != 2'h0) begin
       have_excp_inner = 1'b1;
       excp_type_inner = ADEF;
-    end else if (mmu_page_fault) begin
+    end else if (mmu_page_fault && (mmu_ok || mmu_ok_reg)) begin
       have_excp_inner = 1'b1;
       excp_type_inner = I_TLBR;
-    end else if (mmu_page_invalid) begin
+    end else if (mmu_page_invalid && (mmu_ok || mmu_ok_reg)) begin
       have_excp_inner = 1'b1;
       excp_type_inner = PIF;
-    end else if (mmu_plv_fault) begin
+    end else if (mmu_plv_fault && (mmu_ok || mmu_ok_reg)) begin
       have_excp_inner = 1'b1;
       excp_type_inner = PPI;
     end else begin

@@ -40,6 +40,7 @@ module mmu (
     input              [TLBIDLEN-1:0] tlb_r_index,
     output tlb_entry_t                tlb_r_entry,
 
+    input                 is_tlbsrch,
     input                 tlbsrch_valid,
     input  [        18:0] tlbsrch_vppn,
     output                tlbsrch_ok,
@@ -59,15 +60,17 @@ module mmu (
   logic               tlb_s0_va_bit12;
   logic        [ 9:0] tlb_s0_asid;
   tlb_result_t        tlb_s0_result;
+  logic               tlb_s0_ok;
 
   logic        [18:0] tlb_s1_vppn;
   logic               tlb_s1_va_bit12;
   logic        [ 9:0] tlb_s1_asid;
   tlb_result_t        tlb_s1_result;
+  logic               tlb_s1_ok;
 
-  assign i_ok = i_valid;
-  assign d_ok = d_valid;
-  assign tlbsrch_ok = tlbsrch_valid;
+  assign i_ok = i_valid && (!i_use_tlb || tlb_s0_ok);
+  assign d_ok = d_valid && (!d_use_tlb || tlb_s1_ok);
+  assign tlbsrch_ok = tlbsrch_valid && tlb_s1_ok;
 
   addr_trans addr_trans_i (
       .direct_access    (da),
@@ -116,19 +119,23 @@ module mmu (
   assign tlbsrch_found = tlbsrch_valid && tlb_s1_result.found;
   assign tlbsrch_index = tlb_s1_result.index;
 
-  tlb u_tlb (
+  tlb_top u_tlb (
       .clk  (clk),
       .reset(reset),
 
       .s0_vppn    (tlb_s0_vppn),
       .s0_va_bit12(tlb_s0_va_bit12),
       .s0_asid    (tlb_s0_asid),
+      .s0_valid   (i_valid && i_use_tlb),
       .s0_result  (tlb_s0_result),
+      .s0_ok      (tlb_s0_ok),
 
-      .s1_vppn    (tlbsrch_valid ? tlbsrch_vppn : tlb_s1_vppn),
+      .s1_vppn    (is_tlbsrch ? tlbsrch_vppn : tlb_s1_vppn),
       .s1_va_bit12(tlb_s1_va_bit12),
       .s1_asid    (tlb_s1_asid),
+      .s1_valid   (d_valid && d_use_tlb || tlbsrch_valid),
       .s1_result  (tlb_s1_result),
+      .s1_ok      (tlb_s1_ok),
 
       .invtlb_valid(invtlb_valid),
       .invtlb_op   (invtlb_op),
