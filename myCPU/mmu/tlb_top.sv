@@ -1,5 +1,6 @@
 `define TLB_STATE_CACHE 0
 `define TLB_STATE_L2    1
+`define TLB_STATE_REFILL 2
 
 module tlb_top
     (
@@ -75,8 +76,8 @@ module tlb_top
     assign inst_tlb_hit = inst_tlb_result.found;
     assign data_tlb_hit = data_tlb_result.found;
 
-    assign inst_tlb_refill_valid = l2_hit_0 & inst_tlb_state;
-    assign data_tlb_refill_valid = l2_hit_1 & data_tlb_state;
+    assign inst_tlb_refill_valid = l2_hit_0 & inst_tlb_state == `TLB_STATE_L2;
+    assign data_tlb_refill_valid = l2_hit_1 & data_tlb_state == `TLB_STATE_L2;
     assign inst_tlb_refill_index = l2_hit_index_0;
     assign data_tlb_refill_index = l2_hit_index_1;
     assign inst_tlb_refill_data = l2_entry_0;
@@ -102,16 +103,14 @@ module tlb_top
     assign l2_result_0.index = l2_hit_index_0;
     assign l2_result_1.index = l2_hit_index_1;
 
-    assign s0_result = inst_tlb_state ? l2_result_0 : inst_tlb_result;
-    assign s1_result = data_tlb_state ? l2_result_1 : data_tlb_result;
+    assign s0_result = (inst_tlb_state == `TLB_STATE_CACHE) ? inst_tlb_result : l2_result_0;
+    assign s1_result = (data_tlb_state == `TLB_STATE_CACHE) ? data_tlb_result : l2_result_1;
     
     //tcache hit / lookup L2 -> valid result
-    assign s0_ok = (inst_tlb_hit & ~inst_tlb_state) | inst_tlb_state;
-    assign s1_ok = (data_tlb_hit & ~data_tlb_state) | data_tlb_state;
+    assign s0_ok = (inst_tlb_hit & inst_tlb_state == `TLB_STATE_CACHE) | inst_tlb_state == `TLB_STATE_REFILL;
+    assign s1_ok = (data_tlb_hit & data_tlb_state == `TLB_STATE_CACHE) | data_tlb_state == `TLB_STATE_REFILL;
     
-    reg test0;
-    reg test1;
-    reg test2;
+    
     always @(posedge clk) begin: state_transition
         if(reset) begin
             inst_tlb_state <= `TLB_STATE_CACHE;
@@ -119,16 +118,16 @@ module tlb_top
         end else begin
             case(inst_tlb_state)
                 `TLB_STATE_CACHE: begin
-                    test0 <= s0_valid;
-                    test1 <= !inst_tlb_hit;
-                    test2 <= s0_valid && (!inst_tlb_hit);
                     if(s0_valid && (!inst_tlb_hit)) begin
                         inst_tlb_state <= `TLB_STATE_L2;
                     end
                 end
                 `TLB_STATE_L2: begin
-                    inst_tlb_state <= `TLB_STATE_CACHE;
+                    inst_tlb_state <= `TLB_STATE_REFILL;
                 end
+                `TLB_STATE_REFILL: begin
+                    inst_tlb_state <= `TLB_STATE_CACHE;
+                end 
             endcase
             case(data_tlb_state)
                 `TLB_STATE_CACHE: begin
@@ -137,6 +136,9 @@ module tlb_top
                     end
                 end
                 `TLB_STATE_L2: begin
+                    data_tlb_state <= `TLB_STATE_REFILL;
+                end
+                `TLB_STATE_REFILL: begin
                     data_tlb_state <= `TLB_STATE_CACHE;
                 end
             endcase
