@@ -265,7 +265,6 @@ assign data_wr_rdy = ~write_queue_full;
 
 always @(posedge clk) begin
     if (reset) begin
-        write_queue_head <= 0;
         write_queue_tail <= 0;
     end
     else begin
@@ -300,6 +299,7 @@ always @(posedge clk) begin
         write_state <= WR_ST_TX_WAIT;
         write_countdown_reg <= 0;
         write_buffer_data   <= 0;
+        write_queue_head <= 0;
     end
     else case (write_state)
         WR_ST_TX_WAIT: begin
