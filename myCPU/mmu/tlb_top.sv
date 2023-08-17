@@ -130,7 +130,7 @@ module tlb_top
             case(inst_tlb_state)
                 `TLB_STATE_CACHE: begin
                     if(s0_valid && (!inst_tlb_hit)) begin
-                        inst_tlb_state <= `TLB_STATE_L2_FETCH;
+                        inst_tlb_state <= `TLB_STATE_L2_LOOKUP;
                     end
                 end
                 `TLB_STATE_L2_LOOKUP: begin
@@ -154,7 +154,7 @@ module tlb_top
             case(data_tlb_state)
                 `TLB_STATE_CACHE: begin
                     if(s1_valid && (!data_tlb_hit)) begin
-                        data_tlb_state <= `TLB_STATE_L2_FETCH;
+                        data_tlb_state <= `TLB_STATE_L2_LOOKUP;
                     end
                 end
                 `TLB_STATE_L2_LOOKUP: begin
