@@ -263,23 +263,6 @@ assign write_queue_full = (write_queue_head == (write_queue_tail + 1));
 
 assign data_wr_rdy = ~write_queue_full;
 
-always @(posedge clk) begin
-    if (reset) begin
-        write_queue_tail <= 0;
-    end
-    else begin
-        if (!write_queue_full & data_wr_req) begin
-            write_queue_data[write_queue_tail] <= data_wr_data;
-            write_queue_wstrb[write_queue_tail] <= data_wr_wstrb;
-            write_queue_type[write_queue_tail] <= data_wr_type;
-            write_queue_addr[write_queue_tail] <= data_wr_addr;
-            write_queue_len[write_queue_tail] <= data_real_wr_len;
-            write_queue_size[write_queue_tail] <= data_real_wr_size;
-            write_queue_tail <= write_queue_tail + 1;
-        end
-    end
-end
-
 wire [2:0] wtype;
 wire [`LINE_WIDTH-1:0] write_queue_data_line;
 assign write_queue_data_line = write_queue_data[write_queue_head];
@@ -300,46 +283,58 @@ always @(posedge clk) begin
         write_countdown_reg <= 0;
         write_buffer_data   <= 0;
         write_queue_head <= 0;
+        write_queue_tail <= 0;
     end
-    else case (write_state)
-        WR_ST_TX_WAIT: begin
-            if (awready & !write_queue_empty) begin
-                write_state <= WR_ST_TX;
-		        wvalid  <= 1'b1;
-            end
-            if (wtype == 3'b100) begin
-                write_countdown_reg <= {(`OFFSET_WIDTH-2){1'b1}};
-            end
-            else begin
-                write_countdown_reg <= 0;
-            end
-        end 
-        WR_ST_TX: begin
-            if (wready) begin
-                if (wlast) begin
-                    write_state <= WR_ST_WAIT_B;
-                    wvalid <= 1'b0;
-        	        bready <= 1'b1;
+    else
+        if (!write_queue_full & data_wr_req) begin
+            write_queue_data[write_queue_tail] <= data_wr_data;
+            write_queue_wstrb[write_queue_tail] <= data_wr_wstrb;
+            write_queue_type[write_queue_tail] <= data_wr_type;
+            write_queue_addr[write_queue_tail] <= data_wr_addr;
+            write_queue_len[write_queue_tail] <= data_real_wr_len;
+            write_queue_size[write_queue_tail] <= data_real_wr_size;
+            write_queue_tail <= write_queue_tail + 1;
+        end
+        
+        case (write_state)
+            WR_ST_TX_WAIT: begin
+                if (awready & !write_queue_empty) begin
+                    write_state <= WR_ST_TX;
+                    wvalid  <= 1'b1;
+                end
+                if (wtype == 3'b100) begin
+                    write_countdown_reg <= {(`OFFSET_WIDTH-2){1'b1}};
                 end
                 else begin
-                    write_state <= WR_ST_TX;
-    
-                    wvalid  <= 1'b1;
-                    write_queue_data[write_queue_head] <= {32'b0, write_queue_data_line[`LINE_WIDTH-1:32]};
-                    write_countdown_reg  <= write_countdown_reg - 1;
+                    write_countdown_reg <= 0;
+                end
+            end 
+            WR_ST_TX: begin
+                if (wready) begin
+                    if (wlast) begin
+                        write_state <= WR_ST_WAIT_B;
+                        wvalid <= 1'b0;
+                        bready <= 1'b1;
+                    end
+                    else begin
+                        write_state <= WR_ST_TX;
+        
+                        wvalid  <= 1'b1;
+                        write_queue_data[write_queue_head] <= {32'b0, write_queue_data_line[`LINE_WIDTH-1:32]};
+                        write_countdown_reg  <= write_countdown_reg - 1;
+                    end
                 end
             end
-        end
-        WR_ST_WAIT_B: begin
-            if (bid[0] & bvalid & bready) begin
-                write_state <= WR_ST_TX_WAIT;
-                bready <= 1'b0;
-                write_queue_head <= write_queue_head + 1;
+            WR_ST_WAIT_B: begin
+                if (bid[0] & bvalid & bready) begin
+                    write_state <= WR_ST_TX_WAIT;
+                    bready <= 1'b0;
+                    write_queue_head <= write_queue_head + 1;
+                end
             end
-        end
-        default: begin
-            write_state <= WR_ST_TX_WAIT;
-        end
+            default: begin
+                write_state <= WR_ST_TX_WAIT;
+            end
     endcase
 end
 
