@@ -37,18 +37,6 @@ parameter PALEN = 32;
 `define OFFSET_WIDTH 6
 `endif
 
-`define TCACHE_WAY_4
-
-`ifdef TCACHE_WAY_4
-  `define TCACHE_NUM 4
-  `define TCACHE_ID_LEN 2
-`endif
-
-`ifdef TCACHE_WAY_2
-  `define TCACHE_NUM 2
-  `define TCACHE_ID_LEN 1
-`endif
-
 typedef enum logic [2:0] {
   OP_ALU,
   OP_MUL,
@@ -119,17 +107,6 @@ typedef enum logic [2:0] {
 typedef logic [9:0] asid_t;
 typedef logic [13:0] csr_addr_t;
 
-typedef enum logic [2:0] {
-  SRC_ZERO,
-  SRC_PASSED,
-  SRC_IMM,
-  SRC_EX2_A,
-  SRC_EX2_B,
-  SRC_WB_A,
-  SRC_WB_B,
-  SRC_DELAYED
-} source_t;
-
 typedef enum logic [14:0] {
   INT  = {6'h0, 9'h0},
   PIL  = {6'h1, 9'h0},
@@ -150,7 +127,7 @@ typedef enum logic [14:0] {
 
   I_TLBR = {6'h3d, 9'h0},
   D_TLBR = {6'h3e, 9'h0},
-  ERTN  = {6'h3c, 9'h3c}
+  ERTN   = {6'h3c, 9'h3c}
 } excp_t;
 
 typedef struct packed {

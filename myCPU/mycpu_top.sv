@@ -85,24 +85,18 @@ module mycpu_top (
   logic [             63:0] icache_rdata;
 
 
-  logic                     dcache_p0_valid;
-  logic                     dcache_p1_valid;
+  logic                     dcache_valid;
   logic [              2:0] dcache_op;
   logic [   `TAG_WIDTH-1:0] dcache_tag;
   logic [ `INDEX_WIDTH-1:0] dcache_index;
-  logic [`OFFSET_WIDTH-1:0] dcache_p0_offset;
-  logic [`OFFSET_WIDTH-1:0] dcache_p1_offset;
-  logic [              3:0] dcache_p0_wstrb;
-  logic [              3:0] dcache_p1_wstrb;
-  logic [             31:0] dcache_p0_wdata;
-  logic [             31:0] dcache_p1_wdata;
+  logic [`OFFSET_WIDTH-1:0] dcache_offset;
+  logic [              3:0] dcache_wstrb;
+  logic [             31:0] dcache_wdata;
   logic                     dcache_uncached;
-  logic [              1:0] dcache_p0_size;
-  logic [              1:0] dcache_p1_size;
+  logic [              1:0] dcache_size;
   logic                     dcache_addr_ok;
   logic                     dcache_data_ok;
-  logic [             31:0] dcache_p0_rdata;
-  logic [             31:0] dcache_p1_rdata;
+  logic [             31:0] dcache_rdata;
 
 
   logic                     inst_rd_req;
@@ -153,24 +147,18 @@ module mycpu_top (
       .icache_data_ok(icache_data_ok),
       .icache_rdata(icache_rdata),
 
-      .dcache_p0_valid(dcache_p0_valid),
-      .dcache_p1_valid(dcache_p1_valid),
+      .dcache_valid(dcache_valid),
       .dcache_op(dcache_op),
       .dcache_tag(dcache_tag),
       .dcache_index(dcache_index),
-      .dcache_p0_offset(dcache_p0_offset),
-      .dcache_p1_offset(dcache_p1_offset),
-      .dcache_p0_wstrb(dcache_p0_wstrb),
-      .dcache_p1_wstrb(dcache_p1_wstrb),
-      .dcache_p0_wdata(dcache_p0_wdata),
-      .dcache_p1_wdata(dcache_p1_wdata),
+      .dcache_offset(dcache_offset),
+      .dcache_wstrb(dcache_wstrb),
+      .dcache_wdata(dcache_wdata),
       .dcache_uncached(dcache_uncached),
-      .dcache_p0_size(dcache_p0_size),
-      .dcache_p1_size(dcache_p1_size),
+      .dcache_size(dcache_size),
       .dcache_addr_ok(dcache_addr_ok),
       .dcache_data_ok(dcache_data_ok),
-      .dcache_p0_rdata(dcache_p0_rdata),
-      .dcache_p1_rdata(dcache_p1_rdata),
+      .dcache_rdata(dcache_rdata),
 
       .debug0_wb_pc(debug0_wb_pc),
       .debug0_wb_rf_wen(debug0_wb_rf_wen),
@@ -228,32 +216,18 @@ module mycpu_top (
   dcache dcache (
       .clk(aclk),
       .resetn(aresetn),
-
-      .p0_valid(dcache_p0_valid),
-      .p1_valid(dcache_p1_valid),
-
-      .op       (dcache_op),
-      .tag      (dcache_tag),
-      .index    (dcache_index),
-      .p0_offset(dcache_p0_offset),
-      .p1_offset(dcache_p1_offset),
-
-      .p0_wstrb(dcache_p0_wstrb),
-      .p1_wstrb(dcache_p1_wstrb),
-
-
-      .p0_wdata(dcache_p0_wdata),
-      .p1_wdata(dcache_p1_wdata),
-
+      .valid(dcache_valid),
+      .op(dcache_op),
+      .tag(dcache_tag),
+      .index(dcache_index),
+      .offset(dcache_offset),
+      .wstrb(dcache_wstrb),
+      .wdata(dcache_wdata),
       .uncached(dcache_uncached),
-      .p0_size (dcache_p0_size),
-      .p1_size (dcache_p1_size),
-
-      .addr_ok (dcache_addr_ok),
-      .data_ok (dcache_data_ok),
-      .p0_rdata(dcache_p0_rdata),
-      .p1_rdata(dcache_p1_rdata),
-
+      .size(dcache_size),
+      .addr_ok(dcache_addr_ok),
+      .data_ok(dcache_data_ok),
+      .rdata(dcache_rdata),
       .rd_req(data_rd_req),
       .rd_type(data_rd_type),
       .rd_addr(data_rd_addr),
