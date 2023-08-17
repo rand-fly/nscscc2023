@@ -3,10 +3,11 @@
 module pred #(
     parameter RASNUM   = 16,
     parameter RASIDLEN = $clog2(RASNUM),
-    parameter BHTNUM   = 32,
+    parameter BHTNUM   = 64,
     parameter BHTIDLEN = $clog2(BHTNUM),
-    parameter BHRLEN   = 7,
-    parameter PHTNUM   = 2 ** BHRLEN
+    parameter BHRLEN   = 4,
+    parameter PHTNUM   = 128,
+    parameter PHTIDLEN = $clog2(PHTNUM)
 ) (
     input        clk,
     input        reset,
@@ -56,36 +57,36 @@ module pred #(
   logic [  BHRLEN - 1:0] bht_val_1;
   logic [  BHRLEN - 1:0] bht_val_o;
   logic [  BHRLEN - 1:0] bht_val_w;
-  logic [  BHRLEN - 1:0] pc_frag_0;
-  logic [  BHRLEN - 1:0] pc_frag_1;
-  logic [  BHRLEN - 1:0] pc_frag_o;
-  logic [  BHRLEN - 1:0] pc_frag_w;
-  logic [  BHRLEN - 1:0] hashed_index_0;
-  logic [  BHRLEN - 1:0] hashed_index_1;
-  logic [  BHRLEN - 1:0] hashed_index_o;
-  logic [  BHRLEN - 1:0] hashed_index_w;
+  logic [PHTIDLEN - 1:0] pc_frag_0;
+  logic [PHTIDLEN - 1:0] pc_frag_1;
+  logic [PHTIDLEN - 1:0] pc_frag_o;
+  logic [PHTIDLEN - 1:0] pc_frag_w;
+  logic [PHTIDLEN - 1:0] hashed_index_0;
+  logic [PHTIDLEN - 1:0] hashed_index_1;
+  logic [PHTIDLEN - 1:0] hashed_index_o;
+  logic [PHTIDLEN - 1:0] hashed_index_w;
 
 
   //adjust this hash while change BHTNUM/IDLEN
-  assign bht_index_0 = fetch_pc_0[31:27]^fetch_pc_0[26:22]^fetch_pc_0[21:17]^fetch_pc_0[16:12]^fetch_pc_0[11:7]^fetch_pc_0[6:2];
-  assign bht_index_1 = fetch_pc_1[31:27]^fetch_pc_1[26:22]^fetch_pc_1[21:17]^fetch_pc_1[16:12]^fetch_pc_1[11:7]^fetch_pc_1[6:2];
-  assign bht_index_o = retire_pc[31:27]^retire_pc[26:22]^retire_pc[21:17]^retire_pc[16:12]^retire_pc[11:7]^retire_pc[6:2];
-  assign bht_index_w = wrong_pc[31:27]^wrong_pc[26:22]^wrong_pc[21:17]^wrong_pc[16:12]^wrong_pc[11:7]^wrong_pc[6:2];
+  assign bht_index_0 = fetch_pc_0[31:26]^fetch_pc_0[25:20]^fetch_pc_0[19:14]^fetch_pc_0[13:8]^fetch_pc_0[7:2];
+  assign bht_index_1 = fetch_pc_1[31:26]^fetch_pc_1[25:20]^fetch_pc_1[19:14]^fetch_pc_1[13:8]^fetch_pc_1[7:2];
+  assign bht_index_o = retire_pc[31:26]^retire_pc[25:20]^retire_pc[19:14]^retire_pc[13:8]^retire_pc[7:2];
+  assign bht_index_w = wrong_pc[31:26]^wrong_pc[25:20]^wrong_pc[19:14]^wrong_pc[13:8]^wrong_pc[7:2];
 
-  assign bht_val_0 = {7{bht_v[bht_index_0]}} & bht[bht_index_0];
-  assign bht_val_1 = {7{bht_v[bht_index_1]}} & bht[bht_index_1];
-  assign bht_val_o = {7{bht_v[bht_index_o]}} & bht[bht_index_o];
-  assign bht_val_w = {7{bht_v[bht_index_w]}} & bht[bht_index_w];
+  assign bht_val_0 = {4{bht_v[bht_index_0]}} & bht[bht_index_0];
+  assign bht_val_1 = {4{bht_v[bht_index_1]}} & bht[bht_index_1];
+  assign bht_val_o = {4{bht_v[bht_index_o]}} & bht[bht_index_o];
+  assign bht_val_w = {4{bht_v[bht_index_w]}} & bht[bht_index_w];
 
-  assign pc_frag_0 = fetch_pc_0[BHRLEN+1 : 2];
-  assign pc_frag_1 = fetch_pc_1[BHRLEN+1 : 2];
-  assign pc_frag_o = retire_pc[BHRLEN+1 : 2];
-  assign pc_frag_w = wrong_pc[BHRLEN+1 : 2];
+  assign pc_frag_0 = fetch_pc_0[PHTIDLEN+1 : 2];
+  assign pc_frag_1 = fetch_pc_1[PHTIDLEN+1 : 2];
+  assign pc_frag_o = retire_pc[PHTIDLEN+1 : 2];
+  assign pc_frag_w = wrong_pc[PHTIDLEN+1 : 2];
 
-  assign hashed_index_0 = /*bht_val_0 ^ */ pc_frag_0;
-  assign hashed_index_1 = /*bht_val_1 ^ */ pc_frag_1;
-  assign hashed_index_o = /*bht_val_o ^ */ pc_frag_o;
-  assign hashed_index_w = /*bht_val_w ^ */ pc_frag_w;
+  assign hashed_index_0 = {bht_val_0, 3'b0} ^ pc_frag_0;
+  assign hashed_index_1 = {bht_val_1, 3'b0} ^ pc_frag_1;
+  assign hashed_index_o = {bht_val_o, 3'b0} ^ pc_frag_o;
+  assign hashed_index_w = {bht_val_w, 3'b0} ^ pc_frag_w;
   //reset & update BHT
   integer i;
   always @(posedge clk) begin
@@ -95,10 +96,8 @@ module pred #(
       end
     end else if (update_orien_en) begin
       if (bht_v[bht_index_o]) begin
-        for (i = BHRLEN - 1; i >= 0; i = i - 1) begin
-          bht[bht_index_o] <= bht[bht_index_o] << 1;
-          bht[bht_index_o][0] <= right_orien;
-        end
+        bht[bht_index_o] <= bht[bht_index_o] << 1;
+        bht[bht_index_o][0] <= right_orien;
       end else begin  //need reset
         bht[bht_index_o]   <= right_orien;
         bht_v[bht_index_o] <= 1;

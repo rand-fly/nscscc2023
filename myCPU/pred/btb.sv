@@ -60,7 +60,7 @@ module btb #(
     |   {3{way_id_==1}} & btb_ins_type_way1[index_]\
 )
 
-  reg   [       $clog2(BTBGROUP)-1:0] btb_replace_counter[BTBNUM/BTBGROUP -1:0];
+  reg   [       $clog2(BTBGROUP)-1:0] btb_last_visit     [BTBNUM/BTBGROUP -1:0];
 
   //search
   logic [                       29:0] pc_0_32to2;
@@ -141,18 +141,36 @@ module btb #(
 
   assign ins_type_0 = hit_0 ? `get_ins_type(btb_hit_way_id_0, btb_group_num_0) : 3'b000;
   assign ins_type_1 = hit_1 ? `get_ins_type(btb_hit_way_id_1, btb_group_num_1) : 3'b000;
+
+  always @(posedge clk) begin
+    if (reset) begin
+      for (k = 0; k < BTBNUM / BTBGROUP; k = k + 1) begin
+        btb_last_visit[k] <= 0;
+      end
+    end else begin
+      if (btb_hit_way_0[0]) begin
+        btb_last_visit[btb_group_num_0] <= 0;
+      end else if (btb_hit_way_0[1]) begin
+        btb_last_visit[btb_group_num_0] <= 1;
+      end
+      if (btb_hit_way_1[0]) begin
+        btb_last_visit[btb_group_num_1] <= 0;
+      end else if (btb_hit_way_1[1]) begin
+        btb_last_visit[btb_group_num_1] <= 1;
+      end
+    end
+  end
+
+
   integer k;
   always @(posedge clk) begin
     if (reset) begin
       btb_valid_way0 <= 0;
       btb_valid_way1 <= 0;
-      for (k = 0; k < BTBNUM / BTBGROUP; k = k + 1) begin
-        btb_replace_counter[k] <= 0;
-      end
     end else begin
       if (branch_mistaken) begin
         //replace the same tag
-        btb_replace_counter[btb_group_num_w] <= ~btb_replace_counter[btb_group_num_w];
+        // btb_replace_counter[btb_group_num_w] <= ~btb_replace_counter[btb_group_num_w];
         if (hit_w) begin
           case (btb_hit_way_id_w)
             0: begin
@@ -184,14 +202,14 @@ module btb #(
           endcase
         end  //random replace
         else begin
-          case (btb_replace_counter[btb_group_num_w])
-            0: begin
+          case (btb_last_visit[btb_group_num_w])
+            1: begin
               btb_tag_way0[btb_group_num_w] <= btb_fetch_tag_w;
               btb_target_way0[btb_group_num_w] <= right_target;
               btb_ins_type_way0[btb_group_num_w] <= ins_type_w;
               btb_valid_way0[btb_group_num_w] <= 1'b1;
             end
-            1: begin
+            0: begin
               btb_tag_way1[btb_group_num_w] <= btb_fetch_tag_w;
               btb_target_way1[btb_group_num_w] <= right_target;
               btb_ins_type_way1[btb_group_num_w] <= ins_type_w;
