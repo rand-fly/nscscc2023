@@ -840,8 +840,8 @@ module core (
       ro_a_src1_ok = EX2_b_optype == OP_ALU;
       ro_a_src1_passed = alu_b2_result;
     end else if (EX2_a_valid && EX2_a_dest == ro_a_r1) begin
-      ro_a_src1_ok = EX2_a_optype == OP_ALU || EX2_a_optype == OP_MEM && lsu_ok;
-      ro_a_src1_from_wba = EX2_a_optype == OP_MEM && lsu_ok;
+      ro_a_src1_ok = EX2_a_optype == OP_ALU || EX2_a_optype == OP_MEM && lsu_ok && ro_a_optype != OP_MEM && ro_a_optype != OP_CACHE;
+      ro_a_src1_from_wba = EX2_a_optype == OP_MEM && lsu_ok && ro_a_optype != OP_MEM && ro_a_optype != OP_CACHE;
       ro_a_src1_passed = EX2_a_alu_result;
     end else if (WB_b_valid && WB_b_dest == ro_a_r1) begin
       ro_a_src1_ok = 1'b1;
@@ -903,8 +903,8 @@ module core (
       ro_b_src1_ok = EX2_b_optype == OP_ALU;
       ro_b_src1_passed = alu_b2_result;
     end else if (EX2_a_valid && EX2_a_dest == ro_b_r1) begin
-      ro_b_src1_ok = EX2_a_optype == OP_ALU || EX2_a_optype == OP_MEM && lsu_ok;
-      ro_b_src1_from_wba = EX2_a_optype == OP_MEM && lsu_ok;
+      ro_b_src1_ok = EX2_a_optype == OP_ALU || EX2_a_optype == OP_MEM && lsu_ok && ro_b_optype != OP_MEM;
+      ro_b_src1_from_wba = EX2_a_optype == OP_MEM && lsu_ok && ro_b_optype != OP_MEM;
       ro_b_src1_passed = EX2_a_alu_result;
     end else if (WB_b_valid && WB_b_dest == ro_b_r1) begin
       ro_b_src1_ok = 1'b1;
@@ -1055,8 +1055,8 @@ module core (
   assign ex1_b_src2 = EX1_stalling ? EX1_b_src2_stalled :
                EX1_b_src2_from_wba ? WB_a_result : EX1_b_src2_passed;
 
-  assign ex1_a_addr = ex1_a_src1 + EX1_a_imm;
-  assign ex1_b_addr = ex1_b_src1 + EX1_b_imm;
+  assign ex1_a_addr = EX1_a_src1_passed + EX1_a_imm;
+  assign ex1_b_addr = EX1_b_src1_passed + EX1_b_imm;
 
   assign ex1_ready = (!lsu_valid || lsu_ready)
             && (!is_tlbsrch || tlbsrch_ok)
