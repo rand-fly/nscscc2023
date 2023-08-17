@@ -41,6 +41,8 @@ module tlb_top
 
     logic s0_valid;
     logic s1_valid;
+    reg s0_cancel_flag;
+    reg s1_cancel_flag;
 
     //state register
     reg [1:0] inst_tlb_state;
@@ -129,7 +131,7 @@ module tlb_top
         end else begin
             case(inst_tlb_state)
                 `TLB_STATE_CACHE: begin
-                    if(s0_valid && (!inst_tlb_hit)) begin
+                    if((s0_valid || s0_cancel_flag)&& (!inst_tlb_hit)) begin
                         inst_tlb_state <= `TLB_STATE_L2_LOOKUP;
                     end
                 end
@@ -153,7 +155,7 @@ module tlb_top
             endcase
             case(data_tlb_state)
                 `TLB_STATE_CACHE: begin
-                    if(s1_valid && (!data_tlb_hit)) begin
+                    if((s1_valid || s1_cancel_flag) && (!data_tlb_hit)) begin
                         data_tlb_state <= `TLB_STATE_L2_LOOKUP;
                     end
                 end
@@ -181,6 +183,21 @@ module tlb_top
     assign s0_valid = !((s0_vppn_reg == s0_vppn) && (s0_asid_reg == s0_asid) && (s0_va_bit12_reg == s0_va_bit12));
     assign s1_valid = !((s1_vppn_reg == s1_vppn) && (s1_asid_reg == s1_asid) && (s1_va_bit12_reg == s1_va_bit12));
 
+    always @(posedge clk) begin
+        if(reset) begin
+            s0_cancel_flag <= 0;
+        end else begin
+            s0_cancel_flag <= s0_valid && inst_tlb_state != `TLB_STATE_CACHE;
+        end
+    end
+
+    always @(posedge clk) begin
+        if(reset) begin
+            s1_cancel_flag <= 0;
+        end else begin
+            s1_cancel_flag <= s1_valid && data_tlb_state != `TLB_STATE_CACHE;
+        end
+    end
 
     always @(posedge clk) begin
         if(reset) begin
