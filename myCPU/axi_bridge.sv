@@ -133,7 +133,7 @@ wire                    write_buffer_last;
 
 assign write_buffer_empty = (write_countdown_reg == {(`OFFSET_WIDTH-2){1'b0}}) & !write_wait_enable;
 
-assign rd_requst_can_receive = rd_requst_state_is_empty & !(write_wait_enable);
+assign rd_requst_can_receive = rd_requst_state_is_empty & (!write_wait_enable | (bvalid & bready & write_queue_last));
 
 assign data_rd_rdy = rd_requst_can_receive;
 assign inst_rd_rdy = !data_rd_req & rd_requst_can_receive;
@@ -170,7 +170,7 @@ always @(posedge clk) begin
         RD_REQ_ST_IDLE: begin
             if (data_rd_req) begin
                 if (write_wait_enable) begin
-                    if (bid[0] & bvalid & bready) begin // TODO faster
+                    if (bid[0] & bvalid & bready & write_queue_last) begin // TODO faster
                         read_requst_state <= RD_REQ_ST_RDY;
                         arid <= 4'b1;
                         araddr <= data_rd_addr;
@@ -191,7 +191,7 @@ always @(posedge clk) begin
             else if (inst_rd_req) begin
                 if (write_wait_enable) begin
                 // if (write_wait_enable & (inst_rd_addr[31:`OFFSET_WIDTH] == awaddr[31:`OFFSET_WIDTH])) begin // wait for write only when in the same line
-                    if (bid[0] & bvalid & bready) begin
+                    if (bid[0] & bvalid & bready & write_queue_last) begin
                         read_requst_state <= RD_REQ_ST_RDY;
                         arid <= 4'b0;
                         araddr <= inst_rd_addr;
@@ -254,12 +254,19 @@ reg            [ 2:0]   write_queue_size [`WR_QUEUE_DEPTH-1:0];
 
 reg [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_head;
 reg [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_tail;
+wire [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_tail_plus_1;
+wire [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_head_plus_1;
 
 wire write_queue_empty;
 wire write_queue_full;
+wire write_queue_last;
+
+assign write_queue_tail_plus_1 = write_queue_tail + 1;
+assign write_queue_head_plus_1 = write_queue_head + 1;
 
 assign write_queue_empty = (write_queue_head == write_queue_tail);
-assign write_queue_full = (write_queue_head == (write_queue_tail + 1));
+assign write_queue_full = (write_queue_head == write_queue_tail_plus_1);
+assign write_queue_last = (write_queue_tail == write_queue_head_plus_1);
 
 assign data_wr_rdy = ~write_queue_full;
 
@@ -295,7 +302,7 @@ always @(posedge clk) begin
             write_queue_size[write_queue_tail] <= data_real_wr_size;
             write_queue_tail <= write_queue_tail + 1;
         end
-
+        
         case (write_state)
             WR_ST_TX_WAIT: begin
                 if (awready & !write_queue_empty) begin
