@@ -235,6 +235,7 @@ wire [2:0]  rd_type_cache;
 wire [31:0] rd_addr_cache;
 wire rd_req_cache;
 
+reg wr_addr_ok;
 reg rd_addr_ok;
 wire ret_valid_last;
 
@@ -520,7 +521,7 @@ assign replace_way_id = cacop_reg ? cacop_way_id : replace_way_id_counter;
 assign wr_type = uncached_reg ? {1'b0,size_reg} : WR_TYPE_CACHELINE;
 assign wr_addr = uncached_reg ? {tag_reg,index_reg, offset_reg} : {replace_tag,index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
 assign wr_data = uncached_reg ? {{(`LINE_WIDTH-32){1'b0}},wdata_reg} : `get_data(replace_way_id);
-assign wr_req = replace;
+assign wr_req = replace & ~wr_addr_ok;
 assign wr_wstrb = uncached_reg ? wstrb_reg : 4'b1111;
 
 assign rd_type = uncached_reg ? {1'b0,size_reg} : RD_TYPE_CACHELINE;
@@ -557,6 +558,15 @@ always @(posedge clk) begin
     end
     else if (refill & rd_rdy) begin
         rd_addr_ok <= 1;
+    end
+end
+
+always @(posedge clk) begin
+    if (!replace) begin
+        wr_addr_ok <= 0;
+    end
+    else if (replace & wr_rdy) begin
+        wr_addr_ok <= 1;
     end
 end
 
