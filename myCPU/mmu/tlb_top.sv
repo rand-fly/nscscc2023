@@ -13,7 +13,6 @@ module tlb_top
         input               [18:0] s0_vppn,
         input                      s0_va_bit12,
         input               [ 9:0] s0_asid,
-        input wire                 s0_valid,
         output tlb_result_t        s0_result,
         output                     s0_ok,
 
@@ -21,7 +20,6 @@ module tlb_top
         input               [18:0] s1_vppn,
         input                      s1_va_bit12,
         input               [ 9:0] s1_asid,
-        input wire                 s1_valid,
         output tlb_result_t        s1_result,
         output                     s1_ok,
 
@@ -40,6 +38,9 @@ module tlb_top
         input              [TLBIDLEN-1:0] r_index,
         output tlb_entry_t                r_entry
     );
+
+    logic s0_valid;
+    logic s1_valid;
 
     //state register
     reg [1:0] inst_tlb_state;
@@ -129,18 +130,18 @@ module tlb_top
             case(inst_tlb_state)
                 `TLB_STATE_CACHE: begin
                     if(s0_valid && (!inst_tlb_hit)) begin
-                        inst_tlb_state <= `TLB_STATE_L2_LOOKUP;
+                        inst_tlb_state <= `TLB_STATE_L2_FETCH;
                     end
                 end
                 `TLB_STATE_L2_LOOKUP: begin
-                    if(!s0_valid) begin
+                    if(s0_valid) begin
                         inst_tlb_state <= `TLB_STATE_CACHE;
                     end else begin
                         inst_tlb_state <= `TLB_STATE_L2_FETCH;
                     end
                 end
                 `TLB_STATE_L2_FETCH: begin
-                    if(!s0_valid) begin
+                    if(s0_valid) begin
                         inst_tlb_state <= `TLB_STATE_CACHE;
                     end else begin
                         inst_tlb_state <= `TLB_STATE_REFILL;
@@ -153,18 +154,18 @@ module tlb_top
             case(data_tlb_state)
                 `TLB_STATE_CACHE: begin
                     if(s1_valid && (!data_tlb_hit)) begin
-                        data_tlb_state <= `TLB_STATE_L2_LOOKUP;
+                        data_tlb_state <= `TLB_STATE_L2_FETCH;
                     end
                 end
                 `TLB_STATE_L2_LOOKUP: begin
-                    if(!s1_valid) begin
+                    if(s1_valid) begin
                         data_tlb_state <= `TLB_STATE_CACHE;
                     end else begin
                         data_tlb_state <= `TLB_STATE_L2_FETCH;
                     end
                 end
                 `TLB_STATE_L2_FETCH: begin
-                    if(!s1_valid) begin
+                    if(s1_valid) begin
                         data_tlb_state <= `TLB_STATE_CACHE;
                     end else begin
                         data_tlb_state <= `TLB_STATE_REFILL;
@@ -176,6 +177,10 @@ module tlb_top
             endcase
         end
     end
+
+    assign s0_valid = !((s0_vppn_reg == s0_vppn) && (s0_asid_reg == s0_asid) && (s0_va_bit12_reg == s0_va_bit12));
+    assign s1_valid = !((s1_vppn_reg == s1_vppn) && (s1_asid_reg == s1_asid) && (s1_va_bit12_reg == s1_va_bit12));
+
 
     always @(posedge clk) begin
         if(reset) begin
@@ -234,8 +239,9 @@ module tlb_top
         end
     end
 
-
-
+    
+    
+    
     tcache inst_tlb(
         .clk(clk),
         .reset(reset),
@@ -246,7 +252,7 @@ module tlb_top
         .s_result(inst_tlb_result),
 
         .invalid(we || invtlb_valid),
-
+        
         .refill_valid(inst_tlb_refill_valid_reg & inst_tlb_state == `TLB_STATE_REFILL),
         .refill_data(inst_tlb_refill_data_reg),
         .refill_index(inst_tlb_refill_index_reg)
@@ -262,12 +268,12 @@ module tlb_top
         .s_result(data_tlb_result),
 
         .invalid(we || invtlb_valid),
-
+        
         .refill_valid(data_tlb_refill_valid_reg & data_tlb_state == `TLB_STATE_REFILL),
         .refill_data(data_tlb_refill_data_reg),
         .refill_index(data_tlb_refill_index_reg)
     );
-
+    
     tlb_L2 tlb_L2(
         .clk(clk),
         .reset(reset),
@@ -296,5 +302,7 @@ module tlb_top
         .r_index(r_index),
         .r_entry(r_entry)
     );
+
+    
 
 endmodule
