@@ -133,7 +133,7 @@ wire                    write_buffer_last;
 
 assign write_buffer_empty = (write_countdown_reg == {(`OFFSET_WIDTH-2){1'b0}}) & !write_wait_enable;
 
-assign rd_requst_can_receive = rd_requst_state_is_empty & !(write_wait_enable & !(bvalid & bready));
+assign rd_requst_can_receive = rd_requst_state_is_empty & !(write_wait_enable);
 
 assign data_rd_rdy = rd_requst_can_receive;
 assign inst_rd_rdy = !data_rd_req & rd_requst_can_receive;
@@ -295,7 +295,7 @@ always @(posedge clk) begin
             write_queue_size[write_queue_tail] <= data_real_wr_size;
             write_queue_tail <= write_queue_tail + 1;
         end
-        
+
         case (write_state)
             WR_ST_TX_WAIT: begin
                 if (awready & !write_queue_empty) begin
