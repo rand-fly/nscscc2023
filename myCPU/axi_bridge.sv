@@ -255,8 +255,11 @@ reg            [ 2:0]   write_queue_size [`WR_QUEUE_DEPTH-1:0];
 reg [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_head;
 reg [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_tail;
 
-wire write_queue_empty = write_queue_head == write_queue_tail;
-wire write_queue_full  = write_queue_head == (write_queue_tail + 1);
+wire write_queue_empty;
+wire write_queue_full;
+
+assign write_queue_empty = (write_queue_head == write_queue_tail);
+assign write_queue_full = (write_queue_head == (write_queue_tail + 1));
 
 assign data_wr_rdy = ~write_queue_full;
 
