@@ -6,24 +6,18 @@ module dcache(
     input wire resetn,
 
     // Pipe interface
-    input wire                      p0_valid,
-    input wire                      p1_valid,
+    input wire                      valid,
     input wire [2:0]                op,
     input wire [`TAG_WIDTH-1:0]     tag,
     input wire [`INDEX_WIDTH-1:0]   index,
-    input wire [`OFFSET_WIDTH-1:0]  p0_offset,
-    input wire [`OFFSET_WIDTH-1:0]  p1_offset,
-    input wire [3:0]                p0_wstrb,
-    input wire [3:0]                p1_wstrb,
-    input wire [31:0]               p0_wdata,
-    input wire [31:0]               p1_wdata,
+    input wire [`OFFSET_WIDTH-1:0]  offset,
+    input wire [3:0]                wstrb,
+    input wire [31:0]               wdata,
     input wire                      uncached,
-    input wire [1:0]                p0_size,
-    input wire [1:0]                p1_size,
+    input wire [1:0]                size,
     output wire                     addr_ok,
     output wire                     data_ok,
-    output wire [31:0]              p0_rdata,
-    output wire [31:0]              p1_rdata,
+    output wire [31:0]              rdata,
 
     // AXI
     output wire rd_req,
@@ -70,26 +64,19 @@ wire  [`CACHE_WAY_NUM_LOG2-1:0] cacop_way_id;
 reg [`INDEX_WIDTH-1:0] index_reg;
 reg [`INDEX_WIDTH-1:0] index_reg_miss;
 reg [`TAG_WIDTH-1:0] tag_reg;
-reg [`OFFSET_WIDTH-1:0] p0_offset_reg;
-reg [`OFFSET_WIDTH-1:0] p0_offset_reg_miss;
-reg [`OFFSET_WIDTH-1:0] p1_offset_reg;
-wire [`OFFSET_WIDTH-1:0] p0_offset_cell_w;
-wire [`OFFSET_WIDTH-1:0] p1_offset_cell_w;
+reg [`OFFSET_WIDTH-1:0] offset_reg;
+reg [`OFFSET_WIDTH-1:0] offset_reg_miss;
+wire [`OFFSET_WIDTH-1:0] offset_cell_w;
 // reg [1:0] offset_w_reg; // word offset
-wire [`OFFSET_WIDTH-3:0] p0_offset_w_reg; // word offset
-wire [`OFFSET_WIDTH-3:0] p1_offset_w_reg; // word offset
-reg [`OFFSET_WIDTH-3:0] p_offset_w_last_reg;
+wire [`OFFSET_WIDTH-3:0] offset_w_reg; // word offset
+reg [`OFFSET_WIDTH-3:0] offset_w_last_reg;
+
 reg uncached_reg;
-reg p1_valid_reg;
-reg [1:0] p0_size_reg;
-reg [3:0] p0_wstrb_reg;
-reg [3:0] p1_wstrb_reg;
-reg [31:0] p0_wdata_reg;
-reg [31:0] p1_wdata_reg;
-// wire [31:0] p1_wdata_valid;
-// wire [7:0] wdata_reg_bytes [0:3];
-// wire [31:0] wdata_actually;
-// reg [31:0] wdata_actually_reg;
+reg [1:0] size_reg;
+reg [3:0] wstrb_reg;
+reg [31:0] wdata_reg;
+
+
 reg wdata_ok_reg;
 // initial begin
 //     $monitor("tag_way0=%x, tag_way1=%x",tag_way0[86], tag_way1[86]);
@@ -299,32 +286,22 @@ reg [`LINE_SIZE-1:0] cache_wstrb_reg;
 wire [`CACHE_WAY_NUM_LOG2-1:0] cache_write_way_id;
 
 wire [`LINE_WIDTH-1:0] cache_write_data_strobe;
-wire [`LINE_WIDTH-1:0] p0_cache_write_data_strobe;
-wire [`LINE_WIDTH-1:0] p1_cache_write_data_strobe;
 
 wire next_same_line;
-wire [3:0] p1_wstrb_valid;
 
 assign cacop = op[2];
 assign cacop_reg = op_reg[2];
 assign cacop_id_reg = op_reg[1:0];
 assign cacop_iiw_reg = cacop_reg & (cacop_id_reg[0] ^ cacop_id_reg[1]);
-assign cacop_way_id = (op_reg == OP_CACOP2) ? cache_hit_way_id : p0_offset_reg[`CACHE_WAY_NUM_LOG2-1:0];
+assign cacop_way_id = (op_reg == OP_CACOP2) ? cache_hit_way_id : offset_reg[`CACHE_WAY_NUM_LOG2-1:0];
 
 assign data_addr = pipe_interface_latch ? index : index_reg;
 
-// assign p1_wdata_valid = p1_valid ? p1_wdata : 0;
-assign p1_wstrb_valid = p1_valid ? p1_wstrb : 0;
+assign cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{wstrb[3]}},{8{wstrb[2]}},{8{wstrb[1]}},{8{wstrb[0]}}} << (offset_cell_w*8);
 
-assign p0_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{p0_wstrb[3]}},{8{p0_wstrb[2]}},{8{p0_wstrb[1]}},{8{p0_wstrb[0]}}} << (p0_offset_cell_w*8);
-assign p1_cache_write_data_strobe = {{(`LINE_WIDTH-32){1'b0}},{8{p1_wstrb_valid[3]}},{8{p1_wstrb_valid[2]}},{8{p1_wstrb_valid[1]}},{8{p1_wstrb_valid[0]}}} << (p1_offset_cell_w*8);
-assign cache_write_data_strobe = p0_cache_write_data_strobe | p1_cache_write_data_strobe;
+assign offset_cell_w = {offset[`OFFSET_WIDTH-1:2],2'b0};
 
-assign p0_offset_cell_w = {p0_offset[`OFFSET_WIDTH-1:2],2'b0};
-assign p1_offset_cell_w = {p1_offset[`OFFSET_WIDTH-1:2],2'b0};
-
-assign p0_offset_w_reg = p0_offset_reg[`OFFSET_WIDTH-1:2];
-assign p1_offset_w_reg = p1_offset_reg[`OFFSET_WIDTH-1:2];
+assign offset_w_reg = offset_reg[`OFFSET_WIDTH-1:2];
 
 assign idle = (main_state == MAIN_ST_IDLE);
 assign lookup = (main_state == MAIN_ST_LOOKUP);
@@ -338,7 +315,7 @@ assign ret_valid_last = (ret_valid & ret_last);
 assign next_same_line = (index == index_reg) & (tag == tag_reg);
 
 assign addr_ok = cache_rdy;
-assign pipe_interface_latch = p0_valid & cache_rdy;
+assign pipe_interface_latch = valid & cache_rdy;
 assign cache_rdy = idle
     | (lookup & (op_reg == OP_READ) & cache_hit_and_cached) //|
     // (refill & !uncached_reg & !uncached & (op_reg == OP_READ) & (data_ok | finished) & next_same_line & !fetch_ok) |
@@ -369,23 +346,16 @@ always @(posedge clk) begin
             op_reg <= op;
             index_reg <= index;
             tag_reg <= tag;
-            p0_offset_reg <= p0_offset;
-            p1_offset_reg <= p1_offset;
-            p_offset_w_last_reg <= p1_valid ? p1_offset[`OFFSET_WIDTH-1:2] : p0_offset[`OFFSET_WIDTH-1:2];
+            offset_reg <= offset;
+            offset_w_last_reg <= offset[`OFFSET_WIDTH-1:2];
             uncached_reg <= uncached & !cacop;
-            p0_size_reg <= p0_size;
-            p0_wstrb_reg <= p0_wstrb;
-            p1_wstrb_reg <= p1_wstrb_valid;
-            p0_wdata_reg <= p0_wdata;
-            p1_wdata_reg <= p1_wdata;
-            p1_valid_reg <= p1_valid;
+            size_reg <= size;
+            wstrb_reg <= wstrb;
+            wdata_reg <= wdata;
             if (!uncached & (op == OP_WRITE)) begin
-                cache_wstrb_reg <= cache_wstrb_reg | ({{(`LINE_SIZE-4){1'b0}},p0_wstrb} << p0_offset_cell_w) | ({{(`LINE_SIZE-4){1'b0}},p1_wstrb_valid} << p1_offset_cell_w);
-                cache_write_data_reg <= (cache_write_data_reg & ~cache_write_data_strobe) 
-                                        | ((
-                                            ({{(`LINE_WIDTH-32){1'b0}},p0_wdata} << (p0_offset_cell_w*8) & p0_cache_write_data_strobe & ~p1_cache_write_data_strobe) 
-                                            | ({{(`LINE_WIDTH-32){1'b0}},p1_wdata} << (p1_offset_cell_w*8) & p1_cache_write_data_strobe)
-                                            ));
+                cache_wstrb_reg <= cache_wstrb_reg | ({{(`LINE_SIZE-4){1'b0}},wstrb} << offset_cell_w);
+                cache_write_data_reg <= (cache_write_data_reg & ~cache_write_data_strobe)
+                                        | ({{(`LINE_WIDTH-32){1'b0}},wdata} << (offset_cell_w*8) & cache_write_data_strobe);
             end
         end
         else if (refill_write | hit_write) begin
@@ -394,7 +364,7 @@ always @(posedge clk) begin
         end
         if (lookup) begin
             index_reg_miss <= index_reg;
-            p0_offset_reg_miss <= p0_offset_reg;
+            offset_reg_miss <= offset_reg;
         end
     end
 end
@@ -532,13 +502,12 @@ assign cache_rd_data = cache_hit
                             ? buffer_read_data
                             : buffer_read_data_new;
 
-assign p0_rdata = uncached_reg ? ret_data : `get_word(cache_rd_data, p0_offset_w_reg);
-assign p1_rdata = `get_word(cache_rd_data, p1_offset_w_reg);
+assign rdata = uncached_reg ? ret_data : `get_word(cache_rd_data, offset_w_reg);
 
 assign data_ok = !cacop_reg & !finished & ((op_reg == OP_READ)
                     ? ((lookup & cache_hit_and_cached) | (uncached_reg
                                                     ? (refill & ret_valid_last)
-                                                    : (refill & ret_valid & (buffer_read_data_count >= {(p_offset_w_last_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),p_offset_w_last_reg}))))
+                                                    : (refill & ret_valid & (buffer_read_data_count >= {(offset_w_last_reg < buffer_read_data_count_start[`OFFSET_WIDTH-3:0]),offset_w_last_reg}))))
                     : wdata_ok_reg);
 
 always @(posedge clk) begin
@@ -550,14 +519,14 @@ assign replace_way_id = cacop_reg ? cacop_way_id : replace_way_id_counter;
 
 // axi interface
 
-assign wr_type = uncached_reg ? {1'b0,p0_size_reg} : WR_TYPE_CACHELINE;
-assign wr_addr = uncached_reg ? {tag_reg,index_reg, p0_offset_reg} : {replace_tag,index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
-assign wr_data = uncached_reg ? {{(`LINE_WIDTH-32){1'b0}},p0_wdata_reg} : `get_data(replace_way_id);
+assign wr_type = uncached_reg ? {1'b0,size_reg} : WR_TYPE_CACHELINE;
+assign wr_addr = uncached_reg ? {tag_reg,index_reg, offset_reg} : {replace_tag,index_reg_miss,{`OFFSET_WIDTH{1'b0}}};
+assign wr_data = uncached_reg ? {{(`LINE_WIDTH-32){1'b0}},wdata_reg} : `get_data(replace_way_id);
 assign wr_req = replace;
-assign wr_wstrb = uncached_reg ? p0_wstrb_reg : 4'b1111;
+assign wr_wstrb = uncached_reg ? wstrb_reg : 4'b1111;
 
-assign rd_type = uncached_reg ? {1'b0,p0_size_reg} : RD_TYPE_CACHELINE;
-assign rd_addr = uncached_reg ? {tag_reg,index_reg, p0_offset_reg} : {tag_reg, index_reg_miss,p0_offset_reg_miss[`OFFSET_WIDTH-1:2],2'b0};
+assign rd_type = uncached_reg ? {1'b0,size_reg} : RD_TYPE_CACHELINE;
+assign rd_addr = uncached_reg ? {tag_reg,index_reg, offset_reg} : {tag_reg, index_reg_miss,offset_reg_miss[`OFFSET_WIDTH-1:2],2'b0};
 assign rd_req = refill & ~rd_addr_ok;
 
 // fetch data from memory
@@ -582,7 +551,6 @@ always @(posedge clk) begin
             buffer_read_data_count_start <= {1'b0,rd_addr[`OFFSET_WIDTH-1:2]};
         end
     end
-    
 end
 
 always @(posedge clk) begin
@@ -699,19 +667,10 @@ always @(posedge clk) begin
     if (index_reg == `DBG_INDEX) begin
         if (data_ok) begin
             if (op_reg == OP_WRITE) begin
-                $display("[%t] p0 write %h(%h,%h,%h) : %h",$time,{tag_reg,index_reg,p0_offset_reg},tag_reg,index_reg,p0_offset_reg,p0_wdata_reg);
-                if (p1_valid_reg) begin
-                    $display("[%t] p1 write %h(%h,%h,%h) : %h",$time,{tag_reg,index_reg,p1_offset_reg},tag_reg,index_reg,p1_offset_reg,p1_wdata_reg);
-                end
+                $display("[%t] write %h(%h,%h,%h) : %h",$time,{tag_reg,index_reg,offset_reg},tag_reg,index_reg,offset_reg,wdata_reg);
             end
             else begin
-                $display("[%t] p0 read  %h(%h,%h,%h) : %h",$time,{tag_reg,index_reg,p0_offset_reg},tag_reg,index_reg,p0_offset_reg,p0_rdata);
-                if (p1_valid_reg) begin
-                    $display("[%t] p1 read  %h(%h,%h,%h) : %h",$time,{tag_reg,index_reg,p1_offset_reg},tag_reg,index_reg,p1_offset_reg,p1_rdata);
-                end
-                // if ({tag_reg,index_reg,offset_reg} == 32'h3154) begin
-                //     $finish;
-                // end
+                $display("[%t] read  %h(%h,%h,%h) : %h",$time,{tag_reg,index_reg,offset_reg},tag_reg,index_reg,offset_reg,p0_rdata);
             end
         end
         if (refill_write) begin

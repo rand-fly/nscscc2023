@@ -1,143 +1,138 @@
 `include "definitions.svh"
 
 module lsu (
-    input clk,
-    input reset,
-    input cancel,
-    // to ex1
-    output ready,
+    input                                   clk,
+    input                                   reset,
     // from ex1
-    input valid,  // 仅发出请求的第一个周期置为1，但要保证下面的输入不变
-    input [31:0] addr,
-    input mem_opcode_t opcode,
-    input [31:0] st_data,
-    // to ex1
-    output logic have_excp,
-    output excp_t excp_type,
+    input                                   valid,
+    output                                  ready,
+    input               [             31:0] addr,
+    input  mem_opcode_t                     opcode,
+    input               [             31:0] st_data,
+    // dcacop_valid 用于发起 dcacop 请求
+    // cacop2_valid 用于完成 icacop2 和 dcacop2 的 tlb 例外检查
+    input                                   dcacop_valid,
+    input               [              1:0] cacop_op,
+    input                                   cacop2_valid,
+    output                                  cacop2_ok,
+    output logic                            have_excp,
+    output excp_t                           excp_type,
     // to wb reg
-    output ok,
-    input accept_ok,
-    output [31:0] ld_data,
-    //to mmu
-    output logic mmu_req,
-    output logic [31:0] mmu_addr,
-    output logic mmu_we,
-    output logic [1:0] mmu_size,
-    output logic [3:0] mmu_wstrb,
-    output logic [31:0] mmu_wdata,
-    //from mmu
-    input mmu_addr_ok,
-    input mmu_data_ok,
-    input [31:0] mmu_rdata,
-    input mmu_tlbr,
-    input mmu_pil,
-    input mmu_pis,
-    input mmu_ppi,
-    input mmu_pme
+    output                                  ok,
+    output logic        [             31:0] ld_data,
+    // to/from dcache
+    output                                  dcache_valid,
+    output              [              2:0] dcache_op,
+    output              [   `TAG_WIDTH-1:0] dcache_tag,
+    output              [ `INDEX_WIDTH-1:0] dcache_index,
+    output              [`OFFSET_WIDTH-1:0] dcache_offset,
+    output logic        [              3:0] dcache_wstrb,
+    output logic        [             31:0] dcache_wdata,
+    output                                  dcache_uncached,
+    output              [              1:0] dcache_size,
+    input                                   dcache_addr_ok,
+    input                                   dcache_data_ok,
+    input               [             31:0] dcache_rdata,
+    // to/from mmu
+    output                                  mmu_valid,
+    output              [   `TAG_WIDTH-1:0] mmu_vtag,
+    input                                   mmu_ok,
+    input               [   `TAG_WIDTH-1:0] mmu_ptag,
+    input               [              1:0] mmu_mat,
+    input                                   mmu_page_fault,
+    input                                   mmu_page_invalid,
+    input                                   mmu_page_dirty,
+    input                                   mmu_plv_fault
 );
-  logic               wait_for_addr_ok;
-  logic               wait_for_data_ok;
-  logic               ok_not_accepted;
-  logic        [31:0] ld_data_buf;
-
-  logic        [ 1:0] addr_lowbit_buf;
-  mem_opcode_t        opcode_buf;
-  logic        [31:0] ld_data_inner;
-
-  logic               stage2_allowin;
-
-  assign ready = (!wait_for_addr_ok || mmu_addr_ok && stage2_allowin) && !(valid && !mmu_addr_ok);
-  assign stage2_allowin = !ok_not_accepted && (!wait_for_data_ok || mmu_data_ok);
+  logic              mmu_ok_reg;
+  logic        [1:0] addr_lowbit_reg;
+  mem_opcode_t       opcode_reg;
 
   always_ff @(posedge clk) begin
     if (reset) begin
-      wait_for_addr_ok <= 1'b0;
+      mmu_ok_reg <= 1'b0;
     end else begin
-      if (valid && !mmu_addr_ok && !cancel) begin
-        wait_for_addr_ok <= 1'b1;
-      end
-      if (mmu_addr_ok) begin
-        wait_for_addr_ok <= 1'b0;
-        addr_lowbit_buf <= mmu_addr[1:0];
-        opcode_buf <= opcode;
+      if (valid && ready || cacop2_valid || have_excp) begin
+        mmu_ok_reg <= 1'b0;
+      end else if (mmu_ok) begin
+        mmu_ok_reg <= 1'b1;
       end
     end
   end
 
   always_ff @(posedge clk) begin
-    if (reset) begin
-      wait_for_data_ok <= 1'b0;
-    end else begin
-      if (mmu_addr_ok) begin
-        wait_for_data_ok <= 1'b1;
-      end else if (mmu_data_ok) begin
-        wait_for_data_ok <= 1'b0;
-      end
+    if (valid && ready) begin
+      addr_lowbit_reg <= addr[1:0];
+      opcode_reg <= opcode;
     end
   end
 
-  assign ok = mmu_data_ok || ok_not_accepted;
-  assign ld_data = ok_not_accepted ? ld_data_buf : ld_data_inner;
+  assign ready = dcache_addr_ok && (mmu_ok || mmu_ok_reg);
 
-  always_ff @(posedge clk) begin
-    if (reset) begin
-      ok_not_accepted <= 1'b0;
-    end else begin
-      if (mmu_data_ok && !accept_ok) begin
-        ok_not_accepted <= 1'b1;
-        ld_data_buf <= ld_data_inner;
-      end else if (accept_ok) begin
-        ok_not_accepted <= 1'b0;
-      end
-    end
-  end
+  assign ok = dcache_data_ok;
 
-  assign mmu_req  = valid || wait_for_addr_ok;
-  assign mmu_addr = addr;
-  assign mmu_we   = opcode.store;
-  assign mmu_size = opcode.size_byte ? 2'd0 : opcode.size_half ? 2'd1 : 2'd2;
+  assign dcache_valid = valid && !have_excp && (mmu_ok || mmu_ok_reg) || dcacop_valid;
+  assign dcache_tag = mmu_ptag;
+  assign dcache_index = addr[`OFFSET_WIDTH+`INDEX_WIDTH-1:`OFFSET_WIDTH];
+  assign dcache_offset = addr[`OFFSET_WIDTH-1:0];
+  assign dcache_op = dcacop_valid ? {1'b1, cacop_op} : {2'd0, opcode.store};
+  assign dcache_size = opcode.size_byte ? 2'd0 : opcode.size_half ? 2'd1 : 2'd2;
+  assign dcache_uncached = mmu_mat == 2'd0;
+
+  assign mmu_vtag = addr[31:31-`TAG_WIDTH+1];
+  assign mmu_valid = valid && !mmu_ok_reg || cacop2_valid;
+
+  assign cacop2_ok = mmu_ok;
 
   always_comb begin
     if (opcode.size_byte) begin
       unique case (addr[1:0])
-        2'b00: mmu_wstrb = 4'b0001;
-        2'b01: mmu_wstrb = 4'b0010;
-        2'b10: mmu_wstrb = 4'b0100;
-        2'b11: mmu_wstrb = 4'b1000;
+        2'b00: dcache_wstrb = 4'b0001;
+        2'b01: dcache_wstrb = 4'b0010;
+        2'b10: dcache_wstrb = 4'b0100;
+        2'b11: dcache_wstrb = 4'b1000;
       endcase
-      mmu_wdata = {4{st_data[7:0]}};
+      dcache_wdata = {4{st_data[7:0]}};
     end else if (opcode.size_half) begin
       unique case (addr[1])
-        1'b0: mmu_wstrb = 4'b0011;
-        1'b1: mmu_wstrb = 4'b1100;
+        1'b0: dcache_wstrb = 4'b0011;
+        1'b1: dcache_wstrb = 4'b1100;
       endcase
-      mmu_wdata = {2{st_data[15:0]}};
+      dcache_wdata = {2{st_data[15:0]}};
     end else begin
-      mmu_wstrb = 4'b1111;
-      mmu_wdata = st_data;
+      dcache_wstrb = 4'b1111;
+      dcache_wdata = st_data;
     end
   end
 
   always_comb begin
     if (!valid) begin
-      have_excp = 1'b0;
-      excp_type = ALE;
+      if (cacop2_valid && mmu_page_fault) begin
+        have_excp = 1'b1;
+        excp_type = D_TLBR;
+      end else if (cacop2_valid && mmu_page_invalid) begin
+        have_excp = 1'b1;
+        excp_type = PIL;
+      end else begin
+        have_excp = 1'b0;
+        excp_type = ALE;
+      end
     end else if (opcode.size_half && addr[0] || opcode.size_word && addr[1:0] != 2'h0) begin
       have_excp = 1'b1;
       excp_type = ALE;
-    end else if (mmu_tlbr) begin
+    end else if (mmu_page_fault && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = D_TLBR;
-    end else if (mmu_pil) begin
+    end else if (mmu_page_invalid && opcode.load && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = PIL;
-    end else if (mmu_pis) begin
+    end else if (mmu_page_invalid && opcode.store && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = PIS;
-    end else if (mmu_ppi) begin
+    end else if (mmu_plv_fault && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = PPI;
-    end else if (mmu_pme) begin
+    end else if (mmu_page_dirty && opcode.store && (mmu_ok || mmu_ok_reg)) begin
       have_excp = 1'b1;
       excp_type = PME;
     end else begin
@@ -147,24 +142,24 @@ module lsu (
   end
 
   always_comb begin
-    if (opcode_buf.size_byte) begin
+    if (opcode_reg.size_byte) begin
       logic [7:0] load_b;
-      unique case (addr_lowbit_buf)
-        2'b00: load_b = mmu_rdata[7:0];
-        2'b01: load_b = mmu_rdata[15:8];
-        2'b10: load_b = mmu_rdata[23:16];
-        2'b11: load_b = mmu_rdata[31:24];
+      unique case (addr_lowbit_reg[1:0])
+        2'b00: load_b = dcache_rdata[7:0];
+        2'b01: load_b = dcache_rdata[15:8];
+        2'b10: load_b = dcache_rdata[23:16];
+        2'b11: load_b = dcache_rdata[31:24];
       endcase
-      ld_data_inner = {{24{load_b[7] && opcode_buf.load_sign}}, load_b};
-    end else if (opcode_buf.size_half) begin
+      ld_data = {{24{load_b[7] && opcode_reg.load_sign}}, load_b};
+    end else if (opcode_reg.size_half) begin
       logic [15:0] load_h;
-      unique case (addr_lowbit_buf[1])
-        1'b0: load_h = mmu_rdata[15:0];
-        1'b1: load_h = mmu_rdata[31:16];
+      unique case (addr_lowbit_reg[1])
+        1'b0: load_h = dcache_rdata[15:0];
+        1'b1: load_h = dcache_rdata[31:16];
       endcase
-      ld_data_inner = {{16{load_h[15] && opcode_buf.load_sign}}, load_h};
+      ld_data = {{16{load_h[15] && opcode_reg.load_sign}}, load_h};
     end else begin
-      ld_data_inner = mmu_rdata;
+      ld_data = dcache_rdata;
     end
   end
 

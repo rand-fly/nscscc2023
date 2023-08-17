@@ -8,6 +8,7 @@ module addr_trans (
     input dmw_t       dmw0,
     input dmw_t       dmw1,
 
+    output logic               use_tlb,
     output              [18:0] tlb_s_vppn,
     output                     tlb_s_va_bit12,
     output              [ 9:0] tlb_s_asid,
@@ -22,7 +23,6 @@ module addr_trans (
     output              plv_fault
 );
 
-  logic use_tlb;
 
   always_comb begin
     if (direct_access) begin
