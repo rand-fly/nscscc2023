@@ -25,20 +25,20 @@ module axi_bridge(
     output   reg    rready,
 
     output   wire[ 3:0] awid,
-    output   reg[31:0] awaddr,
-    output   reg[ 7:0] awlen,
-    output   reg[ 2:0] awsize,
+    output   wire[31:0] awaddr,
+    output   wire[ 7:0] awlen,
+    output   wire[ 2:0] awsize,
     output   wire[ 1:0] awburst,
     output   wire[ 1:0] awlock,
     output   wire[ 3:0] awcache,
     output   wire[ 2:0] awprot,
-    output   reg       awvalid,
+    output   wire       awvalid,
     input    wire       awready,
 
     output   wire[ 3:0] wid,
-    output   reg[31:0] wdata,
-    output   reg[ 3:0] wstrb,
-    output   reg       wlast,
+    output   wire[31:0] wdata,
+    output   wire[ 3:0] wstrb,
+    output   wire       wlast,
     output   reg       wvalid,
     input    wire      wready,
 
@@ -96,13 +96,13 @@ parameter RD_REQ_ST_RDY = 1'b1;
 parameter RD_RES_ST_IDLE = 1'b0;
 parameter RD_RES_ST_RX = 1'b1;
 
-parameter WR_ST_REQ_IDLE = 3'b000;
-parameter WR_ST_ADDR_RDY = 3'b001;
-parameter WR_ST_DATA_RDY = 3'b010;
-parameter WR_ST_RDY = 3'b011;
-parameter WR_ST_TX = 3'b100;
-parameter WR_ST_TX_WAIT = 3'b101;
-parameter WR_ST_WAIT_B = 3'b110;
+// parameter WR_ST_REQ_IDLE = 3'b000;
+// parameter WR_ST_ADDR_RDY = 3'b001;
+// parameter WR_ST_DATA_RDY = 3'b010;
+// parameter WR_ST_RDY = 3'b011;
+parameter WR_ST_TX_WAIT = 0;
+parameter WR_ST_TX      = 1;
+parameter WR_ST_WAIT_B  = 2;
 
 reg       read_requst_state;
 reg       read_respond_state;
@@ -133,7 +133,7 @@ wire                    write_buffer_last;
 
 assign write_buffer_empty = (write_countdown_reg == {(`OFFSET_WIDTH-2){1'b0}}) & !write_wait_enable;
 
-assign rd_requst_can_receive = rd_requst_state_is_empty & !(write_wait_enable & !(bvalid & bready));
+assign rd_requst_can_receive = rd_requst_state_is_empty & (!write_wait_enable | (bvalid & bready & write_queue_last));
 
 assign data_rd_rdy = rd_requst_can_receive;
 assign inst_rd_rdy = !data_rd_req & rd_requst_can_receive;
@@ -157,9 +157,9 @@ assign data_ret_valid =  rid[0] & rvalid;
 assign data_ret_last  =  rid[0] & rlast;
 assign data_ret_data  = rdata;
 
-assign data_wr_rdy = (write_state == WR_ST_REQ_IDLE);
+// assign data_wr_rdy = (write_state == WR_ST_REQ_IDLE);
 
-assign write_buffer_last = write_countdown_reg == 1;
+assign write_buffer_last = write_countdown_reg == 0;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -170,7 +170,7 @@ always @(posedge clk) begin
         RD_REQ_ST_IDLE: begin
             if (data_rd_req) begin
                 if (write_wait_enable) begin
-                    if (bid[0] & bvalid & bready) begin // TODO faster
+                    if (bid[0] & bvalid & bready & write_queue_last) begin // TODO faster
                         read_requst_state <= RD_REQ_ST_RDY;
                         arid <= 4'b1;
                         araddr <= data_rd_addr;
@@ -191,7 +191,7 @@ always @(posedge clk) begin
             else if (inst_rd_req) begin
                 if (write_wait_enable) begin
                 // if (write_wait_enable & (inst_rd_addr[31:`OFFSET_WIDTH] == awaddr[31:`OFFSET_WIDTH])) begin // wait for write only when in the same line
-                    if (bid[0] & bvalid & bready) begin
+                    if (bid[0] & bvalid & bready & write_queue_last) begin
                         read_requst_state <= RD_REQ_ST_RDY;
                         arid <= 4'b0;
                         araddr <= inst_rd_addr;
@@ -242,82 +242,123 @@ always @(posedge clk) begin
     endcase
 end
 
+`define WR_QUEUE_DEPTH 4
+`define WR_QUEUE_DEPTH_LOG2 2
+
+reg [`LINE_WIDTH-1:0]   write_queue_data [`WR_QUEUE_DEPTH-1:0];
+reg            [ 3:0]   write_queue_wstrb[`WR_QUEUE_DEPTH-1:0];
+reg            [ 2:0]   write_queue_type [`WR_QUEUE_DEPTH-1:0];
+reg            [31:0]   write_queue_addr [`WR_QUEUE_DEPTH-1:0];
+reg            [ 7:0]   write_queue_len  [`WR_QUEUE_DEPTH-1:0];
+reg            [ 2:0]   write_queue_size [`WR_QUEUE_DEPTH-1:0];
+
+reg [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_head;
+reg [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_tail;
+wire [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_tail_plus_1;
+wire [`WR_QUEUE_DEPTH_LOG2-1:0] write_queue_head_plus_1;
+
+wire write_queue_empty;
+wire write_queue_full;
+wire write_queue_last;
+
+assign write_queue_tail_plus_1 = write_queue_tail + 1;
+assign write_queue_head_plus_1 = write_queue_head + 1;
+
+assign write_queue_empty = (write_queue_head == write_queue_tail);
+assign write_queue_full = (write_queue_head == write_queue_tail_plus_1);
+assign write_queue_last = (write_queue_tail == write_queue_head_plus_1);
+
+assign data_wr_rdy = ~write_queue_full;
+
+wire [2:0] wtype;
+wire [`LINE_WIDTH-1:0] write_queue_data_line;
+assign write_queue_data_line = write_queue_data[write_queue_head];
+
+assign wdata    = write_queue_data_line[31:0];
+assign wstrb    = write_queue_wstrb[write_queue_head];
+assign wtype    = write_queue_type[write_queue_head];
+assign awaddr   = write_queue_addr[write_queue_head];
+assign awsize   = write_queue_size[write_queue_head];
+assign awlen    = write_queue_len[write_queue_head];
+
+assign awvalid  = !write_queue_empty & (write_state == WR_ST_TX_WAIT);
+assign wlast    = write_buffer_last & (write_state == WR_ST_TX);
+
 always @(posedge clk) begin
     if (reset) begin
-        write_state <= WR_ST_REQ_IDLE;
-        awvalid <= 1'b0;
-        wvalid  <= 1'b0;
-        wlast   <= 1'b0;
-        bready  <= 1'b0;
-        
+        write_state <= WR_ST_TX_WAIT;
         write_countdown_reg <= 0;
         write_buffer_data   <= 0;
+        write_queue_head <= 0;
+        write_queue_tail <= 0;
     end
-    else case (write_state)
-        WR_ST_REQ_IDLE: begin
-            if (data_wr_req) begin
-                write_state <= WR_ST_TX_WAIT;
-                //end
-                awaddr  <= data_wr_addr;
-                awsize  <= data_real_wr_size;
-                awlen   <= data_real_wr_len;
-                awvalid <= 1'b1;
-                wdata   <= data_wr_data[31:0];
-                wstrb   <= data_wr_wstrb;
-
-                write_buffer_data <= {32'b0, data_wr_data[`LINE_WIDTH-1:32]};
-
-                if (data_wr_type == 3'b100) begin
+    else
+        if (!write_queue_full & data_wr_req) begin
+            write_queue_data[write_queue_tail] <= data_wr_data;
+            write_queue_wstrb[write_queue_tail] <= data_wr_wstrb;
+            write_queue_type[write_queue_tail] <= data_wr_type;
+            write_queue_addr[write_queue_tail] <= data_wr_addr;
+            write_queue_len[write_queue_tail] <= data_real_wr_len;
+            write_queue_size[write_queue_tail] <= data_real_wr_size;
+            write_queue_tail <= write_queue_tail + 1;
+        end
+        
+        case (write_state)
+            WR_ST_TX_WAIT: begin
+                if (awready & !write_queue_empty) begin
+                    write_state <= WR_ST_TX;
+                    wvalid  <= 1'b1;
+                end
+                if (wtype == 3'b100) begin
                     write_countdown_reg <= {(`OFFSET_WIDTH-2){1'b1}};
                 end
                 else begin
                     write_countdown_reg <= 0;
-                    wlast <= 1'b1;
                 end
-            end
-        end
-        WR_ST_TX_WAIT: begin
-            if (awready) begin
-                write_state <= WR_ST_TX;
-                awvalid <= 1'b0;
-		        wvalid  <= 1'b1;
-            end
-        end 
-        WR_ST_TX: begin
-            if (wready) begin
-                if (wlast) begin
-                    write_state <= WR_ST_WAIT_B;
-                    wvalid <= 1'b0;
-                    wlast <= 1'b0;
-        	    bready <= 1'b1;
-                end
-                else begin
-                    if (write_buffer_last) begin
-                        wlast <= 1'b1;
+            end 
+            WR_ST_TX: begin
+                if (wready) begin
+                    if (wlast) begin
+                        write_state <= WR_ST_WAIT_B;
+                        wvalid <= 1'b0;
+                        bready <= 1'b1;
                     end
-                
-                    write_state <= WR_ST_TX;
-    
-                    wdata   <= write_buffer_data[31:0];
-                    wvalid  <= 1'b1;
-                    write_buffer_data <= {32'b0, write_buffer_data[`LINE_WIDTH-1:32]};
-                    write_countdown_reg  <= write_countdown_reg - 1;
+                    else begin
+                        write_state <= WR_ST_TX;
+        
+                        wvalid  <= 1'b1;
+                        write_queue_data[write_queue_head] <= {32'b0, write_queue_data_line[`LINE_WIDTH-1:32]};
+                        write_countdown_reg  <= write_countdown_reg - 1;
+                    end
                 end
             end
-        end
-        WR_ST_WAIT_B: begin
-            if (bid[0] & bvalid & bready) begin
-                write_state <= WR_ST_REQ_IDLE;
-                bready <= 1'b0;
+            WR_ST_WAIT_B: begin
+                if (bid[0] & bvalid & bready) begin
+                    write_state <= WR_ST_TX_WAIT;
+                    bready <= 1'b0;
+                    write_queue_head <= write_queue_head + 1;
+                end
             end
-        end
-        default: begin
-            write_state <= WR_ST_REQ_IDLE;
-        end
+            default: begin
+                write_state <= WR_ST_TX_WAIT;
+            end
     endcase
 end
 
-assign write_wait_enable = !(write_state == WR_ST_REQ_IDLE);
+assign write_wait_enable = !write_queue_empty;
+
+// `define BRIDGE_DBG
+`define BRIDGE_DBG_ADDR 32'h000d3b68
+
+`ifdef BRIDGE_DBG
+always @(posedge clk) begin
+    if (!write_queue_full & data_wr_req) begin
+        if (data_wr_addr == `BRIDGE_DBG_ADDR) begin
+            $display("[%t] axi_bridge write %x: %x", $time, data_wr_addr, data_wr_data);
+        end
+    end
+end
+`endif
 
 
 // `define PERF_COUNT
