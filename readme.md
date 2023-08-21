@@ -1,9 +1,7 @@
-# 配置方法
+# MeowCPU
 
-## 龙芯实验环境
+2023年龙芯杯LoongArch赛道作品。顺序双发射七级流水线。决赛频率90M，IPC比值1.275。
 
-将实验环境的 `myCPU` 设置为本仓库的 `myCPU` 的符号链接，并用本仓库中 `soc_axi` 的内容覆盖实验环境中的 `mycpu_env/soc_axi`。在 Vivado 项目中添加 `myCPU` 中的源文件和 IP 核。
+本项目仍存在一定设计缺陷。
 
-## chiplab
-
-参考 [Chiplab用户手册](https://chiplab.readthedocs.io/zh/latest/Quick-Start.html) 完成配置，将 `IP/myCPU` 设置为本仓库的 `myCPU` 的符号链接。注意设置 `chip/config-generator.mak` 中的 `CPU_2CMT` 为 `y`。
+soc_axi目录下包含了支持双发射的功能测试trace环境。
